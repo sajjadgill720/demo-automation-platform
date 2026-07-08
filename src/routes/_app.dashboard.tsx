@@ -19,7 +19,7 @@ import {
   Tooltip,
 } from "recharts";
 
-export const Route = createFileRoute("/_app/")({
+export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({
     meta: [
       { title: "Dashboard — DataQuartz AI Demo Automation" },

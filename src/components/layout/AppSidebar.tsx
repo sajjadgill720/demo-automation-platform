@@ -3,7 +3,7 @@ import { LayoutDashboard, PlusCircle, Mic, Radio, Settings, Sparkles } from "luc
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/new-demo", label: "New Demo", icon: PlusCircle },
   { to: "/voice-agent", label: "Voice Agents", icon: Mic },
   { to: "/active-demos", label: "Active Demos", icon: Radio },
@@ -16,8 +16,8 @@ export function AppSidebar() {
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
       <div className="flex items-center gap-2 px-5 pt-6 pb-8">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-          <Sparkles className="h-4 w-4 text-primary-foreground" />
+        <div className="h-8 w-8 rounded border border-dashed border-amber-500/60 dark:border-amber-500/40 flex items-center justify-center bg-amber-500/5 text-amber-500 font-bold text-xs uppercase tracking-tight shadow-sm shadow-amber-500/10 shrink-0">
+          DQ
         </div>
         <div>
           <p className="text-sm font-semibold leading-tight">DataQuartz</p>
@@ -27,7 +27,8 @@ export function AppSidebar() {
 
       <nav className="flex-1 space-y-1 px-3">
         {nav.map((item) => {
-          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+          const active =
+            item.to === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.to);
           return (
             <Link
               key={item.to}

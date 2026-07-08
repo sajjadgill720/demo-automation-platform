@@ -9,15 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as DemoPreviewRouteImport } from './routes/demo-preview'
 import { Route as AppRouteImport } from './routes/_app'
-import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppVoiceAgentRouteImport } from './routes/_app.voice-agent'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppResearchProgressRouteImport } from './routes/_app.research-progress'
 import { Route as AppNewDemoRouteImport } from './routes/_app.new-demo'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppActiveDemosRouteImport } from './routes/_app.active-demos'
 
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DemoPreviewRoute = DemoPreviewRouteImport.update({
   id: '/demo-preview',
   path: '/demo-preview',
@@ -27,10 +34,10 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppVoiceAgentRoute = AppVoiceAgentRouteImport.update({
   id: '/voice-agent',
@@ -52,6 +59,11 @@ const AppNewDemoRoute = AppNewDemoRouteImport.update({
   path: '/new-demo',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppActiveDemosRoute = AppActiveDemosRouteImport.update({
   id: '/active-demos',
   path: '/active-demos',
@@ -59,72 +71,93 @@ const AppActiveDemosRoute = AppActiveDemosRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof IndexRoute
   '/demo-preview': typeof DemoPreviewRoute
+  '/portal': typeof PortalRoute
   '/active-demos': typeof AppActiveDemosRoute
+  '/dashboard': typeof AppDashboardRoute
   '/new-demo': typeof AppNewDemoRoute
   '/research-progress': typeof AppResearchProgressRoute
   '/settings': typeof AppSettingsRoute
   '/voice-agent': typeof AppVoiceAgentRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/demo-preview': typeof DemoPreviewRoute
+  '/portal': typeof PortalRoute
   '/active-demos': typeof AppActiveDemosRoute
+  '/dashboard': typeof AppDashboardRoute
   '/new-demo': typeof AppNewDemoRoute
   '/research-progress': typeof AppResearchProgressRoute
   '/settings': typeof AppSettingsRoute
   '/voice-agent': typeof AppVoiceAgentRoute
-  '/': typeof AppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/demo-preview': typeof DemoPreviewRoute
+  '/portal': typeof PortalRoute
   '/_app/active-demos': typeof AppActiveDemosRoute
+  '/_app/dashboard': typeof AppDashboardRoute
   '/_app/new-demo': typeof AppNewDemoRoute
   '/_app/research-progress': typeof AppResearchProgressRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/voice-agent': typeof AppVoiceAgentRoute
-  '/_app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/demo-preview'
+    | '/portal'
     | '/active-demos'
+    | '/dashboard'
     | '/new-demo'
     | '/research-progress'
     | '/settings'
     | '/voice-agent'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/demo-preview'
+    | '/portal'
     | '/active-demos'
+    | '/dashboard'
     | '/new-demo'
     | '/research-progress'
     | '/settings'
     | '/voice-agent'
-    | '/'
   id:
     | '__root__'
+    | '/'
     | '/_app'
     | '/demo-preview'
+    | '/portal'
     | '/_app/active-demos'
+    | '/_app/dashboard'
     | '/_app/new-demo'
     | '/_app/research-progress'
     | '/_app/settings'
     | '/_app/voice-agent'
-    | '/_app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   DemoPreviewRoute: typeof DemoPreviewRoute
+  PortalRoute: typeof PortalRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/demo-preview': {
       id: '/demo-preview'
       path: '/demo-preview'
@@ -139,12 +172,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/': {
-      id: '/_app/'
+    '/': {
+      id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/voice-agent': {
       id: '/_app/voice-agent'
@@ -174,6 +207,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNewDemoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/active-demos': {
       id: '/_app/active-demos'
       path: '/active-demos'
@@ -186,27 +226,29 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppActiveDemosRoute: typeof AppActiveDemosRoute
+  AppDashboardRoute: typeof AppDashboardRoute
   AppNewDemoRoute: typeof AppNewDemoRoute
   AppResearchProgressRoute: typeof AppResearchProgressRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppVoiceAgentRoute: typeof AppVoiceAgentRoute
-  AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppActiveDemosRoute: AppActiveDemosRoute,
+  AppDashboardRoute: AppDashboardRoute,
   AppNewDemoRoute: AppNewDemoRoute,
   AppResearchProgressRoute: AppResearchProgressRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppVoiceAgentRoute: AppVoiceAgentRoute,
-  AppIndexRoute: AppIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   DemoPreviewRoute: DemoPreviewRoute,
+  PortalRoute: PortalRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

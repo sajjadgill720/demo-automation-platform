@@ -1,0 +1,1248 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState, useRef } from "react";
+import {
+  Mic,
+  PhoneOff,
+  ArrowRight,
+  Sparkles,
+  CheckCircle,
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  Sun,
+  Moon,
+  Plus,
+  Database,
+  Truck,
+  Cloud,
+  Ship,
+  Compass,
+  Server,
+  Route as RouteIcon,
+  Target,
+  FileText,
+  Lock,
+  MessageCircle,
+  Clock,
+  HelpCircle,
+  ExternalLink,
+  Bot,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { submitLead } from "@/lib/leads";
+import { ProgressTimeline } from "@/components/common/ProgressTimeline";
+import { researchSteps } from "@/lib/mock-data";
+import { useTheme } from "@/hooks/use-theme";
+import { cn } from "@/lib/utils";
+
+/* ── Shared class constants ── */
+const INPUT_CLS = "w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors";
+const LABEL_CLS = "text-[10px] font-mono uppercase tracking-wider text-foreground/70";
+const SELECT_CLS = "w-full bg-secondary border border-border px-3 py-2 text-foreground/80 focus:outline-none focus:border-primary/65 font-mono text-xs cursor-pointer transition-colors";
+
+/* ── Integration cards data ── */
+interface IntegrationCard {
+  icon: LucideIcon;
+  label: string;
+  displayName: string;
+  borderR?: boolean;
+  borderB?: boolean;
+  plusHidden?: string;
+}
+
+const INTEGRATION_CARDS: IntegrationCard[] = [
+  { icon: Truck, label: "TMS_LOGISTICS", displayName: "TMS / Logistics", borderR: true, borderB: true },
+  { icon: Cloud, label: "SALESFORCE_CRM", displayName: "Salesforce CRM", borderB: true, plusHidden: "hidden md:block" },
+  { icon: Ship, label: "DESCARTES", displayName: "Descartes", borderR: true, borderB: true },
+  { icon: Compass, label: "TRIMBLE", displayName: "Trimble", borderB: true },
+  { icon: Server, label: "SAP_ERP", displayName: "SAP ERP", borderR: true, plusHidden: "md:hidden" },
+  { icon: RouteIcon, label: "ALPEGA", displayName: "Alpega", borderR: true },
+  { icon: Target, label: "HUBSPOT", displayName: "HubSpot", borderR: true },
+  { icon: Database, label: "ORACLE_NETSUITE", displayName: "Oracle NetSuite" },
+];
+
+/* ── FAQ data ── */
+const FAQ_ITEMS = [
+  { q: "Is this a sales call?", a: "No. If your requirements need clarification, you'll speak with an AI assistant — not a salesperson. It's a 2-minute chat focused purely on understanding your workflow so we build the right demo." },
+  { q: "How long does the whole process take?", a: "Under 5 minutes total. The form takes 60 seconds, the optional AI clarification call averages 2 minutes, and demo generation completes in about 3 minutes." },
+  { q: "What if I don't like the demo?", a: "We'll rebuild it — free. Just tell us what to adjust and we regenerate a new version tailored to your updated requirements." },
+  { q: "Who sees my data?", a: "Nobody outside of the demo generation pipeline. Your data is encrypted in transit and at rest, stored in EU-hosted infrastructure, and automatically deleted after 30 days." },
+  { q: "Do I need to install anything?", a: "No. Everything runs in your browser — the voice call, the demo portal, and the dashboard. No downloads, no plugins, no SDKs." },
+  { q: "What does it cost?", a: "Free to try. You can generate your first demo at no cost. Enterprise pricing with custom integrations is available on request." },
+];
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "DataQuartz — Tailored Sales Demos in Minutes" },
+      {
+        name: "description",
+        content:
+          "Stop wasting days preparing sales demos. DataQuartz builds tailored client demos in minutes from your raw use case inputs.",
+      },
+    ],
+  }),
+  component: LandingPage,
+});
+
+function LandingPage() {
+  const { theme, toggleTheme } = useTheme();
+
+
+  // Vapi integration states
+  const [vapi, setVapi] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "on-call" | "ended">("idle");
+  const [voiceForm, setVoiceForm] = useState({
+    name: "",
+    email: "",
+    company: "",
+    urgency: "exploring",
+  });
+  const [isVoiceFormReady, setIsVoiceFormReady] = useState(false);
+
+  // Form pathway states
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    company: "",
+    website: "",
+    problem_text: "",
+    tools: "",
+    persona: "driver_dispatch",
+    language: "en-US",
+    volume: "under_5k",
+    urgency: "exploring",
+  });
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
+
+  // Pipeline simulation states
+  const [isFormBuilding, setIsFormBuilding] = useState(false);
+  const [formBuildStep, setFormBuildStep] = useState(0);
+  const [formLogIdx, setFormLogIdx] = useState(0);
+  const [formBuildCompany, setFormBuildCompany] = useState("");
+  const [formBuildProblem, setFormBuildProblem] = useState("");
+
+  // Refs for scrolling
+  const intakeRef = useRef<HTMLDivElement>(null);
+
+  // Form/Voice Build Progress Timers
+  useEffect(() => {
+    if (!isFormBuilding) return;
+
+    const stepInterval = setInterval(() => {
+      setFormBuildStep((prev) => {
+        if (prev >= 7) {
+          clearInterval(stepInterval);
+          setIsFormBuilding(false);
+          setFormSubmitted(true); // Show final success screen!
+          return 7;
+        }
+        return prev + 1;
+      });
+    }, 1500); // 1.5s per step (Total 10.5 seconds)
+
+    return () => clearInterval(stepInterval);
+  }, [isFormBuilding]);
+
+  useEffect(() => {
+    if (!isFormBuilding) return;
+
+    const logInterval = setInterval(() => {
+      setFormLogIdx((prev) => {
+        if (prev >= 10) {
+          clearInterval(logInterval);
+          return 10;
+        }
+        return prev + 1;
+      });
+    }, 1000); // 1.0s per log line
+
+    return () => clearInterval(logInterval);
+  }, [isFormBuilding]);
+
+  const getBuildLogLines = (company: string, problem: string) => [
+    { t: "0.2s", msg: `Initializing builder sequence for "${company}"…` },
+    {
+      t: "0.8s",
+      msg: `GET https://${company.toLowerCase().replace(/[^a-z0-9]/g, "") || "unknown"}.com…`,
+    },
+    { t: "1.4s", msg: `Crawling site structure & compliance headers for ${company}…` },
+    { t: "2.1s", msg: `Identified tools schema: Salesforce, Descartes, Trimble…` },
+    { t: "2.8s", msg: `Target compliance requirement parsed: "${problem.substring(0, 50)}..."` },
+    { t: "3.6s", msg: `Provisioning Vapi voice agent in EU-Frankfurt cluster…` },
+    { t: "4.5s", msg: `Synthesizing driver/dispatch dialogues in English & German…` },
+    { t: "5.4s", msg: `Deploying mock database schemas for shifts & schedules…` },
+    { t: "6.3s", msg: `Compliance human gate verification check [OK]…` },
+    { t: "7.1s", msg: `Interactive preview bundle created successfully (DMO-8024).` },
+  ];
+
+  // Dynamically load Vapi to prevent SSR crashes (since Vapi uses browser APIs)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const VAPI_PUBLIC_KEY = (import.meta.env.VITE_VAPI_PUBLIC_KEY as string) || "";
+    if (!VAPI_PUBLIC_KEY) {
+      console.warn("VITE_VAPI_PUBLIC_KEY is not defined in environment variables.");
+    }
+
+    import("@vapi-ai/web").then((VapiModule) => {
+      try {
+        const VapiClass = VapiModule.default;
+        const vapiInstance = new VapiClass(VAPI_PUBLIC_KEY);
+
+        vapiInstance.on("call-start", () => {
+          setCallStatus("on-call");
+          toast.success("Connected to advisor agent.");
+        });
+
+        vapiInstance.on("call-end", () => {
+          setCallStatus("ended");
+          toast.info("Call completed.");
+          // Trigger lead submission on call end
+          submitVoiceLead();
+        });
+
+        vapiInstance.on("error", (err: any) => {
+          // eslint-disable-line @typescript-eslint/no-explicit-any
+          console.error("Vapi error:", err);
+          setCallStatus("idle");
+          toast.error("Vapi agent connection failed.");
+        });
+
+        setVapi(vapiInstance);
+      } catch (err) {
+        console.error("Failed to initialize Vapi instance:", err);
+      }
+    });
+
+    return () => {
+      if (vapi) {
+        vapi.stop();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleScrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Submit standard Form Lead
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email || !formData.company || !formData.problem_text) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    setFormSubmitting(true);
+    const submittedCompany = formData.company;
+    const submittedProblem = formData.problem_text;
+    setFormBuildCompany(submittedCompany);
+    setFormBuildProblem(submittedProblem);
+
+    try {
+      const data = await submitLead({
+        data: {
+          name: formData.name,
+          email: formData.email,
+          company: formData.company,
+          website: formData.website || undefined,
+          problem_text: formData.problem_text,
+          tools: formData.tools || undefined,
+          persona: formData.persona,
+          language: formData.language,
+          volume: formData.volume,
+          source: "form",
+          urgency: formData.urgency,
+        },
+      });
+
+      if (data.success) {
+        // Save details to localStorage for personalization on the /demo-preview page
+        localStorage.setItem("convoa_demo_preview_data", JSON.stringify({
+          name: formData.name,
+          company: formData.company,
+          problem: formData.problem_text,
+          language: formData.language === "en-US" ? "English (US Accent)" : formData.language === "en-GB" ? "English (UK Accent)" : formData.language === "de-DE" ? "German (DE Native)" : "Spanish (ES Native)",
+          tools: formData.tools || "Not specified",
+        }));
+
+        setIsFormBuilding(true);
+        setFormBuildStep(0);
+        setFormLogIdx(0);
+        toast.success("Requirements submitted successfully!");
+        setFormData({
+          name: "",
+          email: "",
+          company: "",
+          website: "",
+          problem_text: "",
+          tools: "",
+          persona: "driver_dispatch",
+          language: "en-US",
+          volume: "under_5k",
+          urgency: "exploring",
+        });
+      } else {
+        toast.error((data as any).error || "Failed to submit lead."); // eslint-disable-line @typescript-eslint/no-explicit-any
+      }
+    } catch (err) {
+      toast.error("Server connection failed. Please try again.");
+      console.error(err);
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  // Start Vapi call
+  const handleStartVoiceCall = () => {
+    if (!voiceForm.name || !voiceForm.email || !voiceForm.company) {
+      toast.error("Please enter your name, email, and company before calling.");
+      return;
+    }
+
+    if (!vapi) {
+      toast.error("Vapi SDK is still loading. Please try again in a moment.");
+      return;
+    }
+
+    const VAPI_ASSISTANT_ID = (import.meta.env.VITE_VAPI_ASSISTANT_ID as string) || "";
+    if (!VAPI_ASSISTANT_ID) {
+      toast.error("VITE_VAPI_ASSISTANT_ID environment variable is missing.");
+      return;
+    }
+
+    setCallStatus("connecting");
+    try {
+      vapi.start(VAPI_ASSISTANT_ID);
+    } catch (err) {
+      console.error("Vapi start call failed:", err);
+      setCallStatus("idle");
+      toast.error("Failed to start voice call.");
+    }
+  };
+
+  // End Vapi call
+  const handleEndVoiceCall = () => {
+    if (vapi) {
+      vapi.stop();
+    }
+  };
+
+  // Submit Voice Lead summary automatically on call-end
+  const submitVoiceLead = async () => {
+    const submittedCompany = voiceForm.company;
+    setFormBuildCompany(submittedCompany);
+    setFormBuildProblem("Client spoke with AI Solutions Advisor via Vapi voice agent.");
+
+    try {
+      // Save details to localStorage for personalization on the /demo-preview page
+      localStorage.setItem("convoa_demo_preview_data", JSON.stringify({
+        name: voiceForm.name,
+        company: voiceForm.company,
+        problem: "Spoke with AI Solutions Advisor via Vapi voice call.",
+        language: "English (US Accent)",
+        tools: "Vapi Voice Integration",
+      }));
+
+      await submitLead({
+        data: {
+          name: voiceForm.name,
+          email: voiceForm.email,
+          company: voiceForm.company,
+          problem_text:
+            "Client spoke with AI Solutions Advisor via Vapi voice agent. (Call completed successfully).",
+          source: "voice",
+          urgency: voiceForm.urgency,
+        },
+      });
+      setIsVoiceFormReady(false);
+      setVoiceForm({ name: "", email: "", company: "", urgency: "exploring" });
+
+      setIsFormBuilding(true);
+      setFormBuildStep(0);
+      setFormLogIdx(0);
+    } catch (err) {
+      console.error("Failed to submit voice lead:", err);
+    }
+  };
+
+
+
+  return (
+    <div
+      className={cn(
+        "skydda-sentinel-theme min-h-screen bg-background text-foreground font-sans antialiased overflow-x-hidden selection:bg-primary/10 selection:text-primary relative",
+        theme
+      )}
+    >
+      {/* Dynamic Background — Fine-Line Grid & Ambient Glows */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {/* Fine-line crosshatch grid */}
+        <div
+          className="absolute inset-0 opacity-[0.25] dark:opacity-[0.08]"
+          style={{
+            backgroundImage: [
+              `linear-gradient(to right, var(--border) 1px, transparent 1px)`,
+              `linear-gradient(to bottom, var(--border) 1px, transparent 1px)`,
+            ].join(", "),
+            backgroundSize: "64px 64px",
+          }}
+        />
+
+        {/* Ambient colorful cyber glow spheres */}
+        <div className="absolute top-[8%] left-[15%] w-[30rem] h-[30rem] bg-amber-500/[0.05] dark:bg-amber-500/[0.03] blur-[120px] rounded-full" style={{ animationDuration: '8s' }} />
+        <div className="absolute top-[35%] right-[10%] w-[40rem] h-[40rem] bg-violet-500/[0.04] dark:bg-violet-500/[0.025] blur-[140px] rounded-full" style={{ animationDuration: '12s' }} />
+        <div className="absolute bottom-[15%] left-[8%] w-[35rem] h-[35rem] bg-emerald-500/[0.035] dark:bg-emerald-500/[0.02] blur-[110px] rounded-full" />
+        <div className="absolute top-[60%] right-[35%] w-[25rem] h-[25rem] bg-primary/[0.04] dark:bg-primary/[0.02] blur-[100px] rounded-full" />
+      </div>
+
+      {/* 1. Global Page Guidelines */}
+      <div className="pointer-events-none fixed inset-0 z-50">
+        <div className="mx-auto h-full max-w-7xl">
+          <div className="relative h-full">
+            <div className="absolute left-0 top-0 h-full w-px bg-border/30" />
+            <div className="absolute right-0 top-0 h-full w-px bg-border/30" />
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Navigation Header */}
+      <header className="absolute top-0 left-0 right-0 z-40 bg-transparent border-0 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-6">
+          <Link to="/" className="flex items-center gap-3 text-foreground">
+            <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary text-foreground font-bold text-xs uppercase tracking-tight">
+              DQ
+            </div>
+            <span className="uppercase tracking-widest text-sm font-semibold font-mono">
+              DataQuartz
+            </span>
+          </Link>
+
+
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={toggleTheme}
+              className="p-2 border border-border hover:bg-secondary text-foreground transition-colors cursor-pointer bg-transparent"
+              aria-label="Toggle Theme"
+            >
+              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={() => handleScrollTo(intakeRef)}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-mono font-medium text-xs tracking-wider uppercase px-4 py-2 cursor-pointer border-0"
+            >
+              Build My Demo
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* 3. Hero Section */}
+      <section className="relative h-screen w-full overflow-hidden flex items-center border-b border-border/30 pt-20 px-6">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30 dark:opacity-15"
+          style={{
+            backgroundImage: "url('/images/hero-bg.jpg')",
+          }}
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/80 to-background"
+        />
+
+        {/* Radial vignette for focal depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,var(--background)_75%)] z-[1]" />
+
+        <div className="relative z-10 max-w-5xl mx-auto w-full text-center flex flex-col items-center justify-center space-y-8">
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="inline-flex items-center gap-3 border border-border bg-secondary/50 px-6 py-2.5 relative overflow-hidden backdrop-blur-sm"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+            </span>
+            <span className="font-mono uppercase tracking-widest text-[11px] sm:text-xs text-foreground/80">
+              This isn't a pitch deck. It's your solution, running.
+            </span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full"
+              animate={{ translateX: ["-100%", "100%"] }}
+              transition={{ repeat: Infinity, duration: 4, ease: "linear", repeatDelay: 1 }}
+            />
+          </motion.div>
+
+          {/* Main Headline — outcome-focused */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.15] text-foreground max-w-5xl">
+            {"Never Miss Another Customer Call. See Your AI Receptionist in Action — Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
+              <motion.span
+                key={i}
+                initial={{ filter: "blur(10px)", opacity: 0 }}
+                whileInView={{ filter: "blur(0px)", opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
+                className="inline-block mr-[0.25em] font-sans text-foreground"
+              >
+                {word}
+              </motion.span>
+            ))}
+          </h1>
+
+          <p className="text-sm md:text-base text-foreground/70 max-w-2xl leading-relaxed font-sans">
+            Tell us about your business. If we need more detail, our AI will ask — no forms to babysit. Then watch a demo built specifically for your calls, your industry, your customers.
+          </p>
+
+          {/* Persona targeting */}
+          <p className="text-xs text-foreground/50 font-mono uppercase tracking-widest">
+            Built for sales engineers, demo teams, and SaaS founders
+          </p>
+
+          <div className="flex items-center gap-4 flex-wrap justify-center">
+            <button
+              onClick={() => handleScrollTo(intakeRef)}
+              className="bg-primary text-primary-foreground hover:bg-primary/95 transition-all px-8 py-4 text-xs font-semibold uppercase tracking-wider flex items-center gap-2.5 cursor-pointer border-0"
+            >
+              Build My Demo
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <span className="text-[10px] text-foreground/40 font-mono flex items-center gap-1.5">
+              <Clock className="h-3 w-3" /> Under 5 minutes total
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Integrations Section (rebranded from fake logos) */}
+      <section className="relative w-full border-b border-border/30 py-20 px-6 bg-secondary/10">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="mb-4 text-center font-normal text-4xl text-foreground tracking-tight md:text-5xl">
+            Connects to your existing stack
+          </h2>
+          <p className="text-sm text-foreground/60 text-center max-w-lg mx-auto mb-12 font-sans">
+            Native connectors for the tools your operations team already uses. Go live in under 3 weeks.
+          </p>
+
+          <div className="relative grid grid-cols-2 border-x border-border/30 md:grid-cols-4">
+            <div className="-translate-x-1/2 -top-px pointer-events-none absolute left-1/2 w-screen border-t border-border/30" />
+
+            {INTEGRATION_CARDS.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={card.label}
+                  className={cn(
+                    "group flex flex-col items-center justify-center p-8 relative bg-background hover:bg-secondary/15 transition-all duration-300 cursor-pointer border-border/30",
+                    card.borderR && "border-r",
+                    card.borderB && "border-b",
+                  )}
+                >
+                  <div className="flex items-center justify-center h-12 w-12 border border-border bg-secondary/40 text-foreground/60 mb-4 group-hover:text-amber-500 group-hover:border-amber-500/50 group-hover:bg-amber-500/5 transition-all duration-300">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="font-semibold font-mono text-[11px] uppercase tracking-wider text-foreground/70 group-hover:text-foreground transition-colors text-center">
+                    {card.displayName}
+                  </span>
+                  {card.plusHidden !== undefined && (
+                    <Plus
+                      className={cn("-right-[12.5px] -bottom-[12.5px] absolute z-10 size-6 text-border/30", card.plusHidden)}
+                      strokeWidth={1}
+                    />
+                  )}
+                  {card.plusHidden === undefined && card.borderR && card.borderB && (
+                    <Plus
+                      className="-right-[12.5px] -bottom-[12.5px] absolute z-10 size-6 text-border/30"
+                      strokeWidth={1}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="-translate-x-1/2 -bottom-px pointer-events-none absolute left-1/2 w-screen border-b border-border/30" />
+          </div>
+        </div>
+      </section>
+
+      {/* 5. How It Works — 3-Step Process (C1, I6) */}
+      <section className="w-full bg-background py-24 md:py-32 border-b border-border/30">
+        <div className="mx-auto max-w-7xl px-6 md:px-12 lg:px-16 space-y-14">
+          <div className="text-center space-y-4">
+            <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
+              <div className="w-2.5 h-2.5 bg-amber-500" />
+              <span className="text-xs font-semibold text-foreground/80 font-mono tracking-wide uppercase">
+                How It Works
+              </span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-normal text-foreground tracking-tight">
+              How Your Demo Gets Built
+            </h2>
+            <p className="text-sm text-foreground/60 max-w-lg mx-auto font-sans">
+              Three steps. Under 5 minutes. No sales pitch.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-border">
+            {/* Step 1 */}
+            <div className="p-8 md:border-r border-b md:border-b-0 border-border relative">
+              <div className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">01</div>
+              <div className="flex h-10 w-10 items-center justify-center border border-amber-500/30 bg-amber-500/10 text-amber-500 mb-5">
+                <FileText className="h-4 w-4" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground font-mono uppercase tracking-tight">Describe Your Challenge</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                Fill out a short form with your workflow pain points. Takes 60 seconds.
+              </p>
+            </div>
+            {/* Step 2 */}
+            <div className="p-8 md:border-r border-b md:border-b-0 border-border relative">
+              <div className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">02</div>
+              <div className="flex h-10 w-10 items-center justify-center border border-violet-500/30 bg-violet-500/10 text-violet-500 mb-5">
+                <Mic className="h-4 w-4" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground font-mono uppercase tracking-tight">Quick AI Clarification</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                If anything's unclear, our AI assistant calls for a 2-minute voice chat — just to nail the details. No selling, no pressure.
+              </p>
+              <span className="inline-block mt-3 text-[10px] font-mono text-foreground/40 uppercase tracking-widest border border-border px-2 py-0.5">
+                Only if needed
+              </span>
+            </div>
+            {/* Step 3 */}
+            <div className="p-8 relative">
+              <div className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">03</div>
+              <div className="flex h-10 w-10 items-center justify-center border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 mb-5">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground font-mono uppercase tracking-tight">Your Live Demo Is Ready</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                In under 3 minutes, we deploy a personalized voice agent + dashboard. You'll get an instant link — no email wait, no sales follow-up unless you ask.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Proof Section — See a sample demo (I3, I4) */}
+      <section className="w-full bg-secondary/10 py-24 md:py-28 border-b border-border/30">
+        <div className="mx-auto max-w-5xl px-6 text-center space-y-8">
+          <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
+            <div className="w-2.5 h-2.5 bg-emerald-500" />
+            <span className="text-xs font-semibold text-foreground/80 font-mono tracking-wide uppercase">
+              See It In Action
+            </span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-foreground tracking-tight">
+            Don't take our word for it. See a real demo.
+          </h2>
+          <p className="text-sm text-foreground/60 max-w-lg mx-auto font-sans">
+            This is a real personalized demo we built for a logistics company. It took 2 minutes and 47 seconds to generate.
+          </p>
+          <div className="border border-border bg-card p-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-violet-500 to-emerald-500" />
+            <div className="flex flex-col items-center gap-6 py-8">
+              <div className="flex h-16 w-16 items-center justify-center border border-border bg-secondary text-foreground">
+                <Sparkles className="h-7 w-7" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-foreground font-medium text-lg font-sans">Interactive Demo Portal</p>
+                <p className="text-sm text-muted-foreground">Live voice agent + dashboard, personalized for ABC Logistics</p>
+              </div>
+              <a
+                href="/demo-preview"
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 text-xs font-semibold uppercase tracking-wider hover:bg-primary/90 transition-all border-0 font-mono"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> View Sample Demo
+              </a>
+              <p className="text-[10px] text-foreground/40 font-mono">
+                No login required · Opens in a new page
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Intake / Simulation Section */}
+      <section
+        ref={intakeRef}
+        className="bg-background py-24 px-6 border-b border-border relative"
+      >
+        <div className="max-w-7xl mx-auto space-y-16">
+          <div className="text-center space-y-4">
+            <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
+              <span className="h-1.5 w-1.5 bg-amber-500 animate-pulse"></span>
+              <span className="text-xs font-semibold text-foreground/80 font-mono tracking-wide uppercase">
+                Get Your Demo
+              </span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground">
+              See It Working — For Your Use Case
+            </h2>
+            <p
+              className="text-sm text-foreground/70 max-w-xl mx-auto leading-relaxed font-sans"
+            >
+              Tell us about your workflow in your own words, or talk to our AI assistant. Your personalized demo will be ready in minutes.
+            </p>
+          </div>
+
+          {formSubmitted ? (
+            <div className="w-full bg-card border border-border p-10 font-mono relative overflow-hidden text-center space-y-8 animate-fade-in transition-all">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-emerald-500" />
+
+              <div className="flex flex-col items-center space-y-4">
+                <div className="h-16 w-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-foreground text-xl font-bold uppercase tracking-tight font-mono">
+                    Demo Generation Complete
+                  </h3>
+                  <p className="text-xs text-foreground/75 mt-1 font-sans">
+                    Autonomous node provisioning for {formBuildCompany} finished successfully.
+                  </p>
+                </div>
+              </div>
+
+              <div className="max-w-md mx-auto border border-border bg-secondary p-6 text-left space-y-3.5 text-xs text-foreground/80">
+                <div className="flex justify-between items-center border-b border-border pb-2.5 text-[10px] text-foreground/50 uppercase tracking-widest font-mono border-dashed">
+                  <span>Pipeline Artifacts</span>
+                  <span className="text-emerald-500 flex items-center gap-1.5 font-mono">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Live & Online
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Demo ID:</span>
+                  <span className="text-foreground font-semibold">DMO-8024</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Audio Server:</span>
+                  <span className="text-foreground font-semibold">EU-Frankfurt Vapi Node</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Integration Seed:</span>
+                  <span className="text-foreground font-semibold">
+                    Trimble Logistics compliances
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Target Company:</span>
+                  <span className="text-foreground font-semibold">{formBuildCompany}</span>
+                </div>
+              </div>
+
+              <div className="space-y-4 font-sans max-w-xs mx-auto">
+                <a
+                  href="/demo-preview"
+                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-medium py-4 text-xs uppercase tracking-wider flex items-center justify-center gap-2 active:scale-98 border-0"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Launch Interactive Demo Portal
+                </a>
+
+                <button
+                  onClick={() => setFormSubmitted(false)}
+                  className="text-xs text-foreground/55 hover:text-primary font-mono underline cursor-pointer bg-transparent border-0"
+                >
+                  Reset pipeline wizard
+                </button>
+              </div>
+            </div>
+          ) : isFormBuilding ? (
+            <div className="w-full bg-card border border-border p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-primary animate-pulse" />
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left Side: Steps Timeline */}
+                <div className="lg:col-span-5 space-y-6 text-left">
+                  <div>
+                    <h3 className="text-foreground text-lg font-bold uppercase tracking-tight">
+                      Active Pipeline Build
+                    </h3>
+                    <p className="text-xs text-foreground/75 mt-1 font-sans">
+                      Compiling personalized voice agent and sandbox environment for{" "}
+                      {formBuildCompany}
+                    </p>
+                  </div>
+
+                  <div className="bg-secondary border border-border p-6">
+                    <ProgressTimeline steps={researchSteps} currentIndex={formBuildStep} />
+                  </div>
+                </div>
+
+                {/* Right Side: Live Console Log */}
+                <div className="lg:col-span-7 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
+                      <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                      <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                        CONSOLE_OUTPUT
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-foreground/55">
+                      ETA: {Math.max(0, (7 - formBuildStep) * 1.5).toFixed(1)}s
+                    </div>
+                  </div>
+
+                  <div className="bg-secondary border border-border p-5 min-h-[300px] max-h-[380px] overflow-y-auto space-y-2.5 text-left font-mono">
+                    {getBuildLogLines(formBuildCompany, formBuildProblem)
+                      .slice(0, formLogIdx)
+                      .map((log, idx) => (
+                        <div key={idx} className="flex gap-3 text-xs leading-relaxed">
+                          <span className="text-foreground/45">[{log.t}]</span>
+                          <span
+                            className={
+                              idx === formLogIdx - 1
+                                ? "text-primary animate-pulse font-bold"
+                                : "text-foreground/75"
+                            }
+                          >
+                            {log.msg}
+                          </span>
+                        </div>
+                      ))}
+                    {formLogIdx < 10 && (
+                      <span className="inline-block h-3.5 w-2 bg-primary animate-pulse mt-1" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch font-mono">
+              {/* PATH A: VOICE (VAPI WEB WIDGET) */}
+              <div className="lg:col-span-6 bg-card border border-border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+                <div className="absolute top-0 right-0 px-4 py-1.5 bg-secondary border-l border-b border-border text-[9px] font-mono text-primary uppercase tracking-widest font-semibold">
+                  Path A: Voice Advisor
+                </div>
+
+                <div className="space-y-6 text-left mt-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground font-mono uppercase tracking-tight">
+                      Quick Voice Chat with AI
+                    </h3>
+                    <p className="text-xs text-foreground/70 mt-1.5 font-sans leading-relaxed">
+                      Have a 2-minute voice chat with our AI assistant — no sales pitch, just clarifying questions so we build the right demo. You can hang up anytime.
+                    </p>
+                  </div>
+
+                  {!isVoiceFormReady ? (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!voiceForm.name || !voiceForm.email || !voiceForm.company) {
+                          toast.error("Please fill in contact details.");
+                          return;
+                        }
+                        setIsVoiceFormReady(true);
+                      }}
+                      className="space-y-4 font-sans text-xs"
+                    >
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/70">
+                          Your Name
+                        </label>
+                        <input
+                          type="text"
+                          value={voiceForm.name}
+                          onChange={(e) => setVoiceForm({ ...voiceForm, name: e.target.value })}
+                          className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors"
+                          required
+                          placeholder="Elena Marchetti"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/70">
+                          Work Email
+                        </label>
+                        <input
+                          type="email"
+                          value={voiceForm.email}
+                          onChange={(e) => setVoiceForm({ ...voiceForm, email: e.target.value })}
+                          className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors"
+                          required
+                          placeholder="elena@logistics-global.com"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/70">
+                          Company
+                        </label>
+                        <input
+                          type="text"
+                          value={voiceForm.company}
+                          onChange={(e) => setVoiceForm({ ...voiceForm, company: e.target.value })}
+                          className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors"
+                          required
+                          placeholder="Logistics Global"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full bg-secondary border border-border hover:border-zinc-500/50 text-foreground text-xs font-semibold uppercase tracking-wider py-3 cursor-pointer font-mono"
+                      >
+                        Continue to AI Call →
+                      </button>
+                      <p className="text-[10px] text-foreground/50 font-sans mt-2 text-center">
+                        🔒 Your data is encrypted, never shared, and deleted after 30 days.{" "}
+                        <a href="/privacy" className="underline hover:text-foreground/70 transition-colors">Read our Privacy Policy →</a>
+                      </p>
+                    </form>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-10 space-y-6 font-mono">
+                      {/* Call Status UI */}
+                      <div className="relative">
+                        {callStatus === "on-call" && (
+                          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+                          </span>
+                        )}
+
+                        <button
+                          onClick={
+                            callStatus === "on-call" ? handleEndVoiceCall : handleStartVoiceCall
+                          }
+                          disabled={callStatus === "connecting"}
+                          className={cn(
+                            "h-24 w-24 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-lg outline-none focus:ring-4 font-mono bg-transparent",
+                            callStatus === "on-call"
+                              ? "bg-rose-600/10 border-rose-500 text-rose-500 hover:bg-rose-600/20 focus:ring-rose-500/20"
+                              : "bg-primary/10 border-primary text-primary hover:bg-primary/20 focus:ring-primary/25",
+                          )}
+                        >
+                          {callStatus === "on-call" ? (
+                            <PhoneOff className="h-8 w-8 text-rose-500 animate-pulse bg-transparent" />
+                          ) : (
+                            <Mic className="h-8 w-8 text-primary" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Pulsing Visual Waveform */}
+                      {callStatus === "on-call" && (
+                        <div className="flex items-center gap-1.5 h-6 justify-center bg-transparent">
+                          {[...Array(12)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1 bg-primary rounded-full"
+                              animate={{ height: [8, 24, 8] }}
+                              transition={{
+                                duration: 0.6 + i * 0.05,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Pill badge — anxiety reduction (C3) */}
+                      {callStatus === "idle" && (
+                        <div className="flex items-center gap-3 text-[10px] text-foreground/50 font-mono">
+                          <span className="flex items-center gap-1">⏱ Avg. call: 2 min</span>
+                          <span className="text-border">·</span>
+                          <span className="flex items-center gap-1"><Bot className="h-3 w-3" /> AI-powered</span>
+                          <span className="text-border">·</span>
+                          <span className="flex items-center gap-1">🔇 No recordings shared</span>
+                        </div>
+                      )}
+
+                      <div className="text-center space-y-1.5 font-mono text-xs">
+                        <p className="text-foreground font-semibold tracking-wider">
+                          {callStatus === "idle" && "READY TO CONNECT"}
+                          {callStatus === "connecting" && "ESTABLISHING CHANNEL..."}
+                          {callStatus === "on-call" && "Advisor Online — Speak Now"}
+                          {callStatus === "ended" && "CALL SUMMARY DISPATCHED"}
+                        </p>
+                        <p className="text-foreground/50 max-w-xs font-sans text-xs leading-relaxed mx-auto">
+                          {callStatus === "idle" &&
+                            "Click the microphone to start an interactive speech session."}
+                          {callStatus === "connecting" && "Requesting microphone permissions..."}
+                          {callStatus === "on-call" &&
+                            "The advisor is listening. Speak clearly and confirm when finished."}
+                          {callStatus === "ended" &&
+                            "Thank you. Our pipeline is parsing your specifications."}
+                        </p>
+                      </div>
+
+                      {callStatus === "ended" && (
+                        <button
+                          onClick={() => setIsVoiceFormReady(false)}
+                          className="text-xs text-primary hover:text-primary/80 font-mono cursor-pointer underline bg-transparent border-0"
+                        >
+                          Reset Call
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+
+              </div>
+
+              {/* PATH B: FORM (SPECIFICATION SUBMIT) */}
+              <div className="lg:col-span-6 bg-card border border-border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+                <div className="absolute top-0 right-0 px-4 py-1.5 bg-secondary border-l border-b border-border text-[9px] font-mono text-primary uppercase tracking-widest font-semibold">
+                  Path B: Custom Spec
+                </div>
+
+                <div className="space-y-6 text-left mt-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground font-mono uppercase tracking-tight">
+                      Describe via Form specs
+                    </h3>
+                    <p className="text-xs text-foreground/70 mt-1.5 font-sans leading-relaxed">
+                      Complete this outline to specify operational details, target tooling
+                      connections, and delivery urgency.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleFormSubmit} className="space-y-4 font-sans text-xs">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className={INPUT_CLS}
+                          placeholder="Elena Marchetti"
+                          disabled={formSubmitting}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Work Email *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          className={INPUT_CLS}
+                          placeholder="elena@dataquartz.ai"
+                          disabled={formSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Company Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.company}
+                          onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                          className={INPUT_CLS}
+                          placeholder="Logistics Corp"
+                          disabled={formSubmitting}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Company Website (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.website}
+                          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                          className={INPUT_CLS}
+                          placeholder="https://logisticscorp.com"
+                          disabled={formSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className={LABEL_CLS}>
+                        What problem are you trying to solve? *
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={formData.problem_text}
+                        onChange={(e) => setFormData({ ...formData, problem_text: e.target.value })}
+                        className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs resize-none transition-colors"
+                        placeholder="Describe key scenario steps and dispatch tasks..."
+                        disabled={formSubmitting}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Target Persona *
+                        </label>
+                        <select
+                          value={formData.persona}
+                          onChange={(e) => setFormData({ ...formData, persona: e.target.value })}
+                          className={SELECT_CLS}
+                        >
+                          <option value="driver_dispatch">Driver Dispatcher</option>
+                          <option value="customer_service">Customer Service Rep</option>
+                          <option value="supplier_support">Supplier Support Desk</option>
+                          <option value="sales_intake">Sales Intake Agent</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Agent Accent / Language *
+                        </label>
+                        <select
+                          value={formData.language}
+                          onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                          className={SELECT_CLS}
+                        >
+                          <option value="en-US">English (US Accent)</option>
+                          <option value="en-GB">English (UK Accent)</option>
+                          <option value="de-DE">German (DE Native)</option>
+                          <option value="es-ES">Spanish (ES Native)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Est. Monthly Call Volume *
+                        </label>
+                        <select
+                          value={formData.volume}
+                          onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+                          className={SELECT_CLS}
+                        >
+                          <option value="under_5k">&lt; 5,000 calls</option>
+                          <option value="5k_to_25k">5,000 - 25,000 calls</option>
+                          <option value="25k_to_100k">25,000 - 100,000 calls</option>
+                          <option value="over_100k">100,000+ calls</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className={LABEL_CLS}>
+                          Timeline Urgency *
+                        </label>
+                        <select
+                          value={formData.urgency}
+                          onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
+                          className={SELECT_CLS}
+                        >
+                          <option value="exploring">Just exploring</option>
+                          <option value="evaluating">Evaluating solutions</option>
+                          <option value="ready now">Ready to deploy now</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className={LABEL_CLS}>
+                        Current Tools & Database Systems (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.tools}
+                        onChange={(e) => setFormData({ ...formData, tools: e.target.value })}
+                        className={INPUT_CLS}
+                        placeholder="Descartes, Trimble, Salesforce, SAP, Oracle NetSuite"
+                        disabled={formSubmitting}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={formSubmitting}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all text-xs font-semibold uppercase tracking-wider py-3 cursor-pointer flex items-center justify-center gap-1.5 font-mono active:scale-98 border-0 mt-4"
+                    >
+                      {formSubmitting ? "Dispatching..." : "Submit Build Request"}
+                    </button>
+                    <p className="text-[10px] text-foreground/50 font-sans mt-2 text-center">
+                      🔒 Your data is encrypted, never shared, and deleted after 30 days.{" "}
+                      <a href="/privacy" className="underline hover:text-foreground/70 transition-colors">Read our Privacy Policy →</a>
+                    </p>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+
+      {/* 8. FAQ Section (C5) */}
+      <section className="bg-background py-24 px-6 border-b border-border">
+        <div className="max-w-3xl mx-auto space-y-10">
+          <div className="text-center space-y-4">
+            <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
+              <HelpCircle className="h-3 w-3 text-foreground/60" />
+              <span className="text-xs font-semibold text-foreground/80 font-mono tracking-wide uppercase">
+                FAQ
+              </span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground">
+              Questions before you start
+            </h2>
+          </div>
+
+          <div className="divide-y divide-border border border-border">
+            {FAQ_ITEMS.map((item, idx) => (
+              <details key={idx} className="group">
+                <summary className="flex items-center justify-between cursor-pointer px-6 py-5 text-sm font-medium text-foreground hover:bg-secondary/30 transition-colors font-sans">
+                  {item.q}
+                  <ChevronRight className="h-4 w-4 text-foreground/40 transition-transform group-open:rotate-90" />
+                </summary>
+                <div className="px-6 pb-5 text-sm text-muted-foreground leading-relaxed font-sans">
+                  {item.a}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 9. Footer */}
+      <footer className="bg-background text-foreground/70 py-16 px-6 text-xs font-mono border-t border-border">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-8 border-b border-dashed border-border/40 pb-10">
+          <div className="space-y-1.5 text-center sm:text-left">
+            <div className="font-bold text-foreground tracking-widest uppercase font-mono">DATAQUARTZ AI</div>
+            <p className="text-[11px] text-foreground/60 font-sans">
+              Autonomous sandbox generation & Vapi agent portals.
+            </p>
+          </div>
+
+          <div className="text-center sm:text-right font-sans text-foreground/60 text-[11px] space-y-1.5">
+            <p>Support: operations@dataquartz.ai</p>
+            <p>&copy; 2026 DataQuartz, Inc. All rights reserved.</p>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+          <span className="text-[10px] text-foreground/50 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            SYS: STABLE
+          </span>
+          <div className="flex items-center gap-4 text-[10px] text-foreground/50 font-sans">
+            <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
+            <span className="text-border">&middot;</span>
+            <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
+            <span className="text-border">&middot;</span>
+            <a href="#" className="hover:text-foreground transition-colors">SOC 2 Compliance</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

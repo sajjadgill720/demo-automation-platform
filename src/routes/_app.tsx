@@ -1,7 +1,19 @@
-import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { checkAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_app")({
+  beforeLoad: async ({ location }) => {
+    const auth = await checkAuth();
+    if (!auth.authenticated) {
+      throw redirect({
+        to: "/portal",
+        search: {
+          redirect: location.href,
+        },
+      });
+    }
+  },
   component: AppLayout,
 });
 

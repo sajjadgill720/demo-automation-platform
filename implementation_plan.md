@@ -18,20 +18,20 @@ npm install
 
 ### Dependency Breakdown
 
-| Library | Purpose |
-| :--- | :--- |
-| **react** / **react-dom** | Core React 19 framework providing the UI layer. |
-| **@tanstack/react-router** | Type-safe routing engine for building SPA page states. |
-| **@tanstack/react-start** | Server-side rendering (SSR) web framework wrapper. |
-| **@tanstack/react-query** | State manager for caching, fetching, and updating server state. |
-| **tailwindcss** / **@tailwindcss/vite**| Tailwind CSS v4 compiler and Vite integration. |
-| **framer-motion** | Animation engine for route transitions, waveforms, and live logging. |
-| **lucide-react** | SVG icon set optimized for React. |
-| **recharts** | Composability-based charts library for performance metrics. |
-| **sonner** | Global Toast notification alerts. |
-| **zod** | TypeScript schema validator. |
-| **react-hook-form** | Form states and validation manager. |
-| **Radix UI Primitives** | Headless accessible components (Tabs, Switches, Dialogs, etc.). |
+| Library                                 | Purpose                                                              |
+| :-------------------------------------- | :------------------------------------------------------------------- |
+| **react** / **react-dom**               | Core React 19 framework providing the UI layer.                      |
+| **@tanstack/react-router**              | Type-safe routing engine for building SPA page states.               |
+| **@tanstack/react-start**               | Server-side rendering (SSR) web framework wrapper.                   |
+| **@tanstack/react-query**               | State manager for caching, fetching, and updating server state.      |
+| **tailwindcss** / **@tailwindcss/vite** | Tailwind CSS v4 compiler and Vite integration.                       |
+| **framer-motion**                       | Animation engine for route transitions, waveforms, and live logging. |
+| **lucide-react**                        | SVG icon set optimized for React.                                    |
+| **recharts**                            | Composability-based charts library for performance metrics.          |
+| **sonner**                              | Global Toast notification alerts.                                    |
+| **zod**                                 | TypeScript schema validator.                                         |
+| **react-hook-form**                     | Form states and validation manager.                                  |
+| **Radix UI Primitives**                 | Headless accessible components (Tabs, Switches, Dialogs, etc.).      |
 
 ---
 
@@ -71,6 +71,7 @@ npm install
 ## 6. Settings Page Redesign
 
 Replaced the basic placeholder card with a detailed, tabbed configuration console:
+
 1. **General**: Edit workspace profile (Slug, name, region) and trigger danger actions.
 2. **Vapi (Voice)**: Manage API keys (show/hide toggle), organization IDs, and customize LLM orchestration defaults (GPT-4o vs Claude 3.5).
 3. **Team Crew**: Track seat allowances (18 of 25 filled) via progress gauges, view members and roles (Owner, Admin, Member), and invite teammates dynamically.
