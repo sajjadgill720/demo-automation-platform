@@ -76,7 +76,7 @@ const FAQ_ITEMS = [
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DataQuartz — Tailored Sales Demos in Minutes" },
+      { title: "DataQuartz. Tailored Sales Demos in Minutes" },
       {
         name: "description",
         content:
@@ -482,7 +482,7 @@ function LandingPage() {
 
           {/* Main Headline — outcome-focused */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.15] text-foreground max-w-5xl">
-            {"Never Miss Another Customer Call. See Your AI Receptionist in Action — Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
+            {"Never Miss Another Customer Call. See Your AI Receptionist in Action. Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
               <motion.span
                 key={i}
                 initial={{ filter: "blur(10px)", opacity: 0 }}
