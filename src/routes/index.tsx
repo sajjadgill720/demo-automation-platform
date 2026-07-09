@@ -27,20 +27,146 @@ import {
   HelpCircle,
   ExternalLink,
   Bot,
+  Upload,
+  X,
+  Paperclip,
+  Play,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { submitLead } from "@/lib/leads";
 import { ProgressTimeline } from "@/components/common/ProgressTimeline";
 import { researchSteps } from "@/lib/mock-data";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
+import { ParticleField } from "@/components/common/ParticleField";
 
 /* ── Shared class constants ── */
-const INPUT_CLS = "w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors";
+const INPUT_CLS = "w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors input-glow";
 const LABEL_CLS = "text-[10px] font-mono uppercase tracking-wider text-foreground/70";
-const SELECT_CLS = "w-full bg-secondary border border-border px-3 py-2 text-foreground/80 focus:outline-none focus:border-primary/65 font-mono text-xs cursor-pointer transition-colors";
+const SELECT_CLS = "w-full bg-secondary border border-border px-3 py-2 text-foreground/80 focus:outline-none focus:border-primary/65 font-mono text-xs cursor-pointer transition-colors input-glow";
+
+/* ── Social Proof Trust Signals ── */
+const TRUST_SIGNALS = [
+  { value: "240+", label: "Active Teams" },
+  { value: "12,000+", label: "Demos Generated" },
+  { value: "99.8%", label: "Uptime" },
+  { value: "SOC 2", label: "Type II Certified" },
+  { value: "<3 min", label: "Avg. Build Time" },
+  { value: "GDPR", label: "Compliant" },
+];
+
+/* ── Silicon Valley Floating Elements & Number Counters ── */
+function AnimatedStepNumber({ number }: { number: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) return;
+    let start = 0;
+    const end = number;
+    const duration = 800; // ms
+    const increment = end / (duration / 16);
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [isInView, number]);
+
+  return (
+    <div ref={ref} className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">
+      {count < 10 ? `0${count}` : count}
+    </div>
+  );
+}
+
+interface FloatingLabelInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+}
+
+function FloatingLabelInput({ label, value, ...props }: FloatingLabelInputProps) {
+  const [focused, setFocused] = useState(false);
+  const isFilled = value !== undefined && value !== "";
+
+  return (
+    <div className="relative w-full pt-1">
+      <input
+        {...props}
+        value={value}
+        onFocus={(e) => {
+          setFocused(true);
+          props.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          props.onBlur?.(e);
+        }}
+        className={cn(
+          "w-full bg-secondary/35 border border-border px-3.5 pt-6 pb-2 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-all duration-200 input-glow rounded-none",
+          props.className
+        )}
+      />
+      <label
+        className={cn(
+          "absolute left-3.5 pointer-events-none font-mono uppercase tracking-wider transition-all duration-200",
+          focused || isFilled
+            ? "top-2.5 text-[9px] text-amber-500 font-bold"
+            : "top-5 text-[11px] text-foreground/45"
+        )}
+      >
+        {label}
+      </label>
+    </div>
+  );
+}
+
+interface FloatingLabelTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+}
+
+function FloatingLabelTextarea({ label, value, ...props }: FloatingLabelTextareaProps) {
+  const [focused, setFocused] = useState(false);
+  const isFilled = value !== undefined && value !== "";
+
+  return (
+    <div className="relative w-full pt-1">
+      <textarea
+        {...props}
+        value={value}
+        onFocus={(e) => {
+          setFocused(true);
+          props.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          props.onBlur?.(e);
+        }}
+        className={cn(
+          "w-full bg-secondary/35 border border-border px-3.5 pt-6 pb-2 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-all duration-200 input-glow resize-none rounded-none",
+          props.className
+        )}
+      />
+      <label
+        className={cn(
+          "absolute left-3.5 pointer-events-none font-mono uppercase tracking-wider transition-all duration-200",
+          focused || isFilled
+            ? "top-2.5 text-[9px] text-amber-500 font-bold"
+            : "top-5 text-[11px] text-foreground/45"
+        )}
+      >
+        {label}
+      </label>
+    </div>
+  );
+}
 
 /* ── Integration cards data ── */
 interface IntegrationCard {
@@ -72,6 +198,72 @@ const FAQ_ITEMS = [
   { q: "Do I need to install anything?", a: "No. Everything runs in your browser — the voice call, the demo portal, and the dashboard. No downloads, no plugins, no SDKs." },
   { q: "What does it cost?", a: "Free to try. You can generate your first demo at no cost. Enterprise pricing with custom integrations is available on request." },
 ];
+
+/* ── Mock Knowledge Base API Stubs ── */
+
+interface IngestResponse {
+  status: 'queued';
+  documentsReceived: number;
+  kbId: string;
+}
+
+// TODO: replace with real API call to <endpoint>
+// Expected input: files: File[]
+// Expected output: { status: 'queued'; documentsReceived: number; kbId: 'kb_mock_123'; }
+async function ingestDocuments(files: File[]): Promise<IngestResponse> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        status: 'queued',
+        documentsReceived: files.length,
+        kbId: 'kb_mock_123',
+      });
+    }, 1500);
+  });
+}
+
+// TODO: replace with real API call to GET /api/kb/questions?kbId=<kbId>
+// Expected input: kbId: string
+// Expected output: string[]
+async function getSuggestedQuestions(kbId: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([
+        "What are the key requirements outlined in the uploaded spec?",
+        "What integrations are mentioned in these documents?",
+        "Are there any compliance or security standards specified?",
+        "What is the expected SLA and support turnaround time?",
+        "Who are the target user personas for this integration?"
+      ]);
+    }, 1500);
+  });
+}
+
+// TODO: replace with real API call to POST /api/kb/query
+// Expected input: { question: string; kbId: string }
+// Expected output: { answer: string }
+async function queryKnowledgeBase(question: string, kbId: string): Promise<{ answer: string }> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const q = question.toLowerCase();
+      let answer = "";
+      if (q.includes("requirement")) {
+        answer = "Based on the uploaded documents, the system requires automated intake validation, human escalation policies for complex queries, and detailed activity tracking logs.";
+      } else if (q.includes("integration") || q.includes("connect")) {
+        answer = "The documents suggest integrating with Trimble TMS for logistics routing, Descartes for customs optimization, and Salesforce CRM for dispatch auditing.";
+      } else if (q.includes("compliance") || q.includes("security")) {
+        answer = "All workflows are bound to SOC 2 security protocols. The spec mandates TLS 1.3 encryption for voice streams and EU-Frankfurt hosting for regulatory compliance.";
+      } else if (q.includes("sla") || q.includes("support")) {
+        answer = "A critical SLA response time of under 2 hours is outlined, with standard operations targeted at 99.9% uptime during operational shifts.";
+      } else if (q.includes("persona") || q.includes("user")) {
+        answer = "Primary personas identified are Fleet Operators, Driver Dispatchers, and Compliance Officers needing audit-ready telemetry logs.";
+      } else {
+        answer = `Here is an AI-generated synthesis based on your query: '${question}'. The platform's knowledge base indicates that these specifications will be mapped dynamically to customize your Vapi voice agent and data pipeline settings.`;
+      }
+      resolve({ answer });
+    }, 1200);
+  });
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -125,6 +317,23 @@ function LandingPage() {
   const [formBuildCompany, setFormBuildCompany] = useState("");
   const [formBuildProblem, setFormBuildProblem] = useState("");
 
+  // Unified onboarding step state machine
+  const [flowStep, setFlowStep] = useState<"intake" | "upload" | "questions" | "pipeline" | "completed">("intake");
+
+  // Step 1: Document Upload states
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isIngesting, setIsIngesting] = useState(false);
+  const [kbId, setKbId] = useState<string | null>(null);
+  const [step1Skipped, setStep1Skipped] = useState(false);
+
+  // Step 2: Specialized Questions states
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [qaList, setQaList] = useState<{ question: string; answer: string }[]>([]);
+  const [isQuerying, setIsQuerying] = useState(false);
+  const [currentQuestionText, setCurrentQuestionText] = useState("");
+  const [step2Skipped, setStep2Skipped] = useState(false);
+
   // Refs for scrolling
   const intakeRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +347,7 @@ function LandingPage() {
           clearInterval(stepInterval);
           setIsFormBuilding(false);
           setFormSubmitted(true); // Show final success screen!
+          setFlowStep("completed");
           return 7;
         }
         return prev + 1;
@@ -160,8 +370,25 @@ function LandingPage() {
       });
     }, 1000); // 1.0s per log line
 
-    return () => clearInterval(logInterval);
   }, [isFormBuilding]);
+
+  // Step 2: Auto-fetch suggested questions when entering Step 2 with ingested documents
+  useEffect(() => {
+    if (flowStep === "questions" && kbId && !step1Skipped) {
+      setIsAnalyzing(true);
+      getSuggestedQuestions(kbId)
+        .then((questions) => {
+          setSuggestedQuestions(questions);
+        })
+        .catch((err) => {
+          console.error("Failed to load suggested questions:", err);
+          toast.error("Failed to load suggested questions.");
+        })
+        .finally(() => {
+          setIsAnalyzing(false);
+        });
+    }
+  }, [flowStep, kbId, step1Skipped]);
 
   const getBuildLogLines = (company: string, problem: string) => [
     { t: "0.2s", msg: `Initializing builder sequence for "${company}"…` },
@@ -271,9 +498,7 @@ function LandingPage() {
           tools: formData.tools || "Not specified",
         }));
 
-        setIsFormBuilding(true);
-        setFormBuildStep(0);
-        setFormLogIdx(0);
+        setFlowStep("upload");
         toast.success("Requirements submitted successfully!");
         setFormData({
           name: "",
@@ -363,15 +588,165 @@ function LandingPage() {
       setIsVoiceFormReady(false);
       setVoiceForm({ name: "", email: "", company: "", urgency: "exploring" });
 
-      setIsFormBuilding(true);
-      setFormBuildStep(0);
-      setFormLogIdx(0);
+      setFlowStep("upload");
     } catch (err) {
       console.error("Failed to submit voice lead:", err);
     }
   };
 
 
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const resetOnboardingWizard = () => {
+    setFormSubmitted(false);
+    setIsFormBuilding(false);
+    setFlowStep("intake");
+    setUploadedFiles([]);
+    setKbId(null);
+    setStep1Skipped(false);
+    setStep2Skipped(false);
+    setQaList([]);
+    setSuggestedQuestions([]);
+    setCurrentQuestionText("");
+  };
+
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const allowedExtensions = ["pdf", "docx", "txt", "csv"];
+      const newFiles: File[] = [];
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext && allowedExtensions.includes(ext)) {
+          newFiles.push(file);
+        } else {
+          toast.error(`Invalid file type: ${file.name}. Only pdf, docx, txt, and csv are allowed.`);
+        }
+      }
+      if (newFiles.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...newFiles]);
+      }
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const allowedExtensions = ["pdf", "docx", "txt", "csv"];
+      const newFiles: File[] = [];
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i];
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext && allowedExtensions.includes(ext)) {
+          newFiles.push(file);
+        } else {
+          toast.error(`Invalid file type: ${file.name}. Only pdf, docx, txt, and csv are allowed.`);
+        }
+      }
+      if (newFiles.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...newFiles]);
+      }
+    }
+  };
+
+  const removeFile = (idx: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUploadSubmit = async () => {
+    if (uploadedFiles.length === 0) {
+      toast.error("Please select files or skip this step.");
+      return;
+    }
+    setIsIngesting(true);
+    try {
+      const res = await ingestDocuments(uploadedFiles);
+      setKbId(res.kbId);
+      setStep1Skipped(false);
+      toast.success("Knowledge base created successfully!");
+      startPipelineBuild(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to ingest documents.");
+    } finally {
+      setIsIngesting(false);
+    }
+  };
+
+  const handleSkipUpload = () => {
+    setUploadedFiles([]);
+    setKbId(null);
+    setStep1Skipped(true);
+    toast.info("Document upload skipped. Proceeding to pipeline build.");
+    startPipelineBuild(true);
+  };
+
+  const handleQuestionSubmit = async (e?: React.FormEvent, questionText?: string) => {
+    if (e) e.preventDefault();
+    const query = questionText || currentQuestionText;
+    if (!query.trim()) return;
+
+    if (!questionText) {
+      setCurrentQuestionText("");
+    }
+
+    setQaList((prev) => [...prev, { question: query, answer: "" }]);
+    setIsQuerying(true);
+
+    try {
+      const mockKbId = kbId || "kb_mock_skipped";
+      const res = await queryKnowledgeBase(query, mockKbId);
+
+      setQaList((prev) => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1].answer = res.answer;
+        }
+        return updated;
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to query knowledge base.");
+      setQaList((prev) => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1].answer = "Error: Could not retrieve answer from knowledge base.";
+        }
+        return updated;
+      });
+    } finally {
+      setIsQuerying(false);
+    }
+  };
+
+  const startPipelineBuild = (skipped: boolean) => {
+    setStep2Skipped(skipped);
+    setFlowStep("pipeline");
+    setIsFormBuilding(true);
+    setFormBuildStep(0);
+    setFormLogIdx(0);
+  };
 
   return (
     <div
@@ -455,8 +830,24 @@ function LandingPage() {
           className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/80 to-background"
         />
 
+        {/* Particle constellation background */}
+        <ParticleField
+          className="z-[2]"
+          particleCount={140}
+          connectionDistance={130}
+          particleColor="rgba(245, 158, 11, 0.35)"
+          lineColor="rgba(245, 158, 11, 0.06)"
+        />
+
+        {/* Animated floating glow orbs */}
+        <div className="absolute inset-0 pointer-events-none z-[1]">
+          <div className="absolute top-[20%] left-[20%] w-[28rem] h-[28rem] bg-amber-500/[0.06] dark:bg-amber-500/[0.04] blur-[100px] rounded-full animate-float" />
+          <div className="absolute top-[40%] right-[15%] w-[32rem] h-[32rem] bg-violet-500/[0.05] dark:bg-violet-500/[0.03] blur-[120px] rounded-full animate-float-delayed" />
+          <div className="absolute bottom-[20%] left-[30%] w-[24rem] h-[24rem] bg-emerald-500/[0.04] dark:bg-emerald-500/[0.025] blur-[90px] rounded-full animate-float" style={{ animationDelay: '4s' }} />
+        </div>
+
         {/* Radial vignette for focal depth */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,var(--background)_75%)] z-[1]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,var(--background)_75%)] z-[3]" />
 
         <div className="relative z-10 max-w-5xl mx-auto w-full text-center flex flex-col items-center justify-center space-y-8">
           {/* Badge */}
@@ -480,21 +871,24 @@ function LandingPage() {
             />
           </motion.div>
 
-          {/* Main Headline — outcome-focused */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.15] text-foreground max-w-5xl">
-            {"Never Miss Another Customer Call. See Your AI Receptionist in Action. Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
-              <motion.span
-                key={i}
-                initial={{ filter: "blur(10px)", opacity: 0 }}
-                whileInView={{ filter: "blur(0px)", opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="inline-block mr-[0.25em] font-sans text-foreground"
-              >
-                {word}
-              </motion.span>
-            ))}
-          </h1>
+          {/* Main Headline — gradient shimmer text */}
+          <div className="relative w-full flex justify-center z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[12rem] bg-amber-500/[0.07] dark:bg-amber-500/[0.045] blur-[90px] rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.15] max-w-5xl gradient-text">
+              {"Never Miss Another Customer Call. Ai Receptionalist Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ filter: "blur(10px)", opacity: 0 }}
+                  whileInView={{ filter: "blur(0px)", opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.05 }}
+                  className="inline-block mr-[0.25em] font-sans"
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </h1>
+          </div>
 
           <p className="text-sm md:text-base text-foreground/70 max-w-2xl leading-relaxed font-sans">
             Tell us about your business. If we need more detail, our AI will ask — no forms to babysit. Then watch a demo built specifically for your calls, your industry, your customers.
@@ -505,18 +899,47 @@ function LandingPage() {
             Built for sales engineers, demo teams, and SaaS founders
           </p>
 
-          <div className="flex items-center gap-4 flex-wrap justify-center">
+          <div className="flex items-center gap-5 flex-wrap justify-center">
             <button
               onClick={() => handleScrollTo(intakeRef)}
-              className="bg-primary text-primary-foreground hover:bg-primary/95 transition-all px-8 py-4 text-xs font-semibold uppercase tracking-wider flex items-center gap-2.5 cursor-pointer border-0"
+              className="glow-button bg-primary text-primary-foreground hover:bg-primary/95 transition-all px-10 py-4 text-sm font-semibold uppercase tracking-wider flex items-center gap-2.5 cursor-pointer border-0"
             >
               Build My Demo
               <ArrowRight className="h-4 w-4" />
             </button>
-            <span className="text-[10px] text-foreground/40 font-mono flex items-center gap-1.5">
+            <a
+              href="/demo-preview"
+              className="bg-transparent border border-border text-foreground hover:bg-secondary/40 px-10 py-4 text-sm font-semibold uppercase tracking-wider flex items-center gap-2.5 cursor-pointer transition-all duration-300 font-sans backdrop-blur-sm relative overflow-hidden group rounded-none"
+            >
+              <Play className="h-4 w-4 text-amber-500 fill-amber-500/20 group-hover:scale-110 transition-transform" />
+              Watch Demo
+              <span className="absolute inset-0 border border-amber-500/0 group-hover:border-amber-500/40 transition-colors pointer-events-none" />
+            </a>
+            <span className="text-[10px] text-foreground/40 font-mono flex items-center gap-1.5 ml-2">
               <Clock className="h-3 w-3" /> Under 5 minutes total
             </span>
           </div>
+        </div>
+      </section>
+
+      {/* 3.5 Social Proof Marquee Ticker */}
+      <section className="w-full border-b border-border/30 py-5 overflow-hidden bg-secondary/5 relative">
+        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+        <div className="marquee-track">
+          {[...TRUST_SIGNALS, ...TRUST_SIGNALS].map((item, idx) => (
+            <div key={idx} className="flex items-center gap-2.5 whitespace-nowrap">
+              <span className="text-foreground font-bold text-sm font-mono stat-glow">
+                {item.value}
+              </span>
+              <span className="text-foreground/50 text-[11px] font-mono uppercase tracking-wider">
+                {item.label}
+              </span>
+              {idx < TRUST_SIGNALS.length * 2 - 1 && (
+                <span className="text-border/50 mx-4">·</span>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -536,10 +959,14 @@ function LandingPage() {
             {INTEGRATION_CARDS.map((card) => {
               const Icon = card.icon;
               return (
-                <div
+                <motion.div
                   key={card.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: INTEGRATION_CARDS.indexOf(card) * 0.08 }}
                   className={cn(
-                    "group flex flex-col items-center justify-center p-8 relative bg-background hover:bg-secondary/15 transition-all duration-300 cursor-pointer border-border/30",
+                    "group flex flex-col items-center justify-center p-8 relative bg-background integration-card-premium cursor-pointer border-border/30",
                     card.borderR && "border-r",
                     card.borderB && "border-b",
                   )}
@@ -562,7 +989,7 @@ function LandingPage() {
                       strokeWidth={1}
                     />
                   )}
-                </div>
+                </motion.div>
               );
             })}
 
@@ -591,8 +1018,14 @@ function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-border">
             {/* Step 1 */}
-            <div className="p-8 md:border-r border-b md:border-b-0 border-border relative">
-              <div className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">01</div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0 }}
+              className="p-8 md:border-r border-b md:border-b-0 border-border relative"
+            >
+              <AnimatedStepNumber number={1} />
               <div className="flex h-10 w-10 items-center justify-center border border-amber-500/30 bg-amber-500/10 text-amber-500 mb-5">
                 <FileText className="h-4 w-4" />
               </div>
@@ -600,10 +1033,18 @@ function LandingPage() {
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 Fill out a short form with your workflow pain points. Takes 60 seconds.
               </p>
-            </div>
+              {/* Connecting line */}
+              <div className="hidden md:block absolute top-12 -right-4 w-8 border-t border-dashed border-amber-500/40 z-10" />
+            </motion.div>
             {/* Step 2 */}
-            <div className="p-8 md:border-r border-b md:border-b-0 border-border relative">
-              <div className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">02</div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="p-8 md:border-r border-b md:border-b-0 border-border relative"
+            >
+              <AnimatedStepNumber number={2} />
               <div className="flex h-10 w-10 items-center justify-center border border-violet-500/30 bg-violet-500/10 text-violet-500 mb-5">
                 <Mic className="h-4 w-4" />
               </div>
@@ -614,10 +1055,18 @@ function LandingPage() {
               <span className="inline-block mt-3 text-[10px] font-mono text-foreground/40 uppercase tracking-widest border border-border px-2 py-0.5">
                 Only if needed
               </span>
-            </div>
+              {/* Connecting line */}
+              <div className="hidden md:block absolute top-12 -right-4 w-8 border-t border-dashed border-violet-500/40 z-10" />
+            </motion.div>
             {/* Step 3 */}
-            <div className="p-8 relative">
-              <div className="text-[10px] font-mono text-amber-500 font-bold tracking-widest mb-4">03</div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="p-8 relative"
+            >
+              <AnimatedStepNumber number={3} />
               <div className="flex h-10 w-10 items-center justify-center border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 mb-5">
                 <Sparkles className="h-4 w-4" />
               </div>
@@ -625,7 +1074,7 @@ function LandingPage() {
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 In under 3 minutes, we deploy a personalized voice agent + dashboard. You'll get an instant link — no email wait, no sales follow-up unless you ask.
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -672,7 +1121,7 @@ function LandingPage() {
       {/* 7. Intake / Simulation Section */}
       <section
         ref={intakeRef}
-        className="bg-background py-24 px-6 border-b border-border relative"
+        className="bg-background py-24 px-6 border-b border-border relative dot-grid-bg"
       >
         <div className="max-w-7xl mx-auto space-y-16">
           <div className="text-center space-y-4">
@@ -692,7 +1141,74 @@ function LandingPage() {
             </p>
           </div>
 
-          {formSubmitted ? (
+          {/* Onboarding Flow Stepper */}
+          {flowStep !== "completed" && (
+            <div className="max-w-xl mx-auto mb-8 border border-border bg-secondary/30 p-4 font-mono text-xs">
+              <div className="flex items-center justify-between">
+                {/* Step 1: Intake */}
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    "h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold border",
+                    flowStep === "intake" ? "border-primary text-primary bg-primary/10 animate-pulse" : "border-emerald-500 text-emerald-500 bg-emerald-500/10"
+                  )}>
+                    {flowStep !== "intake" ? "✓" : "1"}
+                  </span>
+                  <span className={cn("tracking-tight font-semibold", flowStep === "intake" ? "text-foreground" : "text-foreground/50")}>
+                    INTAKE
+                  </span>
+                </div>
+
+                <ChevronRight className="h-3 w-3 text-foreground/30" />
+
+                {/* Step 2: Upload */}
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    "h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold border",
+                    flowStep === "upload" ? "border-primary text-primary bg-primary/10 animate-pulse" :
+                      (flowStep === "intake" ? "border-border text-foreground/45" : "border-emerald-500 text-emerald-500 bg-emerald-500/10")
+                  )}>
+                    {flowStep === "questions" || flowStep === "pipeline" ? (step1Skipped ? "⚡" : "✓") : "2"}
+                  </span>
+                  <span className={cn("tracking-tight font-semibold", flowStep === "upload" ? "text-foreground" : "text-foreground/50")}>
+                    UPLOAD
+                  </span>
+                </div>
+
+                <ChevronRight className="h-3 w-3 text-foreground/30" />
+
+                {/* Step 3: Q&A */}
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    "h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold border",
+                    flowStep === "questions" ? "border-primary text-primary bg-primary/10 animate-pulse" :
+                      (flowStep === "pipeline" ? (step2Skipped ? "⚡" : "✓") : "border-border text-foreground/45")
+                  )}>
+                    {flowStep === "pipeline" ? (step2Skipped ? "⚡" : "✓") : "3"}
+                  </span>
+                  <span className={cn("tracking-tight font-semibold", flowStep === "questions" ? "text-foreground" : "text-foreground/50")}>
+                    AI CHAT
+                  </span>
+                </div>
+
+                <ChevronRight className="h-3 w-3 text-foreground/30" />
+
+                {/* Step 4: Build */}
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    "h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold border",
+                    flowStep === "pipeline" ? "border-primary text-primary bg-primary/10 animate-spin" : "border-border text-foreground/45"
+                  )}>
+                    4
+                  </span>
+                  <span className={cn("tracking-tight font-semibold", flowStep === "pipeline" ? "text-foreground animate-pulse" : "text-foreground/50")}>
+                    BUILD
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {flowStep === "completed" ? (
             <div className="w-full bg-card border border-border p-10 font-mono relative overflow-hidden text-center space-y-8 animate-fade-in transition-all">
               <div className="absolute top-0 left-0 w-full h-[3px] bg-emerald-500" />
 
@@ -748,14 +1264,14 @@ function LandingPage() {
                 </a>
 
                 <button
-                  onClick={() => setFormSubmitted(false)}
+                  onClick={resetOnboardingWizard}
                   className="text-xs text-foreground/55 hover:text-primary font-mono underline cursor-pointer bg-transparent border-0"
                 >
                   Reset pipeline wizard
                 </button>
               </div>
             </div>
-          ) : isFormBuilding ? (
+          ) : flowStep === "pipeline" ? (
             <div className="w-full bg-card border border-border p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
               <div className="absolute top-0 left-0 w-full h-[3px] bg-primary animate-pulse" />
 
@@ -816,10 +1332,297 @@ function LandingPage() {
                 </div>
               </div>
             </div>
+          ) : flowStep === "upload" ? (
+            <div className="w-full glass-card gradient-border p-8 font-mono relative overflow-hidden text-left space-y-6 animate-fade-in transition-all">
+              <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
+
+              <div>
+                <h3 className="text-foreground text-lg font-bold uppercase tracking-tight font-mono">
+                  Step 1: Ingest Context Documents (Optional)
+                </h3>
+                <p className="text-xs text-foreground/75 mt-1 font-sans">
+                  Upload API specs, SOPs, databases descriptions, or call logs to feed your custom Knowledge Base. Skip if not needed.
+                </p>
+              </div>
+
+              {/* Drag and Drop Container */}
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById("file-upload-input")?.click()}
+                className={cn(
+                  "border-2 border-dashed p-10 flex flex-col items-center justify-center gap-3 cursor-pointer text-center transition-all bg-secondary/10 relative",
+                  dragActive ? "border-primary bg-primary/5 scale-[1.01]" : "border-border hover:border-primary/50"
+                )}
+              >
+                <input
+                  id="file-upload-input"
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  accept=".pdf,.docx,.txt,.csv"
+                  className="hidden"
+                />
+
+                {isIngesting ? (
+                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                ) : (
+                  <Upload className="h-10 w-10 text-foreground/60 hover:text-primary transition-colors" />
+                )}
+
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Drag and drop your files here, or <span className="text-primary underline">browse</span>
+                  </p>
+                  <p className="text-[10px] text-foreground/50 font-sans">
+                    Supports PDF, DOCX, TXT, CSV up to 10MB each
+                  </p>
+                </div>
+              </div>
+
+              {/* Uploaded Files List & Next-Step Interrelation Preview */}
+              {uploadedFiles.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                  {/* Left Column: Uploaded files list */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] uppercase tracking-wider text-foreground/70 font-mono border-b border-border pb-1 border-dashed">
+                      Uploaded Documents ({uploadedFiles.length})
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                      {uploadedFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-secondary/40 border border-border text-xs">
+                          <div className="flex items-center gap-2.5 truncate">
+                            <Paperclip className="h-4 w-4 text-primary shrink-0" />
+                            <span className="truncate font-medium text-foreground">{file.name}</span>
+                            <span className="text-[10px] text-foreground/40 shrink-0 font-sans">({formatFileSize(file.size)})</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(idx);
+                            }}
+                            className="p-1 hover:bg-secondary text-foreground/60 hover:text-rose-500 transition-colors cursor-pointer border-0 bg-transparent"
+                            aria-label="Remove file"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Interrelated Next-Step RAG Compilation Preview */}
+                  <div className="space-y-3 bg-secondary/20 border border-border p-4 relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-0 right-0 px-2.5 py-0.5 bg-primary/10 border-l border-b border-border text-[8px] font-mono text-primary uppercase tracking-widest font-semibold animate-pulse">
+                      Step 2 Preview
+                    </div>
+                    
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-center gap-1.5">
+                        <Database className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                        <span className="text-[10px] uppercase tracking-wider text-foreground/75 font-mono font-bold">
+                          Knowledge Base RAG Compiler
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-foreground/50 font-sans leading-relaxed">
+                        Compiling context chunks from your uploaded {uploadedFiles.length === 1 ? "document" : `${uploadedFiles.length} documents`}. 
+                        The following verification queries will be ready for testing in Step 2:
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5 font-mono text-[9px] text-foreground/80 bg-background/30 p-2.5 border border-border/50">
+                      <div className="flex items-start gap-1">
+                        <span className="text-amber-500 font-bold">Q1:</span>
+                        <span className="truncate">"What are the key requirements outlined in the uploaded spec?"</span>
+                      </div>
+                      <div className="flex items-start gap-1">
+                        <span className="text-amber-500 font-bold">Q2:</span>
+                        <span className="truncate">"What integrations are mentioned in these documents?"</span>
+                      </div>
+                    </div>
+
+                    <div className="text-[9px] text-emerald-500/90 font-mono flex items-center gap-1">
+                      <span className="h-1 w-1 bg-emerald-500 rounded-full animate-ping" />
+                      <span>Extraction Ready · advance to verify RAG responses</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State Overlay */}
+              {isIngesting && (
+                <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 gap-3 font-mono">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <span className="text-xs uppercase tracking-widest text-primary animate-pulse font-bold">
+                    Adding to knowledge base...
+                  </span>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div className="flex items-center justify-between gap-4 pt-4 border-t border-border/50">
+                <button
+                  type="button"
+                  onClick={handleSkipUpload}
+                  className="bg-transparent border border-border text-foreground hover:bg-secondary transition-colors font-mono font-medium text-xs tracking-wider uppercase px-5 py-3 cursor-pointer"
+                >
+                  Skip this step
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUploadSubmit}
+                  disabled={uploadedFiles.length === 0 || isIngesting}
+                  className={cn(
+                    "font-mono font-medium text-xs tracking-wider uppercase px-6 py-3 cursor-pointer transition-all border-0",
+                    uploadedFiles.length === 0
+                      ? "bg-secondary text-foreground/40 cursor-not-allowed"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  )}
+                >
+                  Upload & Continue →
+                </button>
+              </div>
+            </div>
+          ) : flowStep === "questions" ? (
+            <div className="w-full glass-card gradient-border p-8 font-mono relative overflow-hidden text-left space-y-6 animate-fade-in transition-all">
+              <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
+
+              <div>
+                <h3 className="text-foreground text-lg font-bold uppercase tracking-tight font-mono">
+                  Step 2: Knowledge Base Verification
+                </h3>
+                <p className="text-xs text-foreground/75 mt-1 font-sans">
+                  Query the virtual Knowledge Base to verify content extraction, specify target requirements, or verify custom compliance logic.
+                </p>
+              </div>
+
+              {/* Step 1 Skipped Alert/Empty State */}
+              {step1Skipped ? (
+                <div className="border border-amber-500/30 bg-amber-500/5 p-4 text-xs space-y-1.5 leading-relaxed text-amber-500/90 font-mono">
+                  <div className="font-bold uppercase tracking-wide flex items-center gap-1.5">
+                    <span>⚡ INFO: Document Upload Skipped</span>
+                  </div>
+                  <p className="font-sans text-[11px] text-foreground/70">
+                    No documents were provided, so we don't have specialized questions yet. You can still ask a general question or proceed to the demo build below.
+                  </p>
+                </div>
+              ) : (
+                /* Suggested Questions Area */
+                <div className="space-y-3">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
+                    Suggested Questions (Generated from Documents)
+                  </label>
+
+                  {isAnalyzing ? (
+                    <div className="flex items-center gap-3 py-6 justify-center bg-secondary/15 border border-border border-dashed">
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                      <span className="text-xs tracking-wider animate-pulse text-foreground/60">
+                        Analyzing your documents...
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {suggestedQuestions.map((q, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleQuestionSubmit(undefined, q)}
+                          disabled={isQuerying}
+                          className="p-3 text-left border border-border bg-secondary/20 hover:border-primary/50 hover:bg-secondary/40 transition-all text-[11px] leading-snug cursor-pointer group flex items-start gap-2 text-foreground/80 hover:text-foreground"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+                          <span>{q}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Chat Conversation Thread */}
+              {(qaList.length > 0 || isQuerying) && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
+                    Knowledge Base Session History
+                  </label>
+                  <div className="h-60 border border-border bg-secondary/30 p-4 space-y-4 overflow-y-auto font-mono text-xs flex flex-col justify-start">
+                    {qaList.map((qa, idx) => (
+                      <div key={idx} className="space-y-2">
+                        {/* User Question */}
+                        <div className="flex gap-2 text-left">
+                          <span className="text-emerald-500 shrink-0">[USER]:</span>
+                          <span className="text-foreground/90">{qa.question}</span>
+                        </div>
+                        {/* AI Answer */}
+                        {qa.answer ? (
+                          <div className="flex gap-2 text-left bg-secondary/20 p-2.5 border-l-2 border-primary text-left">
+                            <span className="text-primary shrink-0">[KB_AGENT]:</span>
+                            <span className="text-foreground/75 leading-relaxed font-sans text-[11px]">{qa.answer}</span>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 text-left bg-secondary/20 p-2.5 border-l-2 border-primary animate-pulse">
+                            <span className="text-primary shrink-0">[KB_AGENT]:</span>
+                            <span className="text-foreground/45 flex items-center gap-1">
+                              Thinking<span className="animate-bounce">.</span><span className="animate-bounce" style={{ animationDelay: '0.2s' }}>.</span><span className="animate-bounce" style={{ animationDelay: '0.4s' }}>.</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Free-form Input Area */}
+              <form onSubmit={(e) => handleQuestionSubmit(e)} className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={currentQuestionText}
+                  onChange={(e) => setCurrentQuestionText(e.target.value)}
+                  placeholder="Ask a custom question to verify Knowledge Base extraction..."
+                  className={INPUT_CLS}
+                  disabled={isQuerying}
+                />
+                <button
+                  type="submit"
+                  disabled={isQuerying || !currentQuestionText.trim()}
+                  className={cn(
+                    "px-5 py-2.5 font-mono font-semibold uppercase text-xs cursor-pointer border border-border h-full flex items-center gap-2",
+                    isQuerying || !currentQuestionText.trim()
+                      ? "bg-secondary text-foreground/40 cursor-not-allowed"
+                      : "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+                  )}
+                >
+                  Query
+                </button>
+              </form>
+
+              {/* Actions Footer */}
+              <div className="flex items-center justify-between gap-4 pt-4 border-t border-border/50">
+                <button
+                  type="button"
+                  onClick={() => startPipelineBuild(true)}
+                  className="bg-transparent border border-border text-foreground hover:bg-secondary transition-colors font-mono font-medium text-xs tracking-wider uppercase px-5 py-3 cursor-pointer"
+                >
+                  Skip this step
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startPipelineBuild(false)}
+                  className="bg-primary text-primary-foreground hover:bg-primary/95 font-mono font-medium text-xs tracking-wider uppercase px-6 py-3 cursor-pointer border-0 active:scale-98"
+                >
+                  Continue to demo pipeline →
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch font-mono">
               {/* PATH A: VOICE (VAPI WEB WIDGET) */}
-              <div className="lg:col-span-6 bg-card border border-border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+              <div className="lg:col-span-6 glass-card gradient-border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+                <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
                 <div className="absolute top-0 right-0 px-4 py-1.5 bg-secondary border-l border-b border-border text-[9px] font-mono text-primary uppercase tracking-widest font-semibold">
                   Path A: Voice Advisor
                 </div>
@@ -846,45 +1649,30 @@ function LandingPage() {
                       }}
                       className="space-y-4 font-sans text-xs"
                     >
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/70">
-                          Your Name
-                        </label>
-                        <input
-                          type="text"
-                          value={voiceForm.name}
-                          onChange={(e) => setVoiceForm({ ...voiceForm, name: e.target.value })}
-                          className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors"
-                          required
-                          placeholder="Elena Marchetti"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/70">
-                          Work Email
-                        </label>
-                        <input
-                          type="email"
-                          value={voiceForm.email}
-                          onChange={(e) => setVoiceForm({ ...voiceForm, email: e.target.value })}
-                          className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors"
-                          required
-                          placeholder="elena@logistics-global.com"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/70">
-                          Company
-                        </label>
-                        <input
-                          type="text"
-                          value={voiceForm.company}
-                          onChange={(e) => setVoiceForm({ ...voiceForm, company: e.target.value })}
-                          className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs transition-colors"
-                          required
-                          placeholder="Logistics Global"
-                        />
-                      </div>
+                      <FloatingLabelInput
+                        label="Your Name *"
+                        type="text"
+                        value={voiceForm.name}
+                        onChange={(e) => setVoiceForm({ ...voiceForm, name: e.target.value })}
+                        required
+                        placeholder="Elena Marchetti"
+                      />
+                      <FloatingLabelInput
+                        label="Work Email *"
+                        type="email"
+                        value={voiceForm.email}
+                        onChange={(e) => setVoiceForm({ ...voiceForm, email: e.target.value })}
+                        required
+                        placeholder="elena@logistics-global.com"
+                      />
+                      <FloatingLabelInput
+                        label="Company *"
+                        type="text"
+                        value={voiceForm.company}
+                        onChange={(e) => setVoiceForm({ ...voiceForm, company: e.target.value })}
+                        required
+                        placeholder="Logistics Global"
+                      />
                       <button
                         type="submit"
                         className="w-full bg-secondary border border-border hover:border-zinc-500/50 text-foreground text-xs font-semibold uppercase tracking-wider py-3 cursor-pointer font-mono"
@@ -990,7 +1778,8 @@ function LandingPage() {
               </div>
 
               {/* PATH B: FORM (SPECIFICATION SUBMIT) */}
-              <div className="lg:col-span-6 bg-card border border-border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+              <div className="lg:col-span-6 glass-card gradient-border p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+                <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
                 <div className="absolute top-0 right-0 px-4 py-1.5 bg-secondary border-l border-b border-border text-[9px] font-mono text-primary uppercase tracking-widest font-semibold">
                   Path B: Custom Spec
                 </div>
@@ -1008,80 +1797,55 @@ function LandingPage() {
 
                   <form onSubmit={handleFormSubmit} className="space-y-4 font-sans text-xs">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className={LABEL_CLS}>
-                          Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          className={INPUT_CLS}
-                          placeholder="Elena Marchetti"
-                          disabled={formSubmitting}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className={LABEL_CLS}>
-                          Work Email *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          className={INPUT_CLS}
-                          placeholder="elena@dataquartz.ai"
-                          disabled={formSubmitting}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className={LABEL_CLS}>
-                          Company Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.company}
-                          onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                          className={INPUT_CLS}
-                          placeholder="Logistics Corp"
-                          disabled={formSubmitting}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className={LABEL_CLS}>
-                          Company Website (Optional)
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.website}
-                          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                          className={INPUT_CLS}
-                          placeholder="https://logisticscorp.com"
-                          disabled={formSubmitting}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className={LABEL_CLS}>
-                        What problem are you trying to solve? *
-                      </label>
-                      <textarea
+                      <FloatingLabelInput
+                        label="Name *"
+                        type="text"
                         required
-                        rows={3}
-                        value={formData.problem_text}
-                        onChange={(e) => setFormData({ ...formData, problem_text: e.target.value })}
-                        className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary/65 font-mono text-xs resize-none transition-colors"
-                        placeholder="Describe key scenario steps and dispatch tasks..."
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Elena Marchetti"
+                        disabled={formSubmitting}
+                      />
+                      <FloatingLabelInput
+                        label="Work Email *"
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="elena@dataquartz.ai"
                         disabled={formSubmitting}
                       />
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FloatingLabelInput
+                        label="Company Name *"
+                        type="text"
+                        required
+                        value={formData.company}
+                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                        placeholder="Logistics Corp"
+                        disabled={formSubmitting}
+                      />
+                      <FloatingLabelInput
+                        label="Company Website (Optional)"
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                        placeholder="https://logisticscorp.com"
+                        disabled={formSubmitting}
+                      />
+                    </div>
+
+                    <FloatingLabelTextarea
+                      label="What problem are you trying to solve? *"
+                      required
+                      rows={3}
+                      value={formData.problem_text}
+                      onChange={(e) => setFormData({ ...formData, problem_text: e.target.value })}
+                      placeholder="Describe key scenario steps and dispatch tasks..."
+                      disabled={formSubmitting}
+                    />
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -1148,19 +1912,14 @@ function LandingPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className={LABEL_CLS}>
-                        Current Tools & Database Systems (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.tools}
-                        onChange={(e) => setFormData({ ...formData, tools: e.target.value })}
-                        className={INPUT_CLS}
-                        placeholder="Descartes, Trimble, Salesforce, SAP, Oracle NetSuite"
-                        disabled={formSubmitting}
-                      />
-                    </div>
+                    <FloatingLabelInput
+                      label="Current Tools & Database Systems (Optional)"
+                      type="text"
+                      value={formData.tools}
+                      onChange={(e) => setFormData({ ...formData, tools: e.target.value })}
+                      placeholder="Descartes, Trimble, Salesforce, SAP, Oracle NetSuite"
+                      disabled={formSubmitting}
+                    />
 
                     <button
                       type="submit"

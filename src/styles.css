@@ -181,3 +181,243 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Premium Visual Effects — Silicon Valley Grade
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* --- Animated Gradient Text Shimmer --- */
+@keyframes shimmer-sweep {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.gradient-text {
+  background: linear-gradient(
+    90deg,
+    var(--foreground) 0%,
+    var(--foreground) 35%,
+    oklch(0.79 0.17 70) 50%,
+    var(--foreground) 65%,
+    var(--foreground) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 6s ease-in-out infinite;
+}
+
+/* --- Glow Button --- */
+.glow-button {
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 20px -5px oklch(0.79 0.17 70 / 0.3),
+    0 0 40px -10px oklch(0.79 0.17 70 / 0.15);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+.glow-button:hover {
+  box-shadow:
+    0 0 30px -3px oklch(0.79 0.17 70 / 0.45),
+    0 0 60px -10px oklch(0.79 0.17 70 / 0.25);
+  transform: translateY(-1px);
+}
+
+@keyframes button-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.glow-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  animation: button-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* --- Glassmorphic Card --- */
+.glass-card {
+  background: oklch(1 0 0 / 0.04);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-card:hover {
+  background: oklch(1 0 0 / 0.07);
+  border-color: oklch(1 0 0 / 0.14);
+  box-shadow:
+    0 8px 32px oklch(0 0 0 / 0.12),
+    inset 0 1px 0 oklch(1 0 0 / 0.06);
+}
+.dark .glass-card {
+  background: oklch(0.2 0.005 256 / 0.55);
+  border-color: oklch(1 0 0 / 0.06);
+}
+.dark .glass-card:hover {
+  background: oklch(0.22 0.005 256 / 0.65);
+  border-color: oklch(1 0 0 / 0.1);
+  box-shadow:
+    0 8px 32px oklch(0 0 0 / 0.4),
+    inset 0 1px 0 oklch(1 0 0 / 0.04);
+}
+
+/* --- Animated Gradient Border --- */
+@keyframes gradient-rotate {
+  0% { --gradient-angle: 0deg; }
+  100% { --gradient-angle: 360deg; }
+}
+
+@property --gradient-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.gradient-border {
+  position: relative;
+  overflow: hidden;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--gradient-angle),
+    oklch(0.79 0.17 70),
+    oklch(0.67 0.22 292),
+    oklch(0.72 0.19 149),
+    oklch(0.79 0.17 70)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: gradient-rotate 4s linear infinite;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* --- Input Focus Glow --- */
+.input-glow {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.input-glow:focus {
+  border-color: oklch(0.79 0.17 70 / 0.6) !important;
+  box-shadow:
+    0 0 0 3px oklch(0.79 0.17 70 / 0.1),
+    0 0 16px -4px oklch(0.79 0.17 70 / 0.2);
+  outline: none;
+}
+
+/* --- Floating Animation --- */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+.animate-float-delayed {
+  animation: float 8s ease-in-out 2s infinite;
+}
+
+/* --- Fade Up on Scroll --- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Social Proof Marquee --- */
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  gap: 3rem;
+  width: max-content;
+  animation: marquee-scroll 30s linear infinite;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* --- Gradient Accent Line Animation --- */
+@keyframes gradient-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.gradient-line-animated {
+  background: linear-gradient(
+    90deg,
+    oklch(0.79 0.17 70),
+    oklch(0.67 0.22 292),
+    oklch(0.72 0.19 149),
+    oklch(0.79 0.17 70)
+  );
+  background-size: 300% 100%;
+  animation: gradient-flow 4s ease infinite;
+}
+
+/* --- Stat Counter Glow --- */
+.stat-glow {
+  text-shadow:
+    0 0 20px oklch(0.79 0.17 70 / 0.3),
+    0 0 40px oklch(0.79 0.17 70 / 0.1);
+}
+
+/* --- Integration Card Hover Enhancement --- */
+.integration-card-premium {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.integration-card-premium:hover {
+  background: oklch(1 0 0 / 0.03);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px oklch(0 0 0 / 0.06);
+}
+.dark .integration-card-premium:hover {
+  background: oklch(1 0 0 / 0.04);
+  box-shadow: 0 12px 40px oklch(0 0 0 / 0.3);
+}
+
+/* --- Dot Grid Pattern --- */
+.dot-grid-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    oklch(0.5 0 0 / 0.07) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+}
+.dark .dot-grid-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    oklch(1 0 0 / 0.04) 1px,
+    transparent 0
+  );
+}
