@@ -31,6 +31,7 @@ import {
   X,
   Paperclip,
   Play,
+  Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -685,7 +686,7 @@ function LandingPage() {
       setKbId(res.kbId);
       setStep1Skipped(false);
       toast.success("Knowledge base created successfully!");
-      startPipelineBuild(false);
+      setFlowStep("questions");
     } catch (err) {
       console.error(err);
       toast.error("Failed to ingest documents.");
