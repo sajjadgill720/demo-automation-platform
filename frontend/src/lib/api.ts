@@ -1,0 +1,149 @@
+/**
+ * API client for the FastAPI backend.
+ *
+ * All demo-request lifecycle calls go through here so the rest of the
+ * frontend never constructs URLs or parses responses directly.
+ */
+
+const BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8000";
+
+/* ── Error types ── */
+
+/** Thrown when the backend is unreachable or returns a non-2xx before any
+ *  agent_status exists (network failure, server down, validation error). */
+export class NetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NetworkError";
+  }
+}
+
+/** Thrown when the backend accepted the request but Vapi provisioning
+ *  failed (agent_status === "failed"). Carries the failure_reason from DB. */
+export class ProvisioningError extends Error {
+  failureReason: string;
+  constructor(failureReason: string) {
+    super(`Vapi provisioning failed: ${failureReason}`);
+    this.name = "ProvisioningError";
+    this.failureReason = failureReason;
+  }
+}
+
+/* ── Response types ── */
+
+export interface DemoRequestPayload {
+  company_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  industry: string;
+}
+
+export interface LeadResponse {
+  id: string;
+  company_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  industry: string;
+  agent_status: "pending" | "active" | "completed" | "failed";
+  assistant_id: string | null;
+  failure_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/* ── API functions ── */
+
+/**
+ * POST /api/demo-request
+ *
+ * Creates a new lead and enqueues Vapi assistant provisioning.
+ * Returns immediately with agent_status="pending".
+ *
+ * @throws {NetworkError} if the backend is unreachable or returns non-2xx.
+ */
+export async function submitDemoRequest(
+  payload: DemoRequestPayload,
+): Promise<LeadResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    // Network-level failure (DNS, CORS, backend down)
+    throw new NetworkError(
+      "Could not reach the backend server. Make sure it is running.",
+    );
+  }
+
+  if (!res.ok) {
+    let detail = `Server returned ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body.detail) {
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      }
+    } catch {
+      // ignore parse failure
+    }
+    throw new NetworkError(detail);
+  }
+
+  return res.json();
+}
+
+/**
+ * GET /api/demo-request/{lead_id}
+ *
+ * Polls the current state of a lead, including agent_status and
+ * assistant_id once provisioning completes.
+ *
+ * @throws {NetworkError} on fetch/HTTP errors.
+ */
+export async function getDemoRequestStatus(
+  leadId: string,
+): Promise<LeadResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}`);
+  } catch {
+    throw new NetworkError("Lost connection to the backend while polling.");
+  }
+
+  if (!res.ok) {
+    throw new NetworkError(`Polling failed with status ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * POST /api/demo-request/{lead_id}/end-session
+ *
+ * Triggers Vapi assistant deletion and marks the lead as completed.
+ *
+ * Best-effort: callers should not crash if this fails (e.g. on tab close).
+ */
+export async function endDemoSession(
+  leadId: string,
+): Promise<{ message: string; agent_status: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}/end-session`, {
+      method: "POST",
+    });
+  } catch {
+    throw new NetworkError("Could not reach the backend to end session.");
+  }
+
+  if (!res.ok) {
+    throw new NetworkError(`End session failed with status ${res.status}`);
+  }
+
+  return res.json();
+}
