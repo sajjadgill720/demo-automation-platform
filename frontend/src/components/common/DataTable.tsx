@@ -21,9 +21,9 @@ export function DataTable<T extends { id: string }>({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               {columns.map((c) => (
-                <th key={c.key} className={cn("px-4 py-3 font-medium", c.className)}>
+                <th key={c.key} className={cn("whitespace-nowrap px-4 py-3 font-semibold", c.className)}>
                   {c.header}
                 </th>
               ))}

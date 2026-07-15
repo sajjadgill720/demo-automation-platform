@@ -175,7 +175,7 @@ function NewDemo() {
       <div className="mx-auto w-full max-w-4xl space-y-6 p-6">
         <ProgressTimeline steps={steps} currentIndex={step} orientation="horizontal" />
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
           {/* Step 0: Business Info & Revenue Calculator */}
           {step === 0 && (
             <div className="space-y-4">

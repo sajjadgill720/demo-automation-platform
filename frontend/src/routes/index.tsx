@@ -996,9 +996,9 @@ function LandingPage() {
         </div>
       </div>
 
-      {/* 2. Navigation Header */}
-      <header className="absolute top-0 left-0 right-0 z-40 bg-transparent border-0 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-6">
+      {/* 2. Navigation Header — sticky with backdrop blur */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-background/70 backdrop-blur-md border-b border-border/40 transition-colors duration-300 supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-3 text-foreground">
             <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary text-foreground font-bold text-xs uppercase tracking-tight">
               DQ
@@ -1008,7 +1008,17 @@ function LandingPage() {
             </span>
           </Link>
 
-
+          <nav className="hidden md:flex items-center gap-8 font-mono text-[11px] uppercase tracking-widest text-foreground/60">
+            <a href="#how-it-works" className="hover:text-foreground transition-colors">
+              How It Works
+            </a>
+            <a href="#proof" className="hover:text-foreground transition-colors">
+              Live Demo
+            </a>
+            <a href="#faq" className="hover:text-foreground transition-colors">
+              FAQ
+            </a>
+          </nav>
 
           <div className="flex items-center gap-4">
             <button
@@ -1085,7 +1095,7 @@ function LandingPage() {
           <div className="relative w-full flex justify-center z-10">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[12rem] bg-amber-500/[0.07] dark:bg-amber-500/[0.045] blur-[90px] rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.15] max-w-5xl gradient-text">
-              {"Never Miss Another Customer Call. Ai Receptionalist Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
+              {"Never Miss Another Customer Call. An AI Receptionist Personalized to Your Business in Minutes.".split(" ").map((word, i) => (
                 <motion.span
                   key={i}
                   initial={{ filter: "blur(10px)", opacity: 0 }}
@@ -1209,7 +1219,7 @@ function LandingPage() {
       </section>
 
       {/* 5. How It Works — 3-Step Process (C1, I6) */}
-      <section className="w-full bg-background py-24 md:py-32 border-b border-border/30">
+      <section id="how-it-works" className="w-full bg-background py-24 md:py-32 border-b border-border/30 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-6 md:px-12 lg:px-16 space-y-14">
           <div className="text-center space-y-4">
             <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
@@ -1290,7 +1300,7 @@ function LandingPage() {
       </section>
 
       {/* 6. Proof Section — See a sample demo (I3, I4) */}
-      <section className="w-full bg-secondary/10 py-24 md:py-28 border-b border-border/30">
+      <section id="proof" className="w-full bg-secondary/10 py-24 md:py-28 border-b border-border/30 scroll-mt-20">
         <div className="mx-auto max-w-5xl px-6 text-center space-y-8">
           <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
             <div className="w-2.5 h-2.5 bg-emerald-500" />
@@ -1904,7 +1914,7 @@ function LandingPage() {
                   onClick={() => startPipelineBuild(false)}
                   className="bg-primary text-primary-foreground hover:bg-primary/95 font-mono font-medium text-xs tracking-wider uppercase px-6 py-3 cursor-pointer border-0 active:scale-98 rounded-none"
                 >
-                  Build Convoa Pilot →
+                  Build My Pilot →
                 </button>
               </div>
             </div>
@@ -2346,7 +2356,7 @@ function LandingPage() {
 
 
       {/* 8. FAQ Section (C5) */}
-      <section className="bg-background py-24 px-6 border-b border-border">
+      <section id="faq" className="bg-background py-24 px-6 border-b border-border scroll-mt-20">
         <div className="max-w-3xl mx-auto space-y-10">
           <div className="text-center space-y-4">
             <div className="flex items-center gap-3 px-4 py-2 border border-border w-fit bg-secondary/50 mx-auto">
@@ -2378,32 +2388,52 @@ function LandingPage() {
 
       {/* 9. Footer */}
       <footer className="bg-background text-foreground/70 py-16 px-6 text-xs font-mono border-t border-border">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-8 border-b border-dashed border-border/40 pb-10">
-          <div className="space-y-1.5 text-center sm:text-left">
-            <div className="font-bold text-foreground tracking-widest uppercase font-mono">DATAQUARTZ AI</div>
-            <p className="text-[11px] text-foreground/60 font-sans">
-              Autonomous sandbox generation & Vapi agent portals.
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 border-b border-dashed border-border/40 pb-12">
+          <div className="space-y-3 sm:col-span-2">
+            <Link to="/" className="flex items-center gap-3 text-foreground w-fit">
+              <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary font-bold text-xs uppercase tracking-tight">
+                DQ
+              </div>
+              <span className="font-bold tracking-widest uppercase">DataQuartz AI</span>
+            </Link>
+            <p className="text-[11px] text-foreground/60 font-sans max-w-xs leading-relaxed">
+              Autonomous sandbox generation & Vapi agent portals. Personalized voice-agent demos, built in minutes.
+            </p>
+            <p className="text-[10px] text-foreground/50 flex items-center gap-1.5 pt-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              All systems operational
             </p>
           </div>
 
-          <div className="text-center sm:text-right font-sans text-foreground/60 text-[11px] space-y-1.5">
-            <p>Support: operations@dataquartz.ai</p>
-            <p>&copy; 2026 DataQuartz, Inc. All rights reserved.</p>
+          <div className="space-y-3">
+            <div className="text-[10px] uppercase tracking-widest text-foreground/45 font-semibold">Product</div>
+            <ul className="space-y-2.5 font-sans text-[11px] text-foreground/60">
+              <li><a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a></li>
+              <li><a href="#proof" className="hover:text-foreground transition-colors">Sample Demo</a></li>
+              <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
+              <li><a href="/demo-preview" className="hover:text-foreground transition-colors">Demo Portal</a></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-[10px] uppercase tracking-widest text-foreground/45 font-semibold">Company</div>
+            <ul className="space-y-2.5 font-sans text-[11px] text-foreground/60">
+              <li><a href="mailto:operations@dataquartz.ai" className="hover:text-foreground transition-colors">operations@dataquartz.ai</a></li>
+              <li><a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a></li>
+              <li><a href="#" className="hover:text-foreground transition-colors">Terms of Service</a></li>
+              <li><a href="#" className="hover:text-foreground transition-colors">SOC 2 Compliance</a></li>
+            </ul>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-          <span className="text-[10px] text-foreground/50 flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-            SYS: STABLE
+          <p className="text-[10px] text-foreground/50 font-sans">
+            &copy; 2026 DataQuartz, Inc. All rights reserved.
+          </p>
+          <span className="text-[10px] text-foreground/40 flex items-center gap-1.5">
+            <Lock className="h-3 w-3" />
+            GDPR Compliant · EU-Hosted · SOC 2 Type II
           </span>
-          <div className="flex items-center gap-4 text-[10px] text-foreground/50 font-sans">
-            <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
-            <span className="text-border">&middot;</span>
-            <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
-            <span className="text-border">&middot;</span>
-            <a href="#" className="hover:text-foreground transition-colors">SOC 2 Compliance</a>
-          </div>
         </div>
       </footer>
     </div>

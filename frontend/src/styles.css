@@ -175,10 +175,68 @@
   body {
     font-family: var(--font-sans);
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Visible, consistent keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid oklch(0.79 0.17 70 / 0.7);
+    outline-offset: 2px;
+  }
+
+  /* Refined thin scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.6 0 0 / 0.3) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.6 0 0 / 0.3);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Respect users who prefer reduced motion — disable decorative animation */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .gradient-text,
+  .glow-button::after,
+  .marquee-track,
+  .gradient-line-animated,
+  .animate-float,
+  .animate-float-delayed,
+  .gradient-border::before {
+    animation: none !important;
+  }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -403,6 +461,22 @@
 .dark .integration-card-premium:hover {
   background: oklch(1 0 0 / 0.04);
   box-shadow: 0 12px 40px oklch(0 0 0 / 0.3);
+}
+
+/* --- Elevated Card (dashboard surfaces) --- */
+.elevated-card {
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+}
+.elevated-card:hover {
+  border-color: oklch(0.79 0.17 70 / 0.35);
+  box-shadow: 0 8px 24px -8px oklch(0 0 0 / 0.12);
+  transform: translateY(-1px);
+}
+.dark .elevated-card:hover {
+  box-shadow: 0 8px 24px -8px oklch(0 0 0 / 0.5);
 }
 
 /* --- Dot Grid Pattern --- */

@@ -31,18 +31,22 @@ export function StatCard({
         : "text-muted-foreground";
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-foreground">
+            {value}
+          </p>
         </div>
         <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", accentBg)}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
       {delta && (
-        <p className={cn("mt-3 text-xs font-medium", trendColor)}>
+        <p className={cn("mt-3 text-xs font-medium tabular-nums", trendColor)}>
           {delta} <span className="text-muted-foreground font-normal">vs last week</span>
         </p>
       )}

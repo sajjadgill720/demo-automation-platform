@@ -27,16 +27,22 @@ export function TopNav({ title, actions }: { title: string; actions?: React.Reac
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
-        <button className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+        <button
+          aria-label="Help"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+        >
           <HelpCircle className="h-4 w-4" />
         </button>
-        <button className="relative rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+        <button
+          aria-label="Notifications"
+          className="relative rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+        >
           <Bell className="h-4 w-4" />
           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
         </button>
         <Link
           to="/demo-preview"
-          className="hidden rounded-lg border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted md:inline-block"
+          className="hidden rounded-lg border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors md:inline-block"
         >
           View demo as client
         </Link>

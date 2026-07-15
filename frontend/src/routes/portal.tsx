@@ -49,7 +49,21 @@ function PortalGate() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#070a13] dark:bg-zinc-950 text-slate-200 px-4 font-mono relative overflow-hidden">
-      
+
+      {/* Fine-line crosshatch grid backdrop */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.35]"
+        style={{
+          backgroundImage: [
+            "linear-gradient(to right, rgba(63,63,70,0.25) 1px, transparent 1px)",
+            "linear-gradient(to bottom, rgba(63,63,70,0.25) 1px, transparent 1px)",
+          ].join(", "),
+          backgroundSize: "64px 64px",
+        }}
+      />
+      {/* Ambient amber glow */}
+      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] bg-amber-500/[0.045] blur-[130px] rounded-full z-0" />
+
       {/* Global Page Guidelines */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="mx-auto h-full max-w-7xl relative">
@@ -58,11 +72,19 @@ function PortalGate() {
         </div>
       </div>
 
+      {/* Brand mark */}
+      <div className="relative z-10 mb-8 flex items-center gap-3 text-white select-none">
+        <div className="h-7 w-7 border border-zinc-700 flex items-center justify-center bg-zinc-900 font-bold text-xs uppercase tracking-tight">
+          DQ
+        </div>
+        <span className="uppercase tracking-widest text-sm font-semibold">DataQuartz</span>
+      </div>
+
       <div className="relative z-10 w-full max-w-md border border-zinc-800 bg-[#0c101d]/60 backdrop-blur-md p-8 rounded-xl shadow-2xl overflow-hidden transition-all duration-300">
         <div className="absolute top-0 left-0 w-full h-[3px] bg-amber-500 animate-pulse" />
 
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 shadow-inner shadow-amber-500/5">
             <Lock className="h-5 w-5 text-amber-500" />
           </div>
           <div>

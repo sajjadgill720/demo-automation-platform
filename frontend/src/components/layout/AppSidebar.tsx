@@ -26,6 +26,9 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
+        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+          Workspace
+        </p>
         {nav.map((item) => {
           const active =
             item.to === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.to);
@@ -34,13 +37,16 @@ export function AppSidebar() {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
-              <item.icon className="h-4 w-4" />
+              {active && (
+                <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-amber-500" />
+              )}
+              <item.icon className={cn("h-4 w-4", active && "text-amber-500")} />
               {item.label}
             </Link>
           );

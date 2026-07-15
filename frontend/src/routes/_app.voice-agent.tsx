@@ -143,7 +143,7 @@ function VoiceAgent() {
       <div className="grid gap-6 p-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           {/* Waveform & Info */}
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -179,7 +179,7 @@ function VoiceAgent() {
           </div>
 
           {/* Connected Functions */}
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold">Connected functions</h3>
@@ -213,7 +213,7 @@ function VoiceAgent() {
           </div>
 
           {/* Knowledge Base */}
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <div className="mb-4">
               <h3 className="text-sm font-semibold">Knowledge base</h3>
               <p className="text-xs text-muted-foreground">
@@ -267,7 +267,7 @@ function VoiceAgent() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold">Call settings</h3>
             <label className="mt-4 flex items-center justify-between text-sm cursor-pointer">
               <span>
@@ -294,7 +294,7 @@ function VoiceAgent() {
             </label>
           </div>
 
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold">Agent actions</h3>
             <div className="mt-4 space-y-2">
               <button

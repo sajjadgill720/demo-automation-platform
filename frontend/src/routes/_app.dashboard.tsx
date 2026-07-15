@@ -158,7 +158,7 @@ function Dashboard() {
 
         {/* Dynamic Analytics & Visualization Graph */}
         <div className="grid gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 rounded-xl border bg-card p-5 shadow-sm">
+          <div className="xl:col-span-2 elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-sm font-semibold text-foreground">Performance analytics</h2>
               <p className="text-xs text-muted-foreground">
@@ -231,7 +231,7 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-5 shadow-sm flex flex-col justify-between">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm flex flex-col justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Pipeline health</h2>
               <p className="text-xs text-muted-foreground">Demo generator pipeline distribution</p>
@@ -266,7 +266,7 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-sm">
+        <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Pipeline overview</h2>
@@ -310,7 +310,7 @@ function Dashboard() {
               <h2 className="text-sm font-semibold text-foreground">Recent activity</h2>
               <button
                 onClick={handleMarkAllRead}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
               >
                 Clear activities
               </button>

@@ -110,7 +110,8 @@ function ActiveDemos() {
         <div className="relative">
           <button
             onClick={() => setOpenMenu(openMenu === r.id ? null : r.id)}
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Demo actions"
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
@@ -230,7 +231,7 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted ${
+      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted cursor-pointer transition-colors ${
         danger ? "text-destructive hover:bg-destructive/5" : "text-foreground"
       }`}
     >

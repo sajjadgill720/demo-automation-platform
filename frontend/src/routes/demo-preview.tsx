@@ -376,10 +376,15 @@ function DemoPreview() {
 
         {/* Header */}
         <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 no-print">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            <span className="uppercase tracking-widest text-[10px]">Powered by DataQuartz AI</span>
-          </div>
+          <Link to="/" className="flex items-center gap-3 text-xs text-muted-foreground font-mono group">
+            <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary text-foreground font-bold text-[10px] uppercase tracking-tight group-hover:border-amber-500/50 transition-colors">
+              DQ
+            </div>
+            <span className="flex items-center gap-2 uppercase tracking-widest text-[10px]">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              Powered by DataQuartz AI
+            </span>
+          </Link>
           <div className="flex items-center gap-3">
             <button
               onClick={toggleTheme}

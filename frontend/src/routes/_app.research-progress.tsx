@@ -52,7 +52,7 @@ function ResearchPage() {
       <TopNav title="Research in progress" />
       <div className="grid gap-6 p-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Pipeline</h2>
@@ -103,7 +103,7 @@ function ResearchPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <CompanyLogo company={company} size={48} />
               <div>

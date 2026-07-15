@@ -141,7 +141,7 @@ function Settings() {
           {/* GENERAL SETTINGS */}
           <TabsContent value="general">
             <div className="space-y-6">
-              <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
                 <h2 className="text-sm font-semibold text-foreground">Workspace Profile</h2>
                 <p className="text-xs text-muted-foreground mb-4">
                   Manage details of your organization workspace
@@ -264,7 +264,7 @@ function Settings() {
 
           {/* VAPI / VOICE SETTINGS */}
           <TabsContent value="vapi">
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
               <h2 className="text-sm font-semibold text-foreground">Voice Agent Infrastructure</h2>
               <p className="text-xs text-muted-foreground mb-4">
                 Configure default credentials and LLM providers for Vapi
@@ -397,7 +397,7 @@ function Settings() {
           {/* TEAM MEMBERS */}
           <TabsContent value="team">
             <div className="space-y-6">
-              <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
                 <div className="flex justify-between items-center mb-1">
                   <h2 className="text-sm font-semibold text-foreground">Workspace Seats</h2>
                   <span className="text-xs font-medium text-foreground">
@@ -487,7 +487,7 @@ function Settings() {
           {/* BILLING SETTINGS */}
           <TabsContent value="billing">
             <div className="space-y-6">
-              <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Current Subscription</h2>
@@ -551,7 +551,7 @@ function Settings() {
               </div>
 
               {/* Invoices List */}
-              <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
                 <h2 className="text-sm font-semibold text-foreground">Invoices history</h2>
                 <p className="text-xs text-muted-foreground mb-4">
                   View and download your invoices receipts
@@ -610,7 +610,7 @@ function Settings() {
 
           {/* INTEGRATIONS SETTINGS */}
           <TabsContent value="integrations">
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="elevated-card rounded-xl border bg-card p-6 shadow-sm">
               <h2 className="text-sm font-semibold text-foreground">TMS & CRM Integrations</h2>
               <p className="text-xs text-muted-foreground mb-4">
                 Connect external accounts and systems with DataQuartz pipelines
