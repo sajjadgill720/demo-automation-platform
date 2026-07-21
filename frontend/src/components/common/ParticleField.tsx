@@ -47,7 +47,7 @@ export function ParticleField({
         opacity: Math.random() * 0.5 + 0.2,
       }));
     },
-    [particleCount]
+    [particleCount],
   );
 
   useEffect(() => {
@@ -58,9 +58,7 @@ export function ParticleField({
     if (!ctx) return;
 
     // Respect prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion) return;
 
     const resize = () => {
@@ -150,10 +148,7 @@ export function ParticleField({
 
           if (dist < connectionDistance) {
             const opacity = (1 - dist / connectionDistance) * 0.15;
-            ctx.strokeStyle = lineColor.replace(
-              /[\d.]+\)$/,
-              `${opacity})`
-            );
+            ctx.strokeStyle = lineColor.replace(/[\d.]+\)$/, `${opacity})`);
             ctx.lineWidth = 0.5;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
@@ -165,10 +160,7 @@ export function ParticleField({
 
       // Draw particles
       for (const p of particles) {
-        ctx.fillStyle = particleColor.replace(
-          /[\d.]+\)$/,
-          `${p.opacity * scrollOpacity.current})`
-        );
+        ctx.fillStyle = particleColor.replace(/[\d.]+\)$/, `${p.opacity * scrollOpacity.current})`);
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();

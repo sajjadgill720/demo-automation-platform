@@ -84,7 +84,9 @@ function DemoPreview() {
       return {
         name: search.name || "Elena",
         company: search.company || "ABC Logistics",
-        problem: search.problem || "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
+        problem:
+          search.problem ||
+          "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
         language: search.language || "English (US Accent)",
         tools: search.tools || "Descartes, Trimble, Salesforce",
       };
@@ -100,7 +102,9 @@ function DemoPreview() {
             return {
               name: parsed.name || "Elena",
               company: parsed.company || "ABC Logistics",
-              problem: parsed.problem || "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
+              problem:
+                parsed.problem ||
+                "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
               language: parsed.language || "English (US Accent)",
               tools: parsed.tools || "Descartes, Trimble, Salesforce",
             };
@@ -115,7 +119,8 @@ function DemoPreview() {
     return {
       name: "Elena",
       company: "ABC Logistics",
-      problem: "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
+      problem:
+        "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
       language: "English (US Accent)",
       tools: "Descartes, Trimble, Salesforce",
     };
@@ -126,13 +131,13 @@ function DemoPreview() {
     const name = personalization.company;
     const initials = name
       ? name
-          .split(" ")
-          .map((w: string) => w[0])
-          .join("")
-          .substring(0, 2)
-          .toUpperCase()
+        .split(" ")
+        .map((w: string) => w[0])
+        .join("")
+        .substring(0, 2)
+        .toUpperCase()
       : "DQ";
-    
+
     let hash = 0;
     for (let i = 0; i < (name || "").length; i++) {
       hash = (name || "").charCodeAt(i) + ((hash << 5) - hash);
@@ -151,12 +156,14 @@ function DemoPreview() {
   const [vapi, setVapi] = useState<any>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "on-call" | "ended">("idle");
   const [activeConsoleTab, setActiveConsoleTab] = useState<"browser" | "phone">("browser");
-  
+
   // Simulated Phone Call States
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [phoneCallState, setPhoneCallState] = useState<"idle" | "dialing" | "connected" | "ended">("idle");
+  const [phoneCallState, setPhoneCallState] = useState<"idle" | "dialing" | "connected" | "ended">(
+    "idle",
+  );
   const [phoneCountdown, setPhoneCountdown] = useState(105); // 1:45
-  
+
   // Feedback States
   const [feedbackRating, setFeedbackRating] = useState<"positive" | "negative" | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
@@ -186,8 +193,14 @@ function DemoPreview() {
 
     import("@vapi-ai/web").then((VapiModule) => {
       try {
-        const VapiClass = VapiModule.default;
-        const vapiInstance = new VapiClass(VAPI_PUBLIC_KEY);
+        let VapiClass = VapiModule.default;
+        if (typeof VapiClass !== "function" && VapiClass && typeof (VapiClass as any).default === "function") {
+          VapiClass = (VapiClass as any).default;
+        }
+        if (typeof VapiClass !== "function") {
+          VapiClass = VapiModule as any;
+        }
+        const vapiInstance = new (VapiClass as any)(VAPI_PUBLIC_KEY);
 
         vapiInstance.on("call-start", () => {
           setCallStatus("on-call");
@@ -216,12 +229,7 @@ function DemoPreview() {
         vapi.stop();
       }
       // Best-effort unmount cleanup for the Vapi assistant.
-      // NOTE: This will NOT fire reliably on tab close or browser crash.
-      // TODO: scheduled backstop job to delete Vapi assistants where
-      // agent_status is still "active" after N hours with no end-session call.
-      if (dynamicLeadId) {
-        endDemoSession(dynamicLeadId).catch(() => {});
-      }
+      // Removed endDemoSession here because React StrictMode triggers it instantly during dev, deleting the backend agent before the user can even test it!
     };
   }, []);
 
@@ -244,7 +252,8 @@ function DemoPreview() {
       return;
     }
     // Prefer dynamic assistant_id from URL params; fall back to static env var
-    const assistantId = dynamicAssistantId || (import.meta.env.VITE_VAPI_ASSISTANT_ID as string) || "";
+    const assistantId =
+      dynamicAssistantId || (import.meta.env.VITE_VAPI_ASSISTANT_ID as string) || "";
     if (!assistantId) {
       toast.error("No assistant ID available. Please complete the onboarding wizard first.");
       return;
@@ -265,7 +274,7 @@ function DemoPreview() {
     // Best-effort cleanup: delete the Vapi assistant on the backend
     if (dynamicLeadId) {
       endDemoSession(dynamicLeadId).catch((err) =>
-        console.error("endDemoSession failed (non-blocking):", err)
+        console.error("endDemoSession failed (non-blocking):", err),
       );
     }
   };
@@ -321,7 +330,7 @@ function DemoPreview() {
     toast.success(
       feedbackRating === "positive"
         ? "Thank you for the feedback!"
-        : "Revision request submitted. An operations engineer is checking your specs."
+        : "Revision request submitted. An operations engineer is checking your specs.",
     );
   };
 
@@ -333,8 +342,10 @@ function DemoPreview() {
 
   return (
     <div className={cn(theme === "dark" && "dark")}>
-      <div className="min-h-screen bg-background text-foreground relative overflow-hidden" id="print-section">
-        
+      <div
+        className="min-h-screen bg-background text-foreground relative overflow-hidden"
+        id="print-section"
+      >
         {/* Print Stylesheet (N1) */}
         <style>{`
           @media print {
@@ -370,13 +381,22 @@ function DemoPreview() {
               backgroundSize: "64px 64px",
             }}
           />
-          <div className="absolute top-[5%] left-[20%] w-[28rem] h-[28rem] bg-amber-500/[0.04] dark:bg-amber-500/[0.025] blur-[110px] rounded-full animate-pulse" style={{ animationDuration: "9s" }} />
-          <div className="absolute top-[30%] right-[10%] w-[35rem] h-[35rem] bg-violet-500/[0.035] dark:bg-violet-500/[0.02] blur-[130px] rounded-full animate-pulse" style={{ animationDuration: "12s" }} />
+          <div
+            className="absolute top-[5%] left-[20%] w-[28rem] h-[28rem] bg-amber-500/[0.04] dark:bg-amber-500/[0.025] blur-[110px] rounded-full animate-pulse"
+            style={{ animationDuration: "9s" }}
+          />
+          <div
+            className="absolute top-[30%] right-[10%] w-[35rem] h-[35rem] bg-violet-500/[0.035] dark:bg-violet-500/[0.02] blur-[130px] rounded-full animate-pulse"
+            style={{ animationDuration: "12s" }}
+          />
         </div>
 
         {/* Header */}
         <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 no-print">
-          <Link to="/" className="flex items-center gap-3 text-xs text-muted-foreground font-mono group">
+          <Link
+            to="/"
+            className="flex items-center gap-3 text-xs text-muted-foreground font-mono group"
+          >
             <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary text-foreground font-bold text-[10px] uppercase tracking-tight group-hover:border-amber-500/50 transition-colors">
               DQ
             </div>
@@ -391,7 +411,11 @@ function DemoPreview() {
               className="p-2 border border-border hover:bg-secondary text-foreground transition-colors cursor-pointer bg-transparent"
               aria-label="Toggle Theme"
             >
-              {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
         </header>
@@ -431,12 +455,28 @@ function DemoPreview() {
                   Meet the Convoa voice agent configured for {personalization.company}
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto font-sans">
-                  Based on your challenge summary: <strong className="text-foreground/90 font-medium">"{personalization.problem}"</strong> and requirements criteria, we've compiled a sandbox integration simulating connections to <strong className="text-foreground/90 font-medium">{personalization.tools}</strong> systems, running in an <strong className="text-foreground/90 font-medium">{personalization.language}</strong> accent.
+                  Based on your challenge summary:{" "}
+                  <strong className="text-foreground/90 font-medium">
+                    "{personalization.problem}"
+                  </strong>{" "}
+                  and requirements criteria, we've compiled a sandbox integration simulating
+                  connections to{" "}
+                  <strong className="text-foreground/90 font-medium">
+                    {personalization.tools}
+                  </strong>{" "}
+                  systems, running in an{" "}
+                  <strong className="text-foreground/90 font-medium">
+                    {personalization.language}
+                  </strong>{" "}
+                  accent.
                 </p>
               </motion.div>
 
               {/* C2: Live Demonstration Hub (Interactive Console) */}
-              <motion.div variants={fadeUp} className="w-full max-w-xl border border-border bg-secondary/35 p-6 md:p-8 rounded-lg relative no-print shadow-xl">
+              <motion.div
+                variants={fadeUp}
+                className="w-full max-w-xl border border-border bg-secondary/35 p-6 md:p-8 rounded-lg relative no-print shadow-xl"
+              >
                 <div className="absolute top-3 left-4 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
                   <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -453,7 +493,7 @@ function DemoPreview() {
                       "flex-1 pb-3 text-xs uppercase tracking-wider font-semibold font-mono border-b-2 transition-all cursor-pointer bg-transparent",
                       activeConsoleTab === "browser"
                         ? "border-amber-500 text-amber-500"
-                        : "border-transparent text-foreground/55 hover:text-foreground"
+                        : "border-transparent text-foreground/55 hover:text-foreground",
                     )}
                   >
                     Call in Browser
@@ -464,7 +504,7 @@ function DemoPreview() {
                       "flex-1 pb-3 text-xs uppercase tracking-wider font-semibold font-mono border-b-2 transition-all cursor-pointer bg-transparent",
                       activeConsoleTab === "phone"
                         ? "border-amber-500 text-amber-500"
-                        : "border-transparent text-foreground/55 hover:text-foreground"
+                        : "border-transparent text-foreground/55 hover:text-foreground",
                     )}
                   >
                     Outbound Call Simulation
@@ -476,13 +516,15 @@ function DemoPreview() {
                   <div className="space-y-6">
                     <div className="flex justify-center relative py-2">
                       <button
-                        onClick={callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall}
+                        onClick={
+                          callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall
+                        }
                         disabled={callStatus === "connecting"}
                         className={cn(
                           "h-20 w-20 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-lg outline-none focus:ring-4 font-mono bg-transparent",
                           callStatus === "on-call"
                             ? "bg-rose-500/10 border-rose-500 text-rose-500 hover:bg-rose-500/20 focus:ring-rose-500/20 animate-pulse"
-                            : "bg-primary/10 border-primary text-primary hover:bg-primary/20 focus:ring-primary/25"
+                            : "bg-primary/10 border-primary text-primary hover:bg-primary/20 focus:ring-primary/25",
                         )}
                       >
                         {callStatus === "on-call" ? (
@@ -519,10 +561,14 @@ function DemoPreview() {
                         {callStatus === "ended" && "SESSION COMPLETED"}
                       </p>
                       <p className="text-foreground/50 font-sans max-w-sm mx-auto">
-                        {callStatus === "idle" && "Click the receiver to launch a speech dialog session with your demo agent."}
-                        {callStatus === "connecting" && "Initializing speech protocols and loading credentials..."}
-                        {callStatus === "on-call" && "Talk directly in your browser. Confirm scheduling tasks or ask the agent details."}
-                        {callStatus === "ended" && "Thank you. Use the CTA below if you wish to deploy this configuration."}
+                        {callStatus === "idle" &&
+                          "Click the receiver to launch a speech dialog session with your demo agent."}
+                        {callStatus === "connecting" &&
+                          "Initializing speech protocols and loading credentials..."}
+                        {callStatus === "on-call" &&
+                          "Talk directly in your browser. Confirm scheduling tasks or ask the agent details."}
+                        {callStatus === "ended" &&
+                          "Thank you. Use the CTA below if you wish to deploy this configuration."}
                       </p>
                     </div>
                   </div>
@@ -534,10 +580,13 @@ function DemoPreview() {
                     {phoneCallState === "idle" && (
                       <form onSubmit={triggerPhoneCallSimulation} className="space-y-4 font-sans">
                         <p className="text-xs text-foreground/75 leading-relaxed">
-                          Receive a direct phone call from this agent to experience it like a driver/client on a standard cellular connection.
+                          Receive a direct phone call from this agent to experience it like a
+                          driver/client on a standard cellular connection.
                         </p>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">Phone Number</label>
+                          <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
+                            Phone Number
+                          </label>
                           <div className="flex gap-2">
                             <input
                               type="tel"
@@ -564,8 +613,12 @@ function DemoPreview() {
                           <Phone className="h-4 w-4" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500">Dialing Outbound Connection...</p>
-                          <p className="text-[11px] text-foreground/50">Calling your mobile line at {phoneNumber}.</p>
+                          <p className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500">
+                            Dialing Outbound Connection...
+                          </p>
+                          <p className="text-[11px] text-foreground/50">
+                            Calling your mobile line at {phoneNumber}.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -580,7 +633,8 @@ function DemoPreview() {
                           <span>Duration: {formatTime(phoneCountdown)}</span>
                         </div>
                         <p className="text-xs text-foreground/80 leading-relaxed font-sans max-w-sm mx-auto">
-                          Our AI dispatcher is speaking with you. Answer the call and verify dispatch tasks, request details, or test exception protocols.
+                          Our AI dispatcher is speaking with you. Answer the call and verify
+                          dispatch tasks, request details, or test exception protocols.
                         </p>
                         <button
                           onClick={() => setPhoneCallState("ended")}
@@ -596,7 +650,9 @@ function DemoPreview() {
                         <div className="h-10 w-10 border border-border bg-secondary text-foreground flex items-center justify-center rounded-full mx-auto">
                           <CheckCircle className="h-5 w-5 text-emerald-500" />
                         </div>
-                        <p className="text-xs font-mono font-bold uppercase tracking-wider">Outbound Call Ended</p>
+                        <p className="text-xs font-mono font-bold uppercase tracking-wider">
+                          Outbound Call Ended
+                        </p>
                         <button
                           onClick={() => {
                             setPhoneCallState("idle");
@@ -613,36 +669,53 @@ function DemoPreview() {
 
                 {/* Anxiety Reduction Badges (N2) */}
                 <div className="flex items-center justify-center gap-4 text-[10px] text-foreground/40 font-mono mt-6 pt-4 border-t border-border/40">
-                  <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> SOC 2 SECURED</span>
+                  <span className="flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> SOC 2 SECURED
+                  </span>
                   <span>·</span>
-                  <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> GDPR REGION-LOCKED</span>
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3" /> GDPR REGION-LOCKED
+                  </span>
                   <span>·</span>
-                  <span className="flex items-center gap-1"><Volume2 className="h-3 w-3" /> AUDIO IS ENCRYPTED</span>
+                  <span className="flex items-center gap-1">
+                    <Volume2 className="h-3 w-3" /> AUDIO IS ENCRYPTED
+                  </span>
                 </div>
               </motion.div>
 
               {/* C3: Objection Handling Cards ( PROCUREMENT GRID ) */}
-              <motion.div variants={fadeUp} className="w-full grid gap-6 md:grid-cols-3 text-left border-t border-border pt-8 mt-4 font-sans">
+              <motion.div
+                variants={fadeUp}
+                className="w-full grid gap-6 md:grid-cols-3 text-left border-t border-border pt-8 mt-4 font-sans"
+              >
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground/90">How long to deploy?</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground/90">
+                    How long to deploy?
+                  </h4>
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
-                    Under 3 weeks. Convoa connects natively with Descartes, Trimble, and SAP ERP without locking up custom developer resources.
+                    Under 3 weeks. Convoa connects natively with Descartes, Trimble, and SAP ERP
+                    without locking up custom developer resources.
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground/90">Is my data secure?</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground/90">
+                    Is my data secure?
+                  </h4>
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
-                    Yes. All sessions are encrypted in transit and at rest. GDPR compliant, EU-hosted nodes. Sandbox data automatically purges after 30 days.
+                    Yes. All sessions are encrypted in transit and at rest. GDPR compliant,
+                    EU-hosted nodes. Sandbox data automatically purges after 30 days.
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground/90">Can we pilot first?</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-foreground/90">
+                    Can we pilot first?
+                  </h4>
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
-                    We support single-site beta trials with your custom rules and databases so you can verify response accuracy before rollout.
+                    We support single-site beta trials with your custom rules and databases so you
+                    can verify response accuracy before rollout.
                   </p>
                 </div>
               </motion.div>
-
             </div>
           </div>
 
@@ -655,10 +728,15 @@ function DemoPreview() {
             className="border border-border p-8 md:p-10 space-y-8 bg-card/60 backdrop-blur-sm"
           >
             <div className="space-y-2">
-              <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">Operational Projections</span>
-              <h2 className="text-2xl font-normal tracking-tight">Before / After Comparison for {personalization.company}</h2>
+              <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">
+                Operational Projections
+              </span>
+              <h2 className="text-2xl font-normal tracking-tight">
+                Before / After Comparison for {personalization.company}
+              </h2>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-xl font-sans">
-                We mapped Convoa's autonomous execution against your stated dispatch floor workload bottlenecks:
+                We mapped Convoa's autonomous execution against your stated dispatch floor workload
+                bottlenecks:
               </p>
             </div>
 
@@ -685,7 +763,9 @@ function DemoPreview() {
                 <ul className="space-y-3 text-xs text-foreground/75 leading-relaxed font-sans list-disc list-inside">
                   <li>AI Dispatcher Handling: under 90 seconds average resolution.</li>
                   <li>100% answer rate: parallel inbound phone lines scale instantly.</li>
-                  <li>Automated schema synchronization: writes updates directly via system APIs.</li>
+                  <li>
+                    Automated schema synchronization: writes updates directly via system APIs.
+                  </li>
                 </ul>
               </div>
             </div>
@@ -693,7 +773,8 @@ function DemoPreview() {
             {/* ROI Pill Banner */}
             <div className="bg-emerald-500/[0.04] border border-emerald-500/20 p-4 text-center">
               <p className="text-xs font-semibold text-emerald-500 font-mono uppercase tracking-wider">
-                📈 Projected ROI for {personalization.company}: 81% reduction in ticket-resolution time & $0 cost-per-missed-dispatch.
+                📈 Projected ROI for {personalization.company}: 81% reduction in ticket-resolution
+                time & $0 cost-per-missed-dispatch.
               </p>
             </div>
           </motion.div>
@@ -709,10 +790,15 @@ function DemoPreview() {
             {/* Left: Call to Actions (6 columns) */}
             <div className="md:col-span-6 border border-border bg-card/60 p-8 flex flex-col justify-between space-y-6">
               <div className="space-y-2">
-                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">Action Hub</span>
-                <h3 className="text-lg font-semibold font-mono uppercase tracking-tight">Deploy This Configuration</h3>
+                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">
+                  Action Hub
+                </span>
+                <h3 className="text-lg font-semibold font-mono uppercase tracking-tight">
+                  Deploy This Configuration
+                </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed font-sans">
-                  If this demo matches your expected scheduling workflows, claim this agent to connect it to your testing databases and custom numbers.
+                  If this demo matches your expected scheduling workflows, claim this agent to
+                  connect it to your testing databases and custom numbers.
                 </p>
               </div>
 
@@ -744,10 +830,15 @@ function DemoPreview() {
             {/* Right: Champion Slack Toolkit & Share (6 columns) */}
             <div className="md:col-span-6 border border-border bg-card/60 p-8 flex flex-col justify-between space-y-6">
               <div className="space-y-2">
-                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">Internal Champion Toolkit</span>
-                <h3 className="text-lg font-semibold font-mono uppercase tracking-tight">Pitch Convoa Internally</h3>
+                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">
+                  Internal Champion Toolkit
+                </span>
+                <h3 className="text-lg font-semibold font-mono uppercase tracking-tight">
+                  Pitch Convoa Internally
+                </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed font-sans">
-                  Need to review this sandboxed configuration with your operations director or logistics lead? Use this pre-composed brief.
+                  Need to review this sandboxed configuration with your operations director or
+                  logistics lead? Use this pre-composed brief.
                 </p>
               </div>
 
@@ -757,7 +848,9 @@ function DemoPreview() {
                   <span className="text-amber-500">Copy to Slack</span>
                 </div>
                 <p className="text-[11px] text-foreground/75 leading-relaxed font-sans line-clamp-3">
-                  Hey team, generated this custom voice assistant for our dispatch floor using Convoa. Check out the sandbox and call the agent live here: {typeof window !== "undefined" ? window.location.href : ""}
+                  Hey team, generated this custom voice assistant for our dispatch floor using
+                  Convoa. Check out the sandbox and call the agent live here:{" "}
+                  {typeof window !== "undefined" ? window.location.href : ""}
                 </p>
                 <button
                   onClick={handleCopySlackMessage}
@@ -779,8 +872,12 @@ function DemoPreview() {
           >
             <div className="space-y-4">
               <div className="space-y-1.5 text-center">
-                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">Pipeline Feedback</span>
-                <h3 className="text-lg font-normal tracking-tight">Was this generated sandbox relevant?</h3>
+                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-semibold">
+                  Pipeline Feedback
+                </span>
+                <h3 className="text-lg font-normal tracking-tight">
+                  Was this generated sandbox relevant?
+                </h3>
               </div>
 
               {!feedbackSubmitted ? (
@@ -794,7 +891,7 @@ function DemoPreview() {
                         "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer bg-transparent",
                         feedbackRating === "positive"
                           ? "border-emerald-500 text-emerald-500 bg-emerald-500/[0.03]"
-                          : "border-border text-foreground hover:bg-secondary"
+                          : "border-border text-foreground hover:bg-secondary",
                       )}
                     >
                       <ThumbsUp className="h-4 w-4" /> Yes, Accurate
@@ -806,7 +903,7 @@ function DemoPreview() {
                         "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer bg-transparent",
                         feedbackRating === "negative"
                           ? "border-rose-500 text-rose-500 bg-rose-500/[0.03]"
-                          : "border-border text-foreground hover:bg-secondary"
+                          : "border-border text-foreground hover:bg-secondary",
                       )}
                     >
                       <ThumbsDown className="h-4 w-4" /> Needs Tweaks
@@ -817,14 +914,20 @@ function DemoPreview() {
                   {feedbackRating && (
                     <div className="space-y-1.5 text-left animate-fade-in">
                       <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/75">
-                        {feedbackRating === "positive" ? "What works well? (Optional)" : "What did the agent miss? (e.g. tools, workflow instructions) *"}
+                        {feedbackRating === "positive"
+                          ? "What works well? (Optional)"
+                          : "What did the agent miss? (e.g. tools, workflow instructions) *"}
                       </label>
                       <textarea
                         required={feedbackRating === "negative"}
                         rows={2}
                         value={feedbackText}
                         onChange={(e) => setFeedbackText(e.target.value)}
-                        placeholder={feedbackRating === "positive" ? "Provide any comments..." : "Tell us what to adjust so we can rebuild your agent..."}
+                        placeholder={
+                          feedbackRating === "positive"
+                            ? "Provide any comments..."
+                            : "Tell us what to adjust so we can rebuild your agent..."
+                        }
                         className="w-full bg-secondary border border-border px-3 py-2 text-foreground focus:outline-none focus:border-amber-500 text-xs font-mono resize-none"
                       />
                       <button
@@ -843,22 +946,27 @@ function DemoPreview() {
                   </div>
                   <p className="text-xs uppercase tracking-wider font-bold">Feedback Dispatched</p>
                   <p className="text-[11px] text-foreground/50 font-sans leading-relaxed max-w-xs mx-auto">
-                    Thank you. {feedbackRating === "negative" ? "Our engineering team will adjust the pipeline config and trigger a rebuild." : "Your comments are linked to your sandbox configuration profile."}
+                    Thank you.{" "}
+                    {feedbackRating === "negative"
+                      ? "Our engineering team will adjust the pipeline config and trigger a rebuild."
+                      : "Your comments are linked to your sandbox configuration profile."}
                   </p>
                 </div>
               )}
             </div>
           </motion.div>
-
         </motion.section>
 
         {/* Suggested Questions */}
         <section className="relative z-10 mx-auto max-w-6xl px-6 pb-20 no-print">
           <div className="space-y-4">
             <div>
-              <h2 className="text-xs font-semibold text-foreground font-mono uppercase tracking-wider">Try asking the agent</h2>
+              <h2 className="text-xs font-semibold text-foreground font-mono uppercase tracking-wider">
+                Try asking the agent
+              </h2>
               <p className="text-xs text-muted-foreground mt-1 font-sans">
-                Suggested questions grounded in {personalization.company}&apos;s public documentation and tools.
+                Suggested questions grounded in {personalization.company}&apos;s public
+                documentation and tools.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -882,7 +990,9 @@ function DemoPreview() {
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-[11px] text-muted-foreground font-mono">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="uppercase tracking-widest text-[9px]">Demo Active &middot; EU-Frankfurt Node</span>
+              <span className="uppercase tracking-widest text-[9px]">
+                Demo Active &middot; EU-Frankfurt Node
+              </span>
             </div>
             <span>&copy; DataQuartz &middot; Demo prepared 2026 &middot; Expires in 8 days</span>
           </div>
@@ -912,16 +1022,21 @@ function DemoPreview() {
                 {!bookingConfirmed ? (
                   <div className="space-y-5 text-left">
                     <div className="space-y-1">
-                      <span className="text-[9px] text-amber-500 uppercase tracking-widest font-semibold">Scheduler</span>
+                      <span className="text-[9px] text-amber-500 uppercase tracking-widest font-semibold">
+                        Scheduler
+                      </span>
                       <h3 className="text-base font-bold uppercase">Claim Agent & Book Setup</h3>
                       <p className="text-xs text-foreground/60 font-sans leading-relaxed">
-                        Select a 15-minute slot to connect this sandbox agent to your team's Descartes/Trimble live test databases.
+                        Select a 15-minute slot to connect this sandbox agent to your team's
+                        Descartes/Trimble live test databases.
                       </p>
                     </div>
 
                     {/* Time slots */}
                     <div className="space-y-2 font-mono">
-                      <p className="text-[10px] text-foreground/45 uppercase tracking-widest">Available Slots (Tomorrow)</p>
+                      <p className="text-[10px] text-foreground/45 uppercase tracking-widest">
+                        Available Slots (Tomorrow)
+                      </p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {["09:00 AM", "10:30 AM", "01:00 PM", "03:30 PM"].map((slot) => (
                           <button
@@ -931,7 +1046,7 @@ function DemoPreview() {
                               "border py-2.5 font-mono cursor-pointer transition-colors bg-transparent",
                               selectedTimeSlot === slot
                                 ? "border-amber-500 text-amber-500 bg-amber-500/5 font-semibold"
-                                : "border-border text-foreground hover:bg-secondary"
+                                : "border-border text-foreground hover:bg-secondary",
                             )}
                           >
                             {slot}
@@ -959,9 +1074,13 @@ function DemoPreview() {
                       <CheckCircle className="h-6 w-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="text-sm font-bold uppercase tracking-wider">Booking Confirmed!</h4>
+                      <h4 className="text-sm font-bold uppercase tracking-wider">
+                        Booking Confirmed!
+                      </h4>
                       <p className="text-xs text-foreground/60 font-sans leading-relaxed max-w-xs mx-auto">
-                        Your hand-off setup session is booked for tomorrow at <strong className="text-foreground">{selectedTimeSlot}</strong>. A calendar invite has been sent to your registered email.
+                        Your hand-off setup session is booked for tomorrow at{" "}
+                        <strong className="text-foreground">{selectedTimeSlot}</strong>. A calendar
+                        invite has been sent to your registered email.
                       </p>
                     </div>
                     <button
@@ -980,7 +1099,6 @@ function DemoPreview() {
             </div>
           )}
         </AnimatePresence>
-
       </div>
     </div>
   );

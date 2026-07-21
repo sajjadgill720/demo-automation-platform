@@ -49,7 +49,6 @@ function PortalGate() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#070a13] dark:bg-zinc-950 text-slate-200 px-4 font-mono relative overflow-hidden">
-
       {/* Fine-line crosshatch grid backdrop */}
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.35]"

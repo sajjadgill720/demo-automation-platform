@@ -69,7 +69,9 @@ export const submitLead = createServerFn({ method: "POST" })
       console.log(`Tools: ${tools || "N/A"}`);
       console.log(`Weekly Missed Calls: ${missed_calls || "N/A"}`);
       console.log(`Avg Booking Value: ${booking_value || "N/A"}`);
-      console.log(`Booking Requirements: ${booking_requirements ? booking_requirements.join(", ") : "N/A"}`);
+      console.log(
+        `Booking Requirements: ${booking_requirements ? booking_requirements.join(", ") : "N/A"}`,
+      );
       console.log("==========================================");
 
       const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;

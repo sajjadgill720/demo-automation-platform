@@ -146,40 +146,58 @@ def _call_vapi_create_assistant(name: str, prompt: str) -> str:
             raise e
 
 
-def sanitize_input(value: str) -> str:
-    """Sanitizes user input to prevent prompt injection and restrict length."""
-    if not value:
-        return ""
-    # Cap length at 100 characters to prevent buffer/context stuffing
-    value = value[:100]
-    # Strip brackets, braces, and angle brackets
-    value = re.sub(r'[{}[\]<>]', '', value)
-    # Strip common prompt injection keywords (case-insensitive)
-    injection_keywords = [
-        r"ignore\s+previous", r"system\s+prompt", r"instruction", 
-        r"override", r"you\s+are\s+now", r"bypass", r"developer\s+mode",
-        r"system:", r"human:", r"user:", r"assistant:"
-    ]
-    for pattern in injection_keywords:
-        value = re.sub(pattern, "", value, flags=re.IGNORECASE)
-    # Remove excessive whitespaces/newlines
-    value = " ".join(value.split())
-    return value
+from typing import Optional, Union, Any
+from app.utils import sanitize_input
 
 
-def compile_lead_prompt(company_name: str, industry: str) -> str:
-    """Reads the static, version-controlled markdown template and renders it after sanitization."""
+def compile_lead_prompt(company_name: str, industry: str, profile: Optional[Union[dict, Any]] = None) -> str:
+    """Reads the static, version-controlled markdown template and renders it after sanitization.
+
+    If profile is provided and contains non-UNKNOWN fields, injects a structured
+    Client-Specific Profile Context section into the rendered prompt.
+    """
     sanitized_company = sanitize_input(company_name)
     sanitized_industry = sanitize_input(industry)
-    
+
     # Load template from file
     template_path = os.path.join(os.path.dirname(__file__), "templates", "vapi_prompt_template.md")
     with open(template_path, "r", encoding="utf-8") as f:
         template_content = f.read()
-        
+
+    # Build profile context if available
+    profile_lines = []
+    if profile:
+        prof_dict = profile.dict() if hasattr(profile, "dict") else (profile if isinstance(profile, dict) else {})
+
+        prob = prof_dict.get("primary_problem")
+        if prob and prob != "UNKNOWN":
+            profile_lines.append(f"- **Primary Problem**: {prob}")
+
+        wf = prof_dict.get("current_workflow_summary")
+        if wf and wf != "UNKNOWN":
+            profile_lines.append(f"- **Current Workflow**: {wf}")
+
+        scenarios = prof_dict.get("must_handle_scenarios")
+        if scenarios and isinstance(scenarios, list) and len(scenarios) > 0:
+            profile_lines.append(f"- **Must-Handle Scenarios**: {', '.join(scenarios)}")
+
+        esc = prof_dict.get("escalation_preferences")
+        if esc and esc != "UNKNOWN":
+            profile_lines.append(f"- **Escalation Preference**: {esc}")
+
+        cust = prof_dict.get("desired_customizations")
+        if cust and cust != "UNKNOWN":
+            profile_lines.append(f"- **Desired Customizations**: {cust}")
+
+    if profile_lines:
+        profile_block = "\n\n## Client-Specific Profile Context:\n" + "\n".join(profile_lines)
+    else:
+        profile_block = ""
+
     # Render prompt
     rendered = template_content.replace("{{company_name}}", sanitized_company)
     rendered = rendered.replace("{{industry}}", sanitized_industry)
+    rendered = rendered.replace("{{profile_context}}", profile_block)
     return rendered
 
 
@@ -196,7 +214,25 @@ def provision_vapi_assistant_task(lead_id: str):
             return
             
         try:
-            assistant_id = _call_vapi_create_assistant(f"Convoa AI - {lead.company_name}", lead.rendered_prompt)
+            # Recompile prompt using the finalized company profile
+            from app.models import CompanyProfileDB
+            from sqlmodel import select
+            import json
+            
+            statement = select(CompanyProfileDB).where(CompanyProfileDB.lead_id == db_lead_id)
+            profile_db = session.exec(statement).first()
+            
+            profile_data = None
+            if profile_db and profile_db.profile:
+                try:
+                    profile_data = json.loads(profile_db.profile)
+                except Exception:
+                    pass
+            
+            rendered_prompt = compile_lead_prompt(lead.company_name, lead.industry, profile_data)
+            lead.rendered_prompt = rendered_prompt
+            
+            assistant_id = _call_vapi_create_assistant(f"Convoa AI - {lead.company_name}", rendered_prompt)
             
             lead.assistant_id = assistant_id
             lead.agent_status = AgentStatus.active

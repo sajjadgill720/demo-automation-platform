@@ -1,12 +1,24 @@
 from contextlib import asynccontextmanager
+import json
 import uuid
 import logging
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+import urllib.request
+import urllib.error
+import io
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
+from pypdf import PdfReader
+
+# SlowAPI imports
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
 
 from app.logging_config import setup_logging
 # Initialize structured JSON logging
@@ -16,7 +28,14 @@ logger = logging.getLogger(__name__)
 
 from app.db import init_db, get_session
 from app.config import CORS_ORIGINS
-from app.models import DiscoveryResponse, VoiceAgent, Lead, AgentStatus
+from app.models import (
+    DiscoveryResponse, 
+    VoiceAgent, 
+    Lead, 
+    AgentStatus, 
+    Document, 
+    CompanyProfileDB
+)
 from app.agents import (
     compile_agent_prompt, 
     provision_vapi_assistant,
@@ -24,6 +43,16 @@ from app.agents import (
     provision_vapi_assistant_task,
     delete_vapi_assistant
 )
+from app.qualifier import QualifyRequest, QualificationResult, qualify_lead_internal
+from app.clarification import (
+    start_clarification,
+    submit_clarification_answer,
+    skip_remaining_questions,
+    get_clarification_status,
+    ClarificationStatus,
+    ClarificationAnswer
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,6 +75,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# SlowAPI rate limiter setup
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 class DiscoveryCreate(BaseModel):
     company_name: str
@@ -74,6 +107,9 @@ class LeadResponse(BaseModel):
     agent_status: AgentStatus
     assistant_id: Optional[str] = None
     failure_reason: Optional[str] = None
+    qualified: Optional[bool] = None
+    qualification_confidence: Optional[float] = None
+    qualification_reasoning: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -156,14 +192,22 @@ def get_agents(session: Session = Depends(get_session)):
     return results
 
 
+@app.post("/api/qualify", response_model=QualificationResult)
+def qualify_lead(payload: QualifyRequest):
+    """Exposes the internal lead qualification LangGraph workflow.
+    
+    Exposed for backward compatibility and integration testing.
+    """
+    return qualify_lead_internal(payload.company_name, payload.industry)
+
+
 @app.post("/api/demo-request", response_model=LeadResponse, status_code=201)
 def create_demo_request(
     payload: DemoRequestCreate,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
     """Creates a new demo request lead, renders their prompt template,
-    and schedules Vapi assistant provisioning in the background.
+    and returns lead_id immediately. Ingestion/clarification runs next.
     """
     logger.info(
         "Received demo request",
@@ -188,13 +232,6 @@ def create_demo_request(
     session.refresh(lead)
     
     logger.info("Saved lead to database", extra={"extra_data": {"lead_id": str(lead.id)}})
-    
-    # Enqueue background task to provision the Vapi assistant
-    # NOTE: BackgroundTasks does not persist across a server restart and has no retry queue of its own.
-    # Acceptable for this MVP scope. When this graduates toward the full roadmap, this needs to move
-    # to Celery + Redis for durability — do not let this quietly stay as BackgroundTasks once real traffic depends on it.
-    background_tasks.add_task(provision_vapi_assistant_task, str(lead.id))
-    
     return lead
 
 
@@ -239,5 +276,194 @@ def end_demo_session(lead_id: uuid.UUID, session: Session = Depends(get_session)
     
     logger.info("Demo session ended successfully", extra={"extra_data": {"lead_id": str(lead_id)}})
     return {"message": "Demo session ended successfully", "agent_status": lead.agent_status}
+
+
+# ── Document Parsing and Clarification API Endpoints ──
+
+def extract_text_from_file(file_bytes: bytes, file_name: str) -> str:
+    """Extracts plain text from file bytes (supports txt and pdf)."""
+    ext = file_name.split(".")[-1].lower()
+    
+    if ext == "txt":
+        try:
+            return file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                return file_bytes.decode("latin-1")
+            except Exception:
+                return ""
+                
+    elif ext == "pdf":
+        try:
+            pdf = PdfReader(io.BytesIO(file_bytes))
+            text_parts = []
+            for page in pdf.pages:
+                text_parts.append(page.extract_text() or "")
+            return "\n".join(text_parts)
+        except Exception as e:
+            logger.error(f"Error extracting PDF text: {e}", exc_info=True)
+            return ""
+            
+    else:
+        try:
+            return file_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            return ""
+
+
+@app.post("/api/clarification/{lead_id}/documents", response_model=dict)
+@limiter.limit("5/minute")
+async def upload_clarification_documents(
+    lead_id: uuid.UUID,
+    request: Request,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session)
+):
+    """Multipart upload to ingest a document for a lead, storing in Supabase."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+        
+    max_size = 10 * 1024 * 1024
+    content = await file.read()
+    if len(content) > max_size:
+        raise HTTPException(status_code=400, detail="File too large. Max size is 10MB.")
+        
+    allowed_types = ["application/pdf", "text/plain"]
+    if file.content_type not in allowed_types and not file.filename.endswith((".pdf", ".txt")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and TXT files are allowed.")
+        
+    extracted_text = extract_text_from_file(content, file.filename)
+    
+    from app.storage import upload_document
+    unique_path = f"leads/{lead_id}/{uuid.uuid4()}_{file.filename}"
+    file_url = upload_document("clarifications", unique_path, content, file.content_type or "application/octet-stream")
+    
+    db_doc = Document(
+        lead_id=lead_id,
+        file_url=file_url,
+        file_type=file.filename.split(".")[-1],
+        file_size_bytes=len(content),
+        extracted_text=extracted_text
+    )
+    session.add(db_doc)
+    session.commit()
+    session.refresh(db_doc)
+    
+    logger.info(f"[{lead_id}] Uploaded and parsed document {file.filename}")
+    return {
+        "message": "Document uploaded and parsed successfully",
+        "document_id": str(db_doc.id),
+        "file_url": file_url,
+        "extracted_text_preview": extracted_text[:200] if extracted_text else ""
+    }
+
+
+class ConsentPayload(BaseModel):
+    ai_processing_consent: bool
+
+
+@app.post("/api/clarification/{lead_id}/consent", response_model=dict)
+def set_lead_consent(
+    lead_id: uuid.UUID,
+    payload: ConsentPayload,
+    session: Session = Depends(get_session)
+):
+    """Sets AI processing consent for a lead and records timestamp."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+
+    lead.ai_processing_consent = payload.ai_processing_consent
+    lead.consent_recorded_at = datetime.utcnow()
+    lead.updated_at = datetime.utcnow()
+    session.add(lead)
+    session.commit()
+    session.refresh(lead)
+
+    logger.info(f"[{lead_id}] AI processing consent updated: consent={lead.ai_processing_consent} at {lead.consent_recorded_at}")
+    return {
+        "message": "Consent recorded successfully",
+        "lead_id": str(lead.id),
+        "ai_processing_consent": lead.ai_processing_consent,
+        "consent_recorded_at": lead.consent_recorded_at.isoformat() if lead.consent_recorded_at else None
+    }
+
+
+@app.post("/api/clarification/{lead_id}/start", response_model=ClarificationStatus)
+def start_lead_clarification(
+    lead_id: uuid.UUID, 
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
+    """Invokes the LangGraph clarification workflow for the lead."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+    try:
+        status = start_clarification(str(lead_id))
+        if status.status == "completed":
+            background_tasks.add_task(provision_vapi_assistant_task, str(lead_id))
+        return status
+    except Exception as e:
+        logger.error(f"[{lead_id}] Error starting clarification: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/clarification/{lead_id}/respond", response_model=ClarificationStatus)
+@limiter.limit("20/minute")
+def respond_lead_clarification(
+    lead_id: uuid.UUID,
+    payload: ClarificationAnswer,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
+    """Submits a chat response from the user to continue the clarification graph loop."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+    try:
+        status = submit_clarification_answer(str(lead_id), payload.answer)
+        if status.status == "completed":
+            background_tasks.add_task(provision_vapi_assistant_task, str(lead_id))
+        return status
+    except Exception as e:
+        logger.error(f"[{lead_id}] Error submitting clarification response: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/clarification/{lead_id}/skip-remaining", response_model=ClarificationStatus)
+def skip_lead_clarification(
+    lead_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
+    """Skips the remaining questions to immediately qualify/disqualify the lead with existing profile."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+    try:
+        status = skip_remaining_questions(str(lead_id))
+        if status.status == "completed":
+            background_tasks.add_task(provision_vapi_assistant_task, str(lead_id))
+        return status
+    except Exception as e:
+        logger.error(f"[{lead_id}] Error skipping clarification: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/clarification/{lead_id}", response_model=ClarificationStatus)
+def get_lead_clarification(lead_id: uuid.UUID, session: Session = Depends(get_session)):
+    """Fetches the current status and profile extraction info for the lead."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+    try:
+        return get_clarification_status(str(lead_id))
+    except Exception as e:
+        logger.error(f"[{lead_id}] Error getting clarification status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 

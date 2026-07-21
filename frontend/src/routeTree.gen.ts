@@ -9,8 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
 import { Route as PortalRouteImport } from './routes/portal'
+import { Route as PipelineRouteImport } from './routes/pipeline'
 import { Route as DemoPreviewRouteImport } from './routes/demo-preview'
+import { Route as ClarificationRouteImport } from './routes/clarification'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppVoiceAgentRouteImport } from './routes/_app.voice-agent'
@@ -20,14 +23,29 @@ import { Route as AppNewDemoRouteImport } from './routes/_app.new-demo'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppActiveDemosRouteImport } from './routes/_app.active-demos'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PortalRoute = PortalRouteImport.update({
   id: '/portal',
   path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PipelineRoute = PipelineRouteImport.update({
+  id: '/pipeline',
+  path: '/pipeline',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DemoPreviewRoute = DemoPreviewRouteImport.update({
   id: '/demo-preview',
   path: '/demo-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClarificationRoute = ClarificationRouteImport.update({
+  id: '/clarification',
+  path: '/clarification',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -72,8 +90,11 @@ const AppActiveDemosRoute = AppActiveDemosRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/clarification': typeof ClarificationRoute
   '/demo-preview': typeof DemoPreviewRoute
+  '/pipeline': typeof PipelineRoute
   '/portal': typeof PortalRoute
+  '/upload': typeof UploadRoute
   '/active-demos': typeof AppActiveDemosRoute
   '/dashboard': typeof AppDashboardRoute
   '/new-demo': typeof AppNewDemoRoute
@@ -83,8 +104,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/clarification': typeof ClarificationRoute
   '/demo-preview': typeof DemoPreviewRoute
+  '/pipeline': typeof PipelineRoute
   '/portal': typeof PortalRoute
+  '/upload': typeof UploadRoute
   '/active-demos': typeof AppActiveDemosRoute
   '/dashboard': typeof AppDashboardRoute
   '/new-demo': typeof AppNewDemoRoute
@@ -96,8 +120,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/clarification': typeof ClarificationRoute
   '/demo-preview': typeof DemoPreviewRoute
+  '/pipeline': typeof PipelineRoute
   '/portal': typeof PortalRoute
+  '/upload': typeof UploadRoute
   '/_app/active-demos': typeof AppActiveDemosRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/new-demo': typeof AppNewDemoRoute
@@ -109,8 +136,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/clarification'
     | '/demo-preview'
+    | '/pipeline'
     | '/portal'
+    | '/upload'
     | '/active-demos'
     | '/dashboard'
     | '/new-demo'
@@ -120,8 +150,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/clarification'
     | '/demo-preview'
+    | '/pipeline'
     | '/portal'
+    | '/upload'
     | '/active-demos'
     | '/dashboard'
     | '/new-demo'
@@ -132,8 +165,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_app'
+    | '/clarification'
     | '/demo-preview'
+    | '/pipeline'
     | '/portal'
+    | '/upload'
     | '/_app/active-demos'
     | '/_app/dashboard'
     | '/_app/new-demo'
@@ -145,12 +181,22 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  ClarificationRoute: typeof ClarificationRoute
   DemoPreviewRoute: typeof DemoPreviewRoute
+  PipelineRoute: typeof PipelineRoute
   PortalRoute: typeof PortalRoute
+  UploadRoute: typeof UploadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portal': {
       id: '/portal'
       path: '/portal'
@@ -158,11 +204,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pipeline': {
+      id: '/pipeline'
+      path: '/pipeline'
+      fullPath: '/pipeline'
+      preLoaderRoute: typeof PipelineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/demo-preview': {
       id: '/demo-preview'
       path: '/demo-preview'
       fullPath: '/demo-preview'
       preLoaderRoute: typeof DemoPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clarification': {
+      id: '/clarification'
+      path: '/clarification'
+      fullPath: '/clarification'
+      preLoaderRoute: typeof ClarificationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -247,8 +307,11 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  ClarificationRoute: ClarificationRoute,
   DemoPreviewRoute: DemoPreviewRoute,
+  PipelineRoute: PipelineRoute,
   PortalRoute: PortalRoute,
+  UploadRoute: UploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

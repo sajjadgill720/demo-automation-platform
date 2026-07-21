@@ -19,14 +19,14 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { addDemoJob } from "@/lib/db";
 
-
 export const Route = createFileRoute("/_app/new-demo")({
   head: () => ({
     meta: [
       { title: "Discovery Wizard — DataQuartz" },
       {
         name: "description",
-        content: "Discover operational parameters, analyze leakage, and design your AI Voice routing pipeline.",
+        content:
+          "Discover operational parameters, analyze leakage, and design your AI Voice routing pipeline.",
       },
     ],
   }),
@@ -44,7 +44,7 @@ function NewDemo() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  
+
   const [form, setForm] = useState({
     company: "Northwind Freight",
     email: "ops@northwindfreight.com",
@@ -73,7 +73,9 @@ function NewDemo() {
               missedCalls: latest.missed_calls_per_week,
               bookingValue: latest.average_booking_value,
               calendarSystem: latest.calendar_system,
-              bookingRequirements: latest.booking_requirements ? latest.booking_requirements.split(",") : ["name", "phone", "reason"],
+              bookingRequirements: latest.booking_requirements
+                ? latest.booking_requirements.split(",")
+                : ["name", "phone", "reason"],
               escalationPath: latest.escalation_path,
               integrationDestination: latest.integration_destination,
             });
@@ -109,9 +111,7 @@ function NewDemo() {
   }, []);
 
   // Calculate monthly leakage dynamically: (calls * 4.34) * value * 25% conversion
-  const calculatedLeakage = Math.round(
-    form.missedCalls * 4.34 * form.bookingValue * 0.25
-  );
+  const calculatedLeakage = Math.round(form.missedCalls * 4.34 * form.bookingValue * 0.25);
 
   const toggleRequirement = (req: string) => {
     setForm((prev) => ({
@@ -125,7 +125,7 @@ function NewDemo() {
   const handleSubmit = async () => {
     setLoading(true);
     const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
-    
+
     try {
       const res = await fetch(`${API_URL}/api/discovery`, {
         method: "POST",
@@ -144,7 +144,7 @@ function NewDemo() {
 
       if (res.ok) {
         const data = await res.json();
-        
+
         // Sync with the client-side dashboard state (add the job to list & fire simulation timers)
         addDemoJob(
           {
@@ -152,10 +152,12 @@ function NewDemo() {
             email: form.email,
           },
           "Convoa",
-          ["Form Configuration Wizard"]
+          ["Form Configuration Wizard"],
         );
 
-        toast.success(`Pipeline successfully created! Monthly leakage logged at $${data.calculated_monthly_leakage.toLocaleString()}`);
+        toast.success(
+          `Pipeline successfully created! Monthly leakage logged at $${data.calculated_monthly_leakage.toLocaleString()}`,
+        );
         navigate({ to: "/dashboard" });
       } else {
         toast.error("Failed to save discovery settings on server.");
@@ -167,7 +169,6 @@ function NewDemo() {
       setLoading(false);
     }
   };
-
 
   return (
     <>
@@ -208,19 +209,6 @@ function NewDemo() {
                   onChange={(v) => setForm({ ...form, bookingValue: v })}
                 />
               </div>
-
-              {/* Dynamic ROI Leakage display */}
-              <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/[0.04] p-4 text-center">
-                <p className="text-[10px] font-mono uppercase tracking-widest text-red-400 font-bold flex items-center justify-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5" /> Calculated Monthly Revenue Leakage
-                </p>
-                <p className="text-2xl font-bold text-red-500 mt-1">
-                  ${calculatedLeakage.toLocaleString()} / month
-                </p>
-                <p className="text-xs text-muted-foreground mt-1.5 max-w-md mx-auto leading-relaxed">
-                  Based on a conservative 25% booking rate: out of {Math.round(form.missedCalls * 4.34)} missed calls per month, you lose about {Math.round(form.missedCalls * 4.34 * 0.25)} bookings, valuing ${form.bookingValue} each.
-                </p>
-              </div>
             </div>
           )}
 
@@ -228,14 +216,18 @@ function NewDemo() {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-base font-semibold text-foreground">Booking System Integration</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  Booking System Integration
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   Where should the scheduling take place, and what information is required?
                 </p>
               </div>
               <div className="space-y-4">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Select Calendar Service</span>
+                  <span className="text-xs font-medium text-foreground">
+                    Select Calendar Service
+                  </span>
                   <select
                     value={form.calendarSystem}
                     onChange={(e) => setForm({ ...form, calendarSystem: e.target.value })}
@@ -249,7 +241,9 @@ function NewDemo() {
                 </label>
 
                 <div className="space-y-2">
-                  <span className="text-xs font-medium text-foreground block">Required Client Details to Book</span>
+                  <span className="text-xs font-medium text-foreground block">
+                    Required Client Details to Book
+                  </span>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
                       { id: "name", label: "Full Name" },
@@ -266,14 +260,20 @@ function NewDemo() {
                           onClick={() => toggleRequirement(item.id)}
                           className={cn(
                             "flex items-center justify-between p-3 rounded-lg border text-sm text-left transition-colors bg-background",
-                            checked ? "border-primary bg-primary/5 text-foreground" : "hover:border-foreground/15"
+                            checked
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "hover:border-foreground/15",
                           )}
                         >
                           <span>{item.label}</span>
-                          <div className={cn(
-                            "h-4 w-4 border rounded flex items-center justify-center",
-                            checked ? "bg-primary border-primary text-primary-foreground" : "border-border"
-                          )}>
+                          <div
+                            className={cn(
+                              "h-4 w-4 border rounded flex items-center justify-center",
+                              checked
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-border",
+                            )}
+                          >
                             {checked && <Check className="h-3 w-3" />}
                           </div>
                         </button>
@@ -289,14 +289,19 @@ function NewDemo() {
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-base font-semibold text-foreground">Escalation & Delivery Routing</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  Escalation & Delivery Routing
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  Define agent logic behavior for exceptions and specify where data details are transmitted.
+                  Define agent logic behavior for exceptions and specify where data details are
+                  transmitted.
                 </p>
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <span className="text-xs font-medium text-foreground block">Agent Escalation Path</span>
+                  <span className="text-xs font-medium text-foreground block">
+                    Agent Escalation Path
+                  </span>
                   <div className="grid gap-3">
                     {[
                       {
@@ -323,13 +328,15 @@ function NewDemo() {
                           onClick={() => setForm({ ...form, escalationPath: item.id })}
                           className={cn(
                             "p-3 rounded-lg border text-left flex items-start gap-3 bg-background transition-colors",
-                            selected ? "border-primary bg-primary/5" : "hover:border-foreground/15"
+                            selected ? "border-primary bg-primary/5" : "hover:border-foreground/15",
                           )}
                         >
-                          <div className={cn(
-                            "h-4 w-4 rounded-full border flex items-center justify-center mt-0.5",
-                            selected ? "border-primary" : "border-border"
-                          )}>
+                          <div
+                            className={cn(
+                              "h-4 w-4 rounded-full border flex items-center justify-center mt-0.5",
+                              selected ? "border-primary" : "border-border",
+                            )}
+                          >
                             {selected && <div className="h-2 w-2 rounded-full bg-primary" />}
                           </div>
                           <div>
@@ -343,7 +350,9 @@ function NewDemo() {
                 </div>
 
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">CRM / Sync Destination</span>
+                  <span className="text-xs font-medium text-foreground">
+                    CRM / Sync Destination
+                  </span>
                   <select
                     value={form.integrationDestination}
                     onChange={(e) => setForm({ ...form, integrationDestination: e.target.value })}
@@ -373,11 +382,22 @@ function NewDemo() {
                 <SummaryRow label="Contact Email" value={form.email} />
                 <SummaryRow label="Weekly Missed Calls" value={`${form.missedCalls} calls`} />
                 <SummaryRow label="Average Booking Value" value={`$${form.bookingValue}`} />
-                <SummaryRow label="Monthly Revenue Leakage" value={`$${calculatedLeakage.toLocaleString()}/mo`} className="text-red-500 font-bold" />
-                <SummaryRow label="Selected Scheduler" value={form.calendarSystem.replace("_", " ").toUpperCase()} />
-                <SummaryRow label="Required Parameters" value={form.bookingRequirements.join(", ")} />
-                <SummaryRow label="Escalation Rules" value={form.escalationPath.replace(/_/g, " ").toUpperCase()} />
-                <SummaryRow label="Integration Hub" value={form.integrationDestination.replace("_", " ").toUpperCase()} />
+                <SummaryRow
+                  label="Selected Scheduler"
+                  value={form.calendarSystem.replace("_", " ").toUpperCase()}
+                />
+                <SummaryRow
+                  label="Required Parameters"
+                  value={form.bookingRequirements.join(", ")}
+                />
+                <SummaryRow
+                  label="Escalation Rules"
+                  value={form.escalationPath.replace(/_/g, " ").toUpperCase()}
+                />
+                <SummaryRow
+                  label="Integration Hub"
+                  value={form.integrationDestination.replace("_", " ").toUpperCase()}
+                />
               </div>
             </div>
           )}
@@ -391,7 +411,7 @@ function NewDemo() {
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </button>
-            
+
             {step < steps.length - 1 ? (
               <button
                 onClick={() => setStep((s) => s + 1)}
@@ -485,4 +505,3 @@ function SummaryRow({
     </div>
   );
 }
-

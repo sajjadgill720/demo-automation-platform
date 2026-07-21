@@ -64,6 +64,7 @@ class AgentStatus(str, Enum):
     active = "active"
     completed = "completed"
     failed = "failed"
+    skipped = "skipped"  # Used when lead is unqualified and Vapi provisioning is bypassed
 
 
 class Lead(SQLModel, table=True):
@@ -79,7 +80,59 @@ class Lead(SQLModel, table=True):
     assistant_id: Optional[str] = Field(default=None, max_length=255, nullable=True)
     agent_status: AgentStatus = Field(default=AgentStatus.pending)
     failure_reason: Optional[str] = Field(default=None, nullable=True)
+    qualified: Optional[bool] = Field(default=None, nullable=True)
+    qualification_confidence: Optional[float] = Field(default=None, nullable=True)
+    qualification_reasoning: Optional[str] = Field(default=None, nullable=True)
+    ai_processing_consent: bool = Field(default=False)
+    consent_recorded_at: Optional[datetime] = Field(default=None, nullable=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ProfileStatus(str, Enum):
+    not_started = "not_started"
+    in_progress = "in_progress"
+    awaiting_user = "awaiting_user"
+    completed = "completed"
+
+
+class MessageRole(str, Enum):
+    assistant = "assistant"
+    user = "user"
+
+
+class Document(SQLModel, table=True):
+    __tablename__ = "documents"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lead_id: uuid.UUID = Field(foreign_key="leads.id")
+    file_url: str
+    file_type: str = Field(max_length=50)
+    file_size_bytes: int
+    extracted_text: Optional[str] = Field(default=None, nullable=True)
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CompanyProfileDB(SQLModel, table=True):
+    __tablename__ = "company_profile"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lead_id: uuid.UUID = Field(foreign_key="leads.id", unique=True)
+    profile: Optional[str] = Field(default=None, nullable=True)  # JSON string
+    status: ProfileStatus = Field(default=ProfileStatus.not_started)
+    missing_fields: Optional[str] = Field(default=None, nullable=True)  # JSON string
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ClarificationMessage(SQLModel, table=True):
+    __tablename__ = "clarification_messages"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lead_id: uuid.UUID = Field(foreign_key="leads.id")
+    role: MessageRole
+    content: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 
 
