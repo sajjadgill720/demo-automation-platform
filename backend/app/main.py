@@ -34,7 +34,9 @@ from app.models import (
     Lead, 
     AgentStatus, 
     Document, 
-    CompanyProfileDB
+    CompanyProfileDB,
+    DemoFeedback,
+    FeedbackRating
 )
 from app.agents import (
     compile_agent_prompt, 
@@ -49,6 +51,7 @@ from app.clarification import (
     submit_clarification_answer,
     skip_remaining_questions,
     get_clarification_status,
+    close_checkpointer_pool,
     ClarificationStatus,
     ClarificationAnswer
 )
@@ -59,6 +62,7 @@ async def lifespan(app: FastAPI):
     # Initialize database tables and compile schemas automatically on start
     init_db()
     yield
+    close_checkpointer_pool()
 
 app = FastAPI(
     title="DataQuartz API",
@@ -96,6 +100,8 @@ class DemoRequestCreate(BaseModel):
     contact_email: EmailStr
     contact_phone: str
     industry: str
+    problem_text: Optional[str] = None
+    voice_gender: Optional[str] = None
 
 class LeadResponse(BaseModel):
     id: uuid.UUID
@@ -104,6 +110,8 @@ class LeadResponse(BaseModel):
     contact_email: str
     contact_phone: str
     industry: str
+    problem_statement: Optional[str] = None
+    voice_gender: Optional[str] = None
     agent_status: AgentStatus
     assistant_id: Optional[str] = None
     failure_reason: Optional[str] = None
@@ -120,10 +128,121 @@ class LeadResponse(BaseModel):
 def read_root():
     return {"status": "healthy", "service": "DataQuartz API"}
 
-@app.get("/api/demos")
-def get_demos():
-    # Placeholder: returning an empty list to satisfy requirements
-    return []
+class FeedbackCreate(BaseModel):
+    rating: FeedbackRating
+    comment: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    id: uuid.UUID
+    lead_id: uuid.UUID
+    rating: FeedbackRating
+    comment: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class FeedbackWithLead(FeedbackResponse):
+    """Feedback joined with the company it came from, for the internal list."""
+    company_name: str
+    industry: str
+
+
+@app.post("/api/demo-request/{lead_id}/feedback", response_model=FeedbackResponse, status_code=201)
+def create_feedback(
+    lead_id: uuid.UUID,
+    payload: FeedbackCreate,
+    session: Session = Depends(get_session),
+):
+    """Stores feedback submitted by the client from their demo preview."""
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    # Stored verbatim apart from a length cap and control-character strip.
+    #
+    # Deliberately NOT run through the injection sanitizers: this text is only ever
+    # rendered as text (React escapes it) and is never fed into a prompt, so keyword
+    # stripping buys no safety here while actively corrupting what the client wrote —
+    # "the agent ignored my instructions" came back as "the agent ignored my ".
+    # If this text is ever piped into an LLM prompt, sanitize at that call site.
+    comment = None
+    if payload.comment:
+        cleaned = "".join(ch for ch in payload.comment if ch == "\n" or ch >= " ")
+        comment = cleaned.strip()[:2000] or None
+
+    entry = DemoFeedback(lead_id=lead_id, rating=payload.rating, comment=comment)
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    logger.info(
+        "Demo feedback received",
+        extra={"extra_data": {"lead_id": str(lead_id), "rating": payload.rating.value}},
+    )
+    return entry
+
+
+@app.get("/api/demo-request/{lead_id}/feedback", response_model=list[FeedbackResponse])
+def list_feedback_for_lead(lead_id: uuid.UUID, session: Session = Depends(get_session)):
+    """Feedback for one lead — used by the client's own preview to show them
+    what they already submitted."""
+    statement = (
+        select(DemoFeedback)
+        .where(DemoFeedback.lead_id == lead_id)
+        .order_by(DemoFeedback.created_at.desc())
+    )
+    return session.exec(statement).all()
+
+
+@app.get("/api/feedback", response_model=list[FeedbackWithLead])
+def list_all_feedback(
+    limit: int = 100,
+    rating: Optional[FeedbackRating] = None,
+    session: Session = Depends(get_session),
+):
+    """All client feedback, newest first, for the internal team view."""
+    statement = (
+        select(DemoFeedback, Lead)
+        .join(Lead, Lead.id == DemoFeedback.lead_id)
+        .order_by(DemoFeedback.created_at.desc())
+    )
+    if rating is not None:
+        statement = statement.where(DemoFeedback.rating == rating)
+    statement = statement.limit(max(1, min(limit, 500)))
+
+    return [
+        FeedbackWithLead(
+            id=fb.id,
+            lead_id=fb.lead_id,
+            rating=fb.rating,
+            comment=fb.comment,
+            created_at=fb.created_at,
+            company_name=lead.company_name,
+            industry=lead.industry,
+        )
+        for fb, lead in session.exec(statement).all()
+    ]
+
+
+@app.get("/api/leads", response_model=list[LeadResponse])
+def list_leads(
+    limit: int = 50,
+    status: Optional[AgentStatus] = None,
+    session: Session = Depends(get_session),
+):
+    """Lists leads, newest first, for the internal dashboard and active-demos views.
+
+    Added because those pages previously rendered hardcoded mock rows — there was
+    no endpoint that returned real leads. `status` filters by agent_status so the
+    active-demos view can request just the live ones.
+    """
+    statement = select(Lead).order_by(Lead.created_at.desc())
+    if status is not None:
+        statement = statement.where(Lead.agent_status == status)
+    statement = statement.limit(max(1, min(limit, 200)))
+    return session.exec(statement).all()
 
 @app.post("/api/discovery", response_model=DiscoveryResponse)
 def create_discovery_response(payload: DiscoveryCreate, session: Session = Depends(get_session)):
@@ -216,13 +335,17 @@ def create_demo_request(
     
     # Render and compile the template (includes sanitization)
     rendered_prompt = compile_lead_prompt(payload.company_name, payload.industry)
-    
+
+    problem = payload.problem_text.strip() if payload.problem_text else None
+
     lead = Lead(
         company_name=payload.company_name,
         contact_name=payload.contact_name,
         contact_email=payload.contact_email,
         contact_phone=payload.contact_phone,
         industry=payload.industry,
+        problem_statement=problem or None,
+        voice_gender=(payload.voice_gender or "female").strip().lower(),
         rendered_prompt=rendered_prompt,
         agent_status=AgentStatus.pending
     )
@@ -241,6 +364,42 @@ def get_demo_request(lead_id: uuid.UUID, session: Session = Depends(get_session)
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")
+    return lead
+
+
+@app.delete("/api/demo-request/{lead_id}/agent", response_model=LeadResponse)
+def delete_lead_agent(lead_id: uuid.UUID, session: Session = Depends(get_session)):
+    """Internal: tears down a lead's provisioned Vapi assistant, keeping the lead.
+
+    Distinct from end-session (which the client demo flow uses): this is the
+    internal team's "delete agent" action. It deletes the Vapi assistant to free
+    the resource, then clears assistant_id and marks the lead completed so it
+    drops out of the provisioned-agent list. The lead record and its profile,
+    feedback and conversation history are all retained for reference.
+    """
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    if lead.assistant_id:
+        try:
+            delete_vapi_assistant(lead.assistant_id)
+        except Exception:
+            # Non-blocking: if the remote delete fails we still clear our side so
+            # the agent leaves the list rather than getting stuck as undeletable.
+            logger.error(
+                f"Failed to delete Vapi assistant {lead.assistant_id} during agent delete",
+                exc_info=True,
+                extra={"extra_data": {"lead_id": str(lead_id)}},
+            )
+
+    lead.assistant_id = None
+    lead.agent_status = AgentStatus.completed
+    lead.updated_at = datetime.utcnow()
+    session.add(lead)
+    session.commit()
+    session.refresh(lead)
+    logger.info("Agent deleted (lead retained)", extra={"extra_data": {"lead_id": str(lead_id)}})
     return lead
 
 
@@ -341,6 +500,7 @@ async def upload_clarification_documents(
     
     db_doc = Document(
         lead_id=lead_id,
+        file_name=file.filename,
         file_url=file_url,
         file_type=file.filename.split(".")[-1],
         file_size_bytes=len(content),

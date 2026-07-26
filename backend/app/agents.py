@@ -7,6 +7,8 @@ import time
 import hashlib
 import logging
 import uuid
+from datetime import datetime
+from typing import Optional, Union, Any
 from sqlmodel import Session
 from app.db import engine
 from app.models import DiscoveryResponse, Lead, AgentStatus
@@ -76,10 +78,17 @@ class VapiAPIError(Exception):
         super().__init__(f"Vapi API HTTP {status_code}: {message}")
 
 
-def _call_vapi_create_assistant(name: str, prompt: str) -> str:
+def _call_vapi_create_assistant(
+    name: str,
+    prompt: str,
+    file_id: Optional[str] = None,
+    first_message: Optional[str] = None,
+    voice_id: str = "Emma",
+) -> str:
     """Creates a Vapi assistant using the API.
-    
+
     Includes mock fallback if key is missing/mock, and retry logic on transient errors.
+    If file_id is provided, includes knowledgeBase directly in creation payload.
     Returns the assistant_id.
     """
     logger = logging.getLogger(__name__)
@@ -109,10 +118,26 @@ def _call_vapi_create_assistant(name: str, prompt: str) -> str:
         },
         "voice": {
             "provider": "vapi",
-            "voiceId": "Emma"
+            "voiceId": voice_id
         }
     }
-    
+
+    # Explicit opening. Without BOTH of these Vapi defaults to
+    # firstMessageMode="assistant-speaks-first" with nothing scripted, leaving the
+    # model to improvise an opener from a 12k-character system prompt — which it
+    # sometimes did and sometimes did not, producing calls that connected to dead
+    # air. Scripting the greeting makes the first turn deterministic.
+    if first_message:
+        payload["firstMessage"] = first_message
+        payload["firstMessageMode"] = "assistant-speaks-first"
+
+    if file_id:
+        payload["model"]["knowledgeBase"] = {
+            "provider": "canonical",
+            "fileIds": [file_id]
+        }
+        logger.info(f"Including knowledgeBase in Vapi assistant creation payload for file_id: {file_id}")
+
     headers = {
         "Authorization": f"Bearer {vapi_key}",
         "Content-Type": "application/json",
@@ -127,7 +152,9 @@ def _call_vapi_create_assistant(name: str, prompt: str) -> str:
             logger.info(f"Sending Vapi assistant creation request. Attempt {attempt + 1}/{attempts}")
             with urllib.request.urlopen(req, timeout=10) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
-                return res_data["id"]
+                created_id = res_data["id"]
+                logger.info(f"Vapi assistant created successfully. assistant_id: {created_id}, file_id attached: {file_id}")
+                return created_id
         except urllib.error.HTTPError as e:
             status_code = e.code
             err_body = e.read().decode("utf-8") if e.fp else str(e)
@@ -147,58 +174,322 @@ def _call_vapi_create_assistant(name: str, prompt: str) -> str:
 
 
 from typing import Optional, Union, Any
-from app.utils import sanitize_input
+from app.utils import sanitize_input, sanitize_profile_text
+from app.scenario_library import lookup_industry, format_scenarios_as_rules
 
 
-def compile_lead_prompt(company_name: str, industry: str, profile: Optional[Union[dict, Any]] = None) -> str:
-    """Reads the static, version-controlled markdown template and renders it after sanitization.
+# ── Modular Vapi prompt composition ───────────────────────────────────────────
+# The template is split into named sections (see templates/vapi_prompt_template.md).
+# This module parses those sections, fills each one's variables, and emits only the
+# sections it has real content for.
+#
+# DETERMINISM CONTRACT: no LLM call may ever be added to this path. Composition is
+# conditional assembly plus literal string substitution, so the same inputs always
+# produce byte-identical output. This is what makes the rendered prompt reviewable
+# and stops lead-supplied text from redefining agent behavior.
 
-    If profile is provided and contains non-UNKNOWN fields, injects a structured
-    Client-Specific Profile Context section into the rendered prompt.
+# Emission order. A section absent from this list is never emitted, even if the
+# template defines it.
+SECTION_ORDER = [
+    "opening_and_purpose",
+    "patience_and_turn_taking",
+    "general_role_and_tone",
+    "business_context",
+    "primary_purpose_and_scenarios",
+    "escalation_rules",
+    "follow_up_and_clarification_rules",
+    "customization_notes",
+    "restrictions",
+    "closing_behavior",
+]
+
+_SECTION_RE = re.compile(
+    r"<!--\s*SECTION:\s*(?P<name>[a-z_]+)\s*-->(?P<body>.*?)<!--\s*/SECTION\s*-->",
+    re.DOTALL,
+)
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+
+# Values that mean "the extractor found nothing", not real content.
+_EMPTY_SENTINELS = {"", "UNKNOWN", "NONE", "N/A", "NULL"}
+
+
+def _is_filled(value: Any) -> bool:
+    """True when a profile field carries real content rather than a placeholder."""
+    if value is None:
+        return False
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value) > 0
+    return str(value).strip().upper() not in _EMPTY_SENTINELS
+
+
+def _normalize_profile(profile: Optional[Union[dict, Any]]) -> dict:
+    """Coerces the several shapes a profile arrives in into a plain dict.
+
+    Callers pass a CompanyProfile pydantic model, a dict decoded from the jsonb
+    column, or None. The jsonb case matters: SQLModel hands back a dict already,
+    so callers must not json.loads() it first.
+    """
+    if profile is None:
+        return {}
+    if isinstance(profile, dict):
+        return profile
+    if hasattr(profile, "model_dump"):
+        return profile.model_dump()
+    if hasattr(profile, "dict"):
+        return profile.dict()
+    return {}
+
+
+def _load_template_sections() -> dict:
+    """Parses the markdown template into {section_name: raw_body}."""
+    template_path = os.path.join(os.path.dirname(__file__), "templates", "vapi_prompt_template.md")
+    with open(template_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return {m.group("name"): m.group("body") for m in _SECTION_RE.finditer(content)}
+
+
+def _render_section(body: str, variables: dict) -> str:
+    """Strips authoring comments and substitutes {{variables}}."""
+    rendered = _COMMENT_RE.sub("", body)
+    for key, value in variables.items():
+        rendered = rendered.replace("{{" + key + "}}", str(value))
+    # Collapse the blank-line runs left behind by stripped comments and omitted lines.
+    rendered = re.sub(r"\n{3,}", "\n\n", rendered)
+    return rendered.strip()
+
+
+def compile_lead_prompt(
+    company_name: str,
+    industry: str,
+    profile: Optional[Union[dict, Any]] = None,
+    business_brief: str = "",
+) -> str:
+    """Assembles the Vapi system prompt from vetted template sections.
+
+    Deterministic: same inputs always produce the same output. No LLM involved.
+
+    Sections are emitted only when they have real content, so a lead with two
+    profile fields gets a shorter complete prompt rather than a full-length one
+    with visible gaps. core_identity and closing_behavior are unconditional.
+
+    PRECEDENCE RULE (profile beats library, library fills gaps)
+    ----------------------------------------------------------
+    Where the lead's own CompanyProfile and the industry scenario library both
+    speak to the same category, the profile always wins, because it is what this
+    specific business told us about itself, whereas the library is a sensible
+    default for businesses of that type:
+
+      * scenario_handling — the lead's must_handle_scenarios are emitted FIRST and
+        labelled as their stated priorities. Library (trigger, action) rules are
+        then appended to cover situations the lead did not mention. They are
+        additive, never contradictory, because library rules describe call types
+        the lead simply did not think to list. If the lead named no scenarios at
+        all, the section is built from library rules alone.
+      * escalation_rules — the lead's escalation_preferences REPLACE the library
+        default outright rather than being appended. Two competing escalation
+        instructions would be worse than either alone, so only one is ever emitted.
+      * business_context — carries THREE independent inputs, and none gates another:
+        the industry-stakes sentence from the library, the `business_brief`
+        distilled from uploaded documents by app/document_summarizer.py, and the
+        profile-derived lines. The brief is emitted whether or not the five
+        structured profile fields were ever filled — a lead who skipped the
+        clarification questions still gets a richly-informed agent if they
+        uploaded a document. The profile lines supplement the brief; they no
+        longer block it.
+      * customization_notes — profile-only. The library has no equivalent, and the
+        section is omitted entirely when the lead gave us nothing.
     """
     sanitized_company = sanitize_input(company_name)
     sanitized_industry = sanitize_input(industry)
 
-    # Load template from file
-    template_path = os.path.join(os.path.dirname(__file__), "templates", "vapi_prompt_template.md")
-    with open(template_path, "r", encoding="utf-8") as f:
-        template_content = f.read()
+    prof = _normalize_profile(profile)
+    library = lookup_industry(industry)
+    sections = _load_template_sections()
 
-    # Build profile context if available
-    profile_lines = []
-    if profile:
-        prof_dict = profile.dict() if hasattr(profile, "dict") else (profile if isinstance(profile, dict) else {})
+    # ── business_context ──────────────────────────────────────────────────────
+    # Each line is independently conditional so a partial profile yields a
+    # shorter honest section rather than one padded with placeholders.
+    context_lines = []
+    primary_problem = prof.get("primary_problem")
+    if _is_filled(primary_problem):
+        context_lines.append(
+            f"The problem they came to Convoa to solve: {sanitize_profile_text(str(primary_problem))}. "
+            f"Keep this in mind on every call — the calls that relate to this are the ones that matter most to them."
+        )
+    workflow = prof.get("current_workflow_summary")
+    if _is_filled(workflow):
+        context_lines.append(
+            f"How their calls are handled today: {sanitize_profile_text(str(workflow))}. "
+            f"You are the improvement on that, so do not replicate its gaps."
+        )
 
-        prob = prof_dict.get("primary_problem")
-        if prob and prob != "UNKNOWN":
-            profile_lines.append(f"- **Primary Problem**: {prob}")
+    # ── scenario_handling ─────────────────────────────────────────────────────
+    # Profile scenarios first and explicitly labelled, then library rules to fill gaps.
+    scenario_blocks = []
+    lead_scenarios = prof.get("must_handle_scenarios")
+    if _is_filled(lead_scenarios) and isinstance(lead_scenarios, (list, tuple)):
+        cleaned = [sanitize_profile_text(str(s)).strip() for s in lead_scenarios if str(s).strip()]
+        if cleaned:
+            scenario_blocks.append(
+                f"{sanitized_company} specifically asked that you handle these situations. "
+                f"Treat them as the priority calls on this line:\n"
+                + "\n".join(f"- {s}" for s in cleaned)
+            )
 
-        wf = prof_dict.get("current_workflow_summary")
-        if wf and wf != "UNKNOWN":
-            profile_lines.append(f"- **Current Workflow**: {wf}")
+    library_rules = format_scenarios_as_rules(library)
+    if library_rules:
+        lead_in = (
+            f"These are the calls a {library['display_name']} line reliably gets. "
+            f"Handle them this way unless the business told you otherwise:"
+            if scenario_blocks
+            else f"These are the calls a {library['display_name']} line reliably gets:"
+        )
+        scenario_blocks.append(lead_in + "\n" + "\n".join(f"- {r}" for r in library_rules))
 
-        scenarios = prof_dict.get("must_handle_scenarios")
-        if scenarios and isinstance(scenarios, list) and len(scenarios) > 0:
-            profile_lines.append(f"- **Must-Handle Scenarios**: {', '.join(scenarios)}")
+    common_qs = library.get("common_questions") or []
+    if common_qs:
+        scenario_blocks.append(
+            "Callers commonly ask these. Answer from the business information you were given, "
+            "and take a message when you were not given it:\n"
+            + "\n".join(f"- {q}" for q in common_qs)
+        )
 
-        esc = prof_dict.get("escalation_preferences")
-        if esc and esc != "UNKNOWN":
-            profile_lines.append(f"- **Escalation Preference**: {esc}")
-
-        cust = prof_dict.get("desired_customizations")
-        if cust and cust != "UNKNOWN":
-            profile_lines.append(f"- **Desired Customizations**: {cust}")
-
-    if profile_lines:
-        profile_block = "\n\n## Client-Specific Profile Context:\n" + "\n".join(profile_lines)
+    # ── escalation_rules ──────────────────────────────────────────────────────
+    # Profile REPLACES the default; the two are never concatenated.
+    lead_escalation = prof.get("escalation_preferences")
+    if _is_filled(lead_escalation):
+        escalation_content = (
+            f"{sanitized_company} told us exactly how they want this handled: "
+            f"{sanitize_profile_text(str(lead_escalation))}\n\nFollow that instruction as written."
+        )
     else:
-        profile_block = ""
+        escalation_content = (
+            f"{sanitized_company} has not told us their escalation preference yet, so use this "
+            f"conservative default: {library['default_escalation']}\n\n"
+            f"Because this is a default rather than their stated policy, do not promise a specific "
+            f"person, a specific timeframe, or a live transfer."
+        )
 
-    # Render prompt
-    rendered = template_content.replace("{{company_name}}", sanitized_company)
-    rendered = rendered.replace("{{industry}}", sanitized_industry)
-    rendered = rendered.replace("{{profile_context}}", profile_block)
-    return rendered
+    # ── customization_notes ───────────────────────────────────────────────────
+    customizations = prof.get("desired_customizations")
+    customization_content = ""
+    if _is_filled(customizations):
+        customization_content = (
+            f"They asked specifically for the following: {sanitize_profile_text(str(customizations))}"
+        )
+
+    # ── business_brief (from the document summarizer) ─────────────────────────
+    # Deliberately NOT gated on the profile being complete. This is the whole
+    # point of the decoupling: a document can carry the operational detail even
+    # when the Q&A loop was skipped and every structured field came back UNKNOWN.
+    brief_text = (business_brief or "").strip()
+    brief_block = ""
+    if brief_text:
+        brief_block = (
+            "Here is what their own operating documentation says about how they work. "
+            "Treat it as authoritative:\n\n"
+            f"{brief_text}"
+        )
+
+    # ── primary_purpose ───────────────────────────────────────────────────────
+    # Leads the scenario section with WHY this line exists, so the rules that
+    # follow are read as serving a goal rather than as a checklist.
+    if _is_filled(primary_problem):
+        primary_purpose = (
+            f"{sanitized_company} came to us to solve one thing above all: "
+            f"{sanitize_profile_text(str(primary_problem))}. "
+            f"Calls that touch on this are the ones that matter most — handle them especially well."
+        )
+    else:
+        primary_purpose = (
+            f"Your job on this line is to make sure no call to {sanitized_company} goes unanswered, "
+            f"and that every caller either gets what they needed or leaves details for a callback."
+        )
+
+    variables = {
+        "company_name": sanitized_company,
+        "industry": sanitized_industry,
+        "industry_stakes": library.get("business_stakes", ""),
+        "business_brief": brief_block,
+        "business_context_lines": "\n\n".join(context_lines),
+        "primary_purpose": primary_purpose,
+        "scenario_rules": "\n\n".join(scenario_blocks),
+        "escalation_content": escalation_content,
+        "customization_content": customization_content,
+    }
+
+    # Sections with no real content are dropped rather than rendered empty.
+    # core_identity and closing_behavior are always emitted.
+    # Sections with no real content are dropped rather than rendered as empty
+    # scaffolding. The behavioural sections (opening, patience, tone, follow-ups,
+    # restrictions, closing) are universal and always emitted.
+    has_content = {
+        "opening_and_purpose": True,
+        "patience_and_turn_taking": True,
+        "general_role_and_tone": True,
+        "business_context": bool(brief_block)
+        or bool(context_lines)
+        or bool(library.get("business_stakes")),
+        "primary_purpose_and_scenarios": bool(scenario_blocks) or bool(primary_purpose),
+        "escalation_rules": bool(escalation_content),
+        "follow_up_and_clarification_rules": True,
+        "customization_notes": bool(customization_content),
+        "restrictions": True,
+        "closing_behavior": True,
+    }
+
+    parts = []
+    for name in SECTION_ORDER:
+        if not has_content.get(name):
+            continue
+        body = sections.get(name)
+        if body is None:
+            logging.getLogger(__name__).warning(
+                f"Prompt template is missing section '{name}' listed in SECTION_ORDER"
+            )
+            continue
+        parts.append(_render_section(body, variables))
+
+    return "\n\n".join(parts) + "\n"
+
+
+#: Vapi built-in voices offered to the client. Male maps to Elliot per product
+#: decision; female keeps Emma, which was the previous hardcoded default.
+VOICE_IDS = {"male": "Elliot", "female": "Emma"}
+DEFAULT_VOICE = "Emma"
+
+
+def resolve_voice_id(voice_gender: Optional[str]) -> str:
+    """Maps a stored voice preference to a Vapi voiceId, defaulting to female."""
+    return VOICE_IDS.get((voice_gender or "").strip().lower(), DEFAULT_VOICE)
+
+
+def compile_first_message(company_name: str) -> str:
+    """The exact line the agent speaks when the call connects.
+
+    Deterministic and intentionally identical to the greeting modelled in the
+    prompt's opening_and_purpose section, so the scripted opener and the prompt
+    never disagree about how the business answers its phone.
+    """
+    company = sanitize_input(company_name) or "this business"
+    return f"Thanks for calling {company}, this is the AI assistant — how can I help you today?"
+
+
+def _set_stage(session, lead, status, logger) -> None:
+    """Commits an intermediate provisioning stage so pollers observe it.
+
+    Each call marks a REAL transition in the pipeline below — there is no timer
+    and no simulated progression. The commit matters: the processing screen polls
+    GET /api/demo-request/{id}, so an uncommitted stage would never be visible.
+    """
+    lead.agent_status = status
+    lead.updated_at = datetime.utcnow()
+    session.add(lead)
+    session.commit()
+    logger.info(
+        f"Provisioning stage -> {status.value}",
+        extra={"extra_data": {"lead_id": str(lead.id), "stage": status.value}},
+    )
 
 
 def provision_vapi_assistant_task(lead_id: str):
@@ -215,30 +506,160 @@ def provision_vapi_assistant_task(lead_id: str):
             
         try:
             # Recompile prompt using the finalized company profile
-            from app.models import CompanyProfileDB
+            from app.models import CompanyProfileDB, Document
             from sqlmodel import select
+            from app.utils import sanitize_document_text
+            from app.document_summarizer import summarize_documents
+            from app.vapi_knowledge_base import upload_to_knowledge_base, attach_knowledge_base
             import json
             
             statement = select(CompanyProfileDB).where(CompanyProfileDB.lead_id == db_lead_id)
             profile_db = session.exec(statement).first()
             
+            # company_profile.profile is a jsonb column, so SQLModel returns a dict
+            # already. json.loads() on it raises TypeError, and swallowing that
+            # silently meant every provisioned assistant fell back to the
+            # no-profile prompt. Only decode when it really is a string.
             profile_data = None
             if profile_db and profile_db.profile:
-                try:
-                    profile_data = json.loads(profile_db.profile)
-                except Exception:
-                    pass
+                raw = profile_db.profile
+                if isinstance(raw, dict):
+                    profile_data = raw
+                elif isinstance(raw, (str, bytes, bytearray)):
+                    try:
+                        profile_data = json.loads(raw)
+                    except Exception:
+                        logger.warning(
+                            "Could not decode stored company profile JSON",
+                            extra={"extra_data": {"lead_id": lead_id}},
+                        )
+                if profile_data is not None:
+                    logger.info(
+                        "Loaded company profile for prompt composition",
+                        extra={"extra_data": {
+                            "lead_id": lead_id,
+                            "filled_fields": [k for k, v in profile_data.items()
+                                              if v not in (None, "", "UNKNOWN", [])],
+                        }},
+                    )
             
-            rendered_prompt = compile_lead_prompt(lead.company_name, lead.industry, profile_data)
+            # ── Stage 1: distil uploaded documents into a business brief ──────
+            # Runs BEFORE prompt assembly so the brief can be injected into it.
+            # Both existing gates are preserved exactly: nothing is summarized
+            # without ai_processing_consent, and nothing that sanitize_document_text
+            # flagged for injection is ever passed on.
+            doc_statement = select(Document).where(Document.lead_id == db_lead_id)
+            docs = session.exec(doc_statement).all()
+
+            business_brief = ""
+            sanitized_text = ""
+            file_id = None
+            has_text = bool(docs) and any(
+                d.extracted_text and d.extracted_text.strip() for d in docs
+            )
+
+            if not has_text:
+                logger.info(
+                    "Document stage skipped: no document with extracted text",
+                    extra={"extra_data": {"lead_id": lead_id}},
+                )
+            elif not lead.ai_processing_consent:
+                logger.info(
+                    "Document stage skipped: ai_processing_consent is False",
+                    extra={"extra_data": {"lead_id": lead_id}},
+                )
+            else:
+                combined_docs_text = "\n\n".join(
+                    d.extracted_text.strip()
+                    for d in docs
+                    if d.extracted_text and d.extracted_text.strip()
+                )
+                # Full-length sanitization: the old 5000-char default silently
+                # discarded ~79% of a long SOP. Length is handled by summarization.
+                sanitized_text, was_flagged, match_count, pattern_names = sanitize_document_text(
+                    combined_docs_text
+                )
+                if was_flagged:
+                    logger.warning(
+                        "Document rejected due to prompt injection flags — not summarized, not uploaded",
+                        extra={"extra_data": {
+                            "lead_id": lead_id,
+                            "match_count": match_count,
+                            "patterns": pattern_names,
+                        }},
+                    )
+                    sanitized_text = ""
+                else:
+                    _set_stage(session, lead, AgentStatus.summarizing_documents, logger)
+                    business_brief = summarize_documents(
+                        sanitized_text,
+                        lead.company_name,
+                        lead.industry,
+                        lead_id=str(lead_id),
+                    )
+                    logger.info(
+                        "Document brief produced",
+                        extra={"extra_data": {
+                            "lead_id": lead_id,
+                            "input_chars": len(sanitized_text),
+                            "brief_chars": len(business_brief),
+                        }},
+                    )
+
+            # ── Stage 2: assemble the prompt (deterministic, no LLM) ──────────
+            _set_stage(session, lead, AgentStatus.building_profile, logger)
+            rendered_prompt = compile_lead_prompt(
+                lead.company_name,
+                lead.industry,
+                profile_data,
+                business_brief=business_brief,
+            )
             lead.rendered_prompt = rendered_prompt
-            
-            assistant_id = _call_vapi_create_assistant(f"Convoa AI - {lead.company_name}", rendered_prompt)
+
+            # ── Knowledge base upload (reuses the same sanitized text) ────────
+            if sanitized_text:
+                doc_obj = docs[0]
+                fname = getattr(doc_obj, "file_name", None)
+                if not fname and doc_obj.file_url:
+                    base = os.path.basename(doc_obj.file_url)
+                    fname = base.split("_", 1)[1] if "_" in base and len(base.split("_", 1)[0]) == 36 else base
+                primary_filename = fname or "document.txt"
+                file_id = upload_to_knowledge_base(
+                    sanitized_text, str(lead_id), filename=primary_filename
+                )
+                if file_id:
+                    logger.info(
+                        f"Document uploaded to Vapi Files library. file_id: {file_id}, filename: {primary_filename}",
+                        extra={"extra_data": {"lead_id": lead_id, "file_id": file_id, "filename": primary_filename}},
+                    )
+
+            # ── Stage 3: provision the voice agent ────────────────────────────
+            _set_stage(session, lead, AgentStatus.provisioning, logger)
+            assistant_name = f"Convoa AI - {lead.company_name}"[:40]
+            assistant_id = _call_vapi_create_assistant(
+                assistant_name,
+                rendered_prompt,
+                file_id=file_id,
+                first_message=compile_first_message(lead.company_name),
+                voice_id=resolve_voice_id(getattr(lead, "voice_gender", None)),
+            )
             
             lead.assistant_id = assistant_id
             lead.agent_status = AgentStatus.active
             session.add(lead)
             session.commit()
-            logger.info("Vapi assistant provisioned successfully", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id}})
+            logger.info(f"Vapi assistant provisioned successfully. assistant_id: {assistant_id}, file_id: {file_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+
+            # Fallback/verification attach call if file_id exists
+            if file_id:
+                try:
+                    attached = attach_knowledge_base(assistant_id, file_id, prompt=rendered_prompt)
+                    if attached:
+                        logger.info(f"Knowledge Base attached to Vapi assistant successfully. assistant_id: {assistant_id}, file_id: {file_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+                    else:
+                        logger.warning(f"KB attach update call returned False for assistant_id: {assistant_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+                except Exception as attach_err:
+                    logger.warning(f"Non-blocking error during fallback KB attach: {attach_err}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
         except VapiAPIError as e:
             lead.agent_status = AgentStatus.failed
             lead.failure_reason = str(e)

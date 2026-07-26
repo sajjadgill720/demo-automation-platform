@@ -1,6 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Upload, X, Paperclip, Database, Loader2 } from "lucide-react";
+import {
+  Upload,
+  X,
+  Paperclip,
+  Database,
+  Loader2,
+  ScanSearch,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  MessagesSquare,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -15,7 +26,7 @@ const uploadSearchSchema = z.object({
   leadId: z.string(),
 });
 
-export const Route = createFileRoute("/upload")({
+export const Route = createFileRoute("/_wizard/upload")({
   validateSearch: uploadSearchSchema,
   component: UploadRoute,
 });
@@ -28,6 +39,9 @@ function UploadRoute() {
   const [aiConsent, setAiConsent] = useState(false);
   const [isIngesting, setIsIngesting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  // What the busy state is actually doing, so the loading copy never claims to be
+  // "processing documents" on the skip path (or when no file was attached).
+  const [busyMode, setBusyMode] = useState<"docs" | "scoping" | null>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -98,9 +112,12 @@ function UploadRoute() {
     if (!aiConsent) {
       return handleSkipUploadStep();
     }
+    // Only claim to be reading documents when a file is genuinely being sent.
+    const hasDocs = uploadedFiles.length > 0;
+    setBusyMode(hasDocs ? "docs" : "scoping");
     setIsIngesting(true);
     try {
-      if (uploadedFiles.length > 0) {
+      if (hasDocs) {
         await uploadClarificationDocument(leadId, uploadedFiles[0]);
         toast.success("Document uploaded successfully.");
       }
@@ -117,14 +134,17 @@ function UploadRoute() {
       if (err instanceof NetworkError) {
         toast.error(err.message);
       } else {
-        toast.error("Failed to start clarification process.");
+        toast.error("Failed to start solution scoping.");
       }
     } finally {
       setIsIngesting(false);
+      setBusyMode(null);
     }
   };
 
   const handleSkipUploadStep = async () => {
+    // No documents involved on this path — never show document-processing copy.
+    setBusyMode("scoping");
     setIsIngesting(true);
     try {
       await setClarificationConsent(leadId, false);
@@ -140,27 +160,59 @@ function UploadRoute() {
       if (err instanceof NetworkError) {
         toast.error(err.message);
       } else {
-        toast.error("Failed to start clarification process.");
+        toast.error("Failed to start solution scoping.");
       }
     } finally {
       setIsIngesting(false);
+      setBusyMode(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-4xl mx-auto glass-card gradient-border p-8 font-mono relative overflow-hidden text-left space-y-6 animate-fade-in transition-all rounded-xl shadow-2xl">
+    <div className="flex flex-1 flex-col items-center justify-center p-4">
+      <div className="w-full max-w-4xl mx-auto glass-card gradient-border p-8 font-mono relative overflow-hidden text-left space-y-6 animate-fade-in transition-all rounded-2xl shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
 
         <div>
-          <h3 className="text-foreground text-lg font-bold uppercase tracking-tight font-mono">
-            Step 1: Ingest Context Documents (Optional)
-          </h3>
-          <p className="text-xs text-foreground/75 mt-1 font-sans">
-            Upload API specs, SOPs, databases descriptions, or call logs to feed your custom
-            Knowledge Base. Skip if not needed.
-          </p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-foreground text-lg font-bold uppercase tracking-tight font-mono">
+              Make it sound like your team
+            </h3>
+            <span className="text-[9px] font-mono uppercase tracking-widest text-foreground/45 border border-border rounded-full px-2 py-0.5">
+              Optional
+            </span>
+          </div>
         </div>
+
+        {/* Icon-led explanation. Replaces the descriptive paragraph that used to
+            sit here — the three steps carry the same meaning in far less text. */}
+        <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2">
+          {[
+            { icon: Upload, label: "Share how you work", sub: "SOPs, call scripts, call logs" },
+            { icon: ScanSearch, label: "We train your agent", sub: "It learns your rules" },
+            { icon: Sparkles, label: "Hear it answer like you", sub: "Not a generic bot" },
+          ].map((s, i) => (
+            <li key={s.label} className="flex items-center gap-3 sm:flex-col sm:text-center sm:gap-2">
+              <div className="relative shrink-0">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                  <s.icon className="h-4 w-4" aria-hidden="true" />
+                </span>
+                {i < 2 && (
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="hidden sm:block absolute top-1/2 -right-[calc(50%+0.5rem)] h-3 w-3 -translate-y-1/2 text-foreground/25"
+                  />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-mono font-bold uppercase tracking-wider text-foreground/85 leading-tight">
+                  {s.label}
+                </p>
+                <p className="text-[10px] text-foreground/50 font-sans mt-0.5">{s.sub}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
         {/* Drag and Drop Container */}
         <div
@@ -231,7 +283,7 @@ function UploadRoute() {
                         e.stopPropagation();
                         removeFile(idx);
                       }}
-                      className="p-1 hover:bg-secondary text-foreground/60 hover:text-rose-500 transition-colors cursor-pointer border-0 bg-transparent"
+                      className="p-1 hover:bg-secondary text-foreground/60 hover:text-destructive transition-colors cursor-pointer border-0 bg-transparent"
                       aria-label="Remove file"
                     >
                       <X className="h-4 w-4" />
@@ -241,61 +293,73 @@ function UploadRoute() {
               </div>
             </div>
 
-            {/* Right Column: Interrelated Next-Step RAG Compilation Preview */}
-            <div className="space-y-3 bg-secondary/20 border border-border p-4 relative overflow-hidden flex flex-col justify-between rounded-lg">
-              <div className="absolute top-0 right-0 px-2.5 py-0.5 bg-primary/10 border-l border-b border-border text-[8px] font-mono text-primary uppercase tracking-widest font-semibold animate-pulse rounded-bl">
-                Step 2 Preview
+            {/* What happens next. Previously this panel showed two invented sample
+                queries and claimed they were "ready for testing in Step 2" — nothing
+                generated them and no such step existed. Replaced with an honest
+                icon-led summary of the actual next stage. */}
+            <div className="space-y-3 bg-secondary/20 border border-border p-4 flex flex-col justify-center rounded-lg">
+              <div className="flex items-center gap-1.5">
+                <Database className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                <span className="text-[10px] uppercase tracking-wider text-foreground/75 font-mono font-bold">
+                  What you get
+                </span>
               </div>
-
-              <div className="space-y-2 text-left">
-                <div className="flex items-center gap-1.5">
-                  <Database className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
-                  <span className="text-[10px] uppercase tracking-wider text-foreground/75 font-mono font-bold">
-                    Knowledge Base RAG Compiler
+              <ul className="space-y-2.5">
+                <li className="flex items-center gap-2.5">
+                  <ScanSearch className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                  <span className="text-[11px] text-foreground/75 font-sans">
+                    We read your {uploadedFiles.length === 1 ? "document" : `${uploadedFiles.length} documents`}
                   </span>
-                </div>
-                <p className="text-[10px] text-foreground/50 font-sans leading-relaxed">
-                  Compiling context chunks from your uploaded{" "}
-                  {uploadedFiles.length === 1
-                    ? "document"
-                    : `${uploadedFiles.length} documents`}
-                  . The following verification queries will be ready for testing in Step 2:
-                </p>
-              </div>
-
-              <div className="space-y-1.5 font-mono text-[9px] text-foreground/80 bg-background/30 p-2.5 border border-border/50 rounded">
-                <div className="flex items-start gap-1">
-                  <span className="text-amber-500 font-bold">Q1:</span>
-                  <span className="truncate">
-                    "What are the key requirements outlined in the uploaded spec?"
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <MessagesSquare className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                  <span className="text-[11px] text-foreground/75 font-sans">
+                    A few quick questions — only what we can't infer
                   </span>
-                </div>
-                <div className="flex items-start gap-1">
-                  <span className="text-amber-500 font-bold">Q2:</span>
-                  <span className="truncate">
-                    "What integrations are mentioned in these documents?"
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                  <span className="text-[11px] text-foreground/75 font-sans">
+                    A working agent you can call in minutes
                   </span>
-                </div>
-              </div>
-
-              <div className="text-[9px] text-emerald-500/90 font-mono flex items-center gap-1">
-                <span className="h-1 w-1 bg-emerald-500 rounded-full animate-ping" />
-                <span>Extraction Ready · advance to verify RAG responses</span>
-              </div>
+                </li>
+              </ul>
             </div>
           </div>
         )}
 
-        {/* Consent Toggle / Checkbox */}
+        {/* Consent. Stays explicitly opt-in and defaulted off; the toggle now
+            carries a label plus one line of explanation instead of a paragraph. */}
         <div className="pt-2">
-          <label className="flex items-center gap-3 p-3.5 bg-secondary/40 border border-border cursor-pointer select-none text-xs font-mono text-foreground/80 hover:border-primary/50 transition-colors rounded">
+          <label
+            className={cn(
+              "flex items-start gap-3 p-3.5 border cursor-pointer select-none transition-colors rounded",
+              aiConsent
+                ? "bg-primary/5 border-primary/40"
+                : "bg-secondary/40 border-border hover:border-primary/50",
+            )}
+          >
             <input
               type="checkbox"
               checked={aiConsent}
               onChange={(e) => setAiConsent(e.target.checked)}
-              className="h-4 w-4 accent-amber-500 cursor-pointer rounded-none"
+              className="h-4 w-4 mt-0.5 accent-primary cursor-pointer rounded-none shrink-0"
             />
-            <span>Allow AI to process uploaded documents to personalize your demo</span>
+            <span className="min-w-0">
+              <span className="block text-xs font-mono font-bold uppercase tracking-wider text-foreground">
+                Train my agent on these docs
+              </span>
+              <span className="block text-[11px] text-foreground/60 font-sans mt-0.5">
+                This is what makes it sound like your team instead of a generic bot. Private, and deleted after 30 days.
+              </span>
+            </span>
+            <ShieldCheck
+              aria-hidden="true"
+              className={cn(
+                "h-4 w-4 ml-auto shrink-0 transition-colors",
+                aiConsent ? "text-primary" : "text-foreground/25",
+              )}
+            />
           </label>
         </div>
 
@@ -304,20 +368,23 @@ function UploadRoute() {
           <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 gap-3 font-mono rounded-xl">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
             <span className="text-xs uppercase tracking-widest text-primary animate-pulse font-bold">
-              Processing documents & clarification state...
+              {busyMode === "docs"
+                ? "Reading your documents..."
+                : "Starting your scoping session..."}
             </span>
           </div>
         )}
 
-        {/* Actions Footer */}
+        {/* Actions Footer. Skip is a text link rather than a bordered button so it
+            stays available without competing with the primary upload path. */}
         <div className="flex items-center justify-between gap-4 pt-4 border-t border-border/50">
           <button
             type="button"
             onClick={handleSkipUploadStep}
             disabled={isIngesting}
-            className="bg-transparent border border-border text-foreground hover:bg-secondary transition-colors font-mono font-medium text-xs tracking-wider uppercase px-5 py-3 cursor-pointer rounded"
+            className="bg-transparent border-0 p-0 text-foreground/55 hover:text-foreground underline underline-offset-4 decoration-foreground/25 hover:decoration-foreground/60 transition-colors font-sans text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Skip this step
+            Skip for now
           </button>
           <button
             type="button"
@@ -329,7 +396,7 @@ function UploadRoute() {
                 : "hover:bg-primary/90 cursor-pointer"
             )}
           >
-            {isIngesting ? "Processing..." : "Continue →"}
+            {isIngesting ? (busyMode === "docs" ? "Training your agent..." : "Starting...") : "Build my agent →"}
           </button>
         </div>
       </div>

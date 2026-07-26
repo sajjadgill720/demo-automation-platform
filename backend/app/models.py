@@ -61,6 +61,14 @@ class VoiceAgent(SQLModel, table=True):
 
 class AgentStatus(str, Enum):
     pending = "pending"
+    # Real intermediate provisioning stages. Each is set at an actual transition
+    # point in provision_vapi_assistant_task — none is a timed/simulated step.
+    # Added because generation now genuinely takes 1-2+ minutes (document
+    # map-reduce summarization + profile extraction + assembly + Vapi call), and
+    # a single indeterminate spinner for that long reads as broken.
+    summarizing_documents = "summarizing_documents"
+    building_profile = "building_profile"
+    provisioning = "provisioning"
     active = "active"
     completed = "completed"
     failed = "failed"
@@ -76,6 +84,12 @@ class Lead(SQLModel, table=True):
     contact_email: str = Field(max_length=255)
     contact_phone: str = Field(max_length=50)
     industry: str = Field(max_length=255)
+    # The problem statement the lead typed on the intake form. Stored so the
+    # clarification chat can open with it and so profile extraction never re-asks
+    # about a pain point the lead already described.
+    problem_statement: Optional[str] = Field(default=None, nullable=True)
+    # Which Vapi voice the client picked: "male" (Elliot) or "female" (Emma).
+    voice_gender: Optional[str] = Field(default="female", max_length=16, nullable=True)
     rendered_prompt: str
     assistant_id: Optional[str] = Field(default=None, max_length=255, nullable=True)
     agent_status: AgentStatus = Field(default=AgentStatus.pending)
@@ -106,6 +120,7 @@ class Document(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     lead_id: uuid.UUID = Field(foreign_key="leads.id")
+    file_name: Optional[str] = Field(default=None, nullable=True)
     file_url: str
     file_type: str = Field(max_length=50)
     file_size_bytes: int
@@ -136,3 +151,25 @@ class ClarificationMessage(SQLModel, table=True):
 
 
 
+
+
+class FeedbackRating(str, Enum):
+    positive = "positive"
+    negative = "negative"
+
+
+class DemoFeedback(SQLModel, table=True):
+    """Client feedback submitted from the demo preview.
+
+    Shown back to the client on their own preview (so they can see what they
+    sent) and listed for the internal team. Previously the preview's feedback
+    form only set local React state and showed a toast — nothing was stored, so
+    no feedback ever reached anyone.
+    """
+    __tablename__ = "demo_feedback"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lead_id: uuid.UUID = Field(foreign_key="leads.id", index=True)
+    rating: FeedbackRating
+    comment: Optional[str] = Field(default=None, nullable=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

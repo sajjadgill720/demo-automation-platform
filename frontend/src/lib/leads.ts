@@ -9,7 +9,7 @@ export const submitLead = createServerFn({ method: "POST" })
       company: z.string(),
       problem_text: z.string(),
       source: z.enum(["voice", "form"]),
-      urgency: z.string(),
+      urgency: z.string().optional(),
       tools: z.string().optional(),
       website: z.string().optional(),
       persona: z.string().optional(),
@@ -65,7 +65,7 @@ export const submitLead = createServerFn({ method: "POST" })
       console.log(`Persona: ${persona || "N/A"}`);
       console.log(`Language: ${language || "N/A"}`);
       console.log(`Volume: ${volume || "N/A"}`);
-      console.log(`Urgency: ${urgency}`);
+      console.log(`Urgency: ${urgency || "N/A"}`);
       console.log(`Tools: ${tools || "N/A"}`);
       console.log(`Weekly Missed Calls: ${missed_calls || "N/A"}`);
       console.log(`Avg Booking Value: ${booking_value || "N/A"}`);

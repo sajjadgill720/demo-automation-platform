@@ -37,6 +37,8 @@ export interface DemoRequestPayload {
   contact_email: string;
   contact_phone: string;
   industry: string;
+  problem_text?: string;
+  voice_gender?: "male" | "female";
 }
 
 export interface LeadResponse {
@@ -46,7 +48,17 @@ export interface LeadResponse {
   contact_email: string;
   contact_phone: string;
   industry: string;
-  agent_status: "pending" | "active" | "completed" | "failed" | "skipped";
+  problem_statement?: string | null;
+  voice_gender?: string | null;
+  agent_status:
+    | "pending"
+    | "summarizing_documents"
+    | "building_profile"
+    | "provisioning"
+    | "active"
+    | "completed"
+    | "failed"
+    | "skipped";
   assistant_id: string | null;
   failure_reason: string | null;
   qualified?: boolean | null;
@@ -103,6 +115,90 @@ export async function submitDemoRequest(payload: DemoRequestPayload): Promise<Le
  *
  * @throws {NetworkError} on fetch/HTTP errors.
  */
+/**
+ * GET /api/leads
+ *
+ * Lists leads newest-first for the internal dashboard and active-demos views.
+ * `status` filters by agent_status.
+ */
+export interface DemoFeedback {
+  id: string;
+  lead_id: string;
+  rating: "positive" | "negative";
+  comment: string | null;
+  created_at: string;
+}
+
+export interface DemoFeedbackWithLead extends DemoFeedback {
+  company_name: string;
+  industry: string;
+}
+
+/** POST /api/demo-request/{lead_id}/feedback — client submits demo feedback. */
+export async function submitDemoFeedback(
+  leadId: string,
+  payload: { rating: "positive" | "negative"; comment?: string },
+): Promise<DemoFeedback> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new NetworkError("Could not reach the server to send your feedback.");
+  }
+  if (!res.ok) throw new NetworkError(`Feedback could not be saved (${res.status})`);
+  return res.json();
+}
+
+/** GET /api/demo-request/{lead_id}/feedback — what this client already sent. */
+export async function getFeedbackForLead(leadId: string): Promise<DemoFeedback[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}/feedback`);
+  } catch {
+    throw new NetworkError("Lost connection to the backend.");
+  }
+  if (!res.ok) throw new NetworkError(`Failed to load feedback (${res.status})`);
+  return res.json();
+}
+
+/** GET /api/feedback — all client feedback, for the internal team view. */
+export async function listAllFeedback(
+  opts: { limit?: number; rating?: "positive" | "negative" } = {},
+): Promise<DemoFeedbackWithLead[]> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.rating) params.set("rating", opts.rating);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/feedback?${params.toString()}`);
+  } catch {
+    throw new NetworkError("Lost connection to the backend.");
+  }
+  if (!res.ok) throw new NetworkError(`Failed to load feedback (${res.status})`);
+  return res.json();
+}
+
+export async function listLeads(
+  opts: { limit?: number; status?: LeadResponse["agent_status"] } = {},
+): Promise<LeadResponse[]> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.status) params.set("status", opts.status);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/leads?${params.toString()}`);
+  } catch {
+    throw new NetworkError("Lost connection to the backend.");
+  }
+  if (!res.ok) throw new NetworkError(`Failed to load leads (${res.status})`);
+  return res.json();
+}
+
 export async function getDemoRequestStatus(leadId: string): Promise<LeadResponse> {
   let res: Response;
   try {
@@ -125,6 +221,23 @@ export async function getDemoRequestStatus(leadId: string): Promise<LeadResponse
  *
  * Best-effort: callers should not crash if this fails (e.g. on tab close).
  */
+/**
+ * DELETE /api/demo-request/{lead_id}/agent — internal team action.
+ * Tears down the Vapi assistant and clears it from the lead, keeping the record.
+ */
+export async function deleteLeadAgent(leadId: string): Promise<LeadResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}/agent`, {
+      method: "DELETE",
+    });
+  } catch {
+    throw new NetworkError("Could not reach the backend to delete the agent.");
+  }
+  if (!res.ok) throw new NetworkError(`Delete agent failed with status ${res.status}`);
+  return res.json();
+}
+
 export async function endDemoSession(
   leadId: string,
 ): Promise<{ message: string; agent_status: string }> {
@@ -158,6 +271,8 @@ export interface ClarificationStatusResponse {
   missing_fields: string[];
   conversation_history: ClarificationMessageItem[];
   profile: Record<string, any> | null;
+  is_final_question?: boolean;
+  final_question_answered?: boolean;
 }
 
 export async function uploadClarificationDocument(

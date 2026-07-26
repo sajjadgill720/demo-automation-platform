@@ -1,0 +1,1391 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import {
+  Phone,
+  Calendar,
+  Sun,
+  Moon,
+  Sparkles,
+  Check,
+  Share2,
+  ArrowRight,
+  ThumbsUp,
+  ThumbsDown,
+  CheckCircle,
+  Volume2,
+  Send,
+  X,
+  ChevronDown,
+  MessageSquare,
+} from "lucide-react";
+import { CompanyLogo } from "@/components/common/CompanyCard";
+import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { z } from "zod";
+import {
+  endDemoSession,
+  getDemoRequestStatus,
+  submitDemoFeedback,
+  getFeedbackForLead,
+  type DemoFeedback,
+} from "@/lib/api";
+import { lookupNarrative } from "@/lib/industry-narratives";
+
+const demoPreviewSearchSchema = z.object({
+  name: z.string().optional(),
+  company: z.string().optional(),
+  problem: z.string().optional(),
+  language: z.string().optional(),
+  tools: z.string().optional(),
+  assistant_id: z.string().optional(),
+  lead_id: z.string().optional(),
+  industry: z.string().optional(),
+});
+
+export const Route = createFileRoute("/_wizard/demo-preview")({
+  validateSearch: (search) => demoPreviewSearchSchema.parse(search),
+  head: () => ({
+    meta: [
+      { title: "Your Personalized Demo — Convoa" },
+      { name: "description", content: "A tailored AI voice demo sandbox." },
+    ],
+  }),
+  component: DemoPreview,
+});
+
+/* Animation variants */
+const containerVariants: any = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
+
+const fadeUp: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+};
+
+function DemoPreview() {
+  const search = Route.useSearch();
+  const { theme, toggleTheme } = useTheme();
+
+  // Dynamic agent identifiers from URL search params (set by the onboarding wizard)
+  const dynamicAssistantId = search.assistant_id || null;
+  const dynamicLeadId = search.lead_id || null;
+
+  // Personalization State
+  const [personalization] = useState(() => {
+    // 1. Check search params
+    if (search.name || search.company || search.problem) {
+      return {
+        name: search.name || "Elena",
+        company: search.company || "ABC Logistics",
+        problem:
+          search.problem ||
+          "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
+        language: search.language || "English (US Accent)",
+        tools: search.tools || "Descartes, Trimble, Salesforce",
+      };
+    }
+
+    // 2. Check localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("convoa_demo_preview_data");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.name || parsed.company) {
+            return {
+              name: parsed.name || "Elena",
+              company: parsed.company || "ABC Logistics",
+              problem:
+                parsed.problem ||
+                "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
+              language: parsed.language || "English (US Accent)",
+              tools: parsed.tools || "Descartes, Trimble, Salesforce",
+            };
+          }
+        }
+      } catch (e) {
+        console.error("Error reading localStorage:", e);
+      }
+    }
+
+    // 3. Fallback to default
+    return {
+      name: "Elena",
+      company: "ABC Logistics",
+      problem:
+        "Our manual dispatch process takes 6+ hours per shift, causing driver churn and delayed communications.",
+      language: "English (US Accent)",
+      tools: "Descartes, Trimble, Salesforce",
+    };
+  });
+
+  // Industry drives the before/after narrative. Prefer the lead record (the
+  // authoritative value the user picked on the form); fall back to the search
+  // param, then to the generic narrative so this never renders blank.
+  const [leadIndustry, setLeadIndustry] = useState<string | null>(search.industry ?? null);
+  const [leadCompany, setLeadCompany] = useState<string | null>(null);
+  // The lead record is the AUTHORITATIVE source for which agent belongs to this
+  // demo. The URL param is only a hint — it can be missing (a link shared without
+  // params, the nav's "View demo as client") or stale (the link was made before
+  // provisioning finished, or the agent was since deleted).
+  const [leadAssistantId, setLeadAssistantId] = useState<string | null>(null);
+  const [agentBuilding, setAgentBuilding] = useState(false);
+
+  useEffect(() => {
+    if (!dynamicLeadId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const IN_PROGRESS = [
+      "pending",
+      "summarizing_documents",
+      "building_profile",
+      "provisioning",
+    ];
+
+    const load = () => {
+      getDemoRequestStatus(dynamicLeadId)
+        .then((lead) => {
+          if (cancelled) return;
+          if (lead.industry) setLeadIndustry(lead.industry);
+          if (lead.company_name) setLeadCompany(lead.company_name);
+          setLeadAssistantId(lead.assistant_id ?? null);
+
+          // If the agent is still being generated, keep checking so the call
+          // button goes live the moment its id exists — rather than the visitor
+          // having to reload the page.
+          const building = IN_PROGRESS.includes(lead.agent_status);
+          setAgentBuilding(building && !lead.assistant_id);
+          if (building && !lead.assistant_id) {
+            timer = setTimeout(load, 3000);
+          }
+        })
+        .catch(() => {
+          /* Non-fatal: falls back to the URL param and the generic narrative. */
+        });
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [dynamicLeadId]);
+
+  /**
+   * The agent this call button dials.
+   *
+   * Precedence: explicit URL param first (it encodes the caller's intent — e.g.
+   * an internal "open this specific demo"), then the lead record.
+   *
+   * There is deliberately NO global-env fallback. It used to fall back to
+   * VITE_VAPI_ASSISTANT_ID, which meant a visitor whose own agent was missing
+   * would be silently connected to an unrelated shared assistant and believe it
+   * was theirs — a demo that appears to work while demonstrating the wrong
+   * business. Failing visibly is far better here.
+   */
+  const resolvedAssistantId = dynamicAssistantId || leadAssistantId;
+  const canCall = Boolean(resolvedAssistantId);
+
+  const narrative = lookupNarrative(leadIndustry);
+  const displayCompany = leadCompany || personalization.company;
+
+  // Dynamic company color / initial calculation
+  const companyRepresentation = (() => {
+    const name = personalization.company;
+    const initials = name
+      ? name
+        .split(" ")
+        .map((w: string) => w[0])
+        .join("")
+        .substring(0, 2)
+        .toUpperCase()
+      : "DQ";
+
+    // Previously hashed the company name into an arbitrary hue, which produced
+    // random indigo/violet/green logos. The brand colour is used instead so the
+    // page keeps one palette.
+    const logoColor = "var(--color-primary)";
+
+    return {
+      name,
+      logoColor,
+      logoInitials: initials,
+    };
+  })();
+
+  // Interactive Live Call Client Setup
+  const [vapi, setVapi] = useState<any>(null);
+  const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "on-call" | "ended">("idle");
+
+  // The two primary actions (feedback + booking) live in this block, directly
+  // below the demo. When a call ends — the moment the client is most primed to
+  // act — we scroll it into view and emphasise it. It stays visible at all other
+  // times, so the actions never depend on completing a call.
+  const actNowRef = useRef<HTMLDivElement>(null);
+  const justEnded = callStatus === "ended";
+  useEffect(() => {
+    if (callStatus === "ended") {
+      actNowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [callStatus]);
+
+  // Feedback States
+  const [feedbackRating, setFeedbackRating] = useState<"positive" | "negative" | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  // Feedback this client has already submitted for this demo, shown back to them.
+  const [pastFeedback, setPastFeedback] = useState<DemoFeedback[]>([]);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (!dynamicLeadId) return;
+    let cancelled = false;
+    getFeedbackForLead(dynamicLeadId)
+      .then((rows) => {
+        if (cancelled) return;
+        setPastFeedback(rows);
+        if (rows.length > 0) setFeedbackSubmitted(true);
+      })
+      .catch(() => {
+        /* Non-fatal: the form still works, we just can't show past submissions. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dynamicLeadId]);
+
+
+  // Booking Modal
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+
+
+  // Dynamic load of Vapi
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const VAPI_PUBLIC_KEY = (import.meta.env.VITE_VAPI_PUBLIC_KEY as string) || "";
+    if (!VAPI_PUBLIC_KEY) {
+      console.warn("VITE_VAPI_PUBLIC_KEY is not defined in environment variables.");
+    }
+
+    import("@vapi-ai/web").then((VapiModule) => {
+      try {
+        let VapiClass = VapiModule.default;
+        if (typeof VapiClass !== "function" && VapiClass && typeof (VapiClass as any).default === "function") {
+          VapiClass = (VapiClass as any).default;
+        }
+        if (typeof VapiClass !== "function") {
+          VapiClass = VapiModule as any;
+        }
+        const vapiInstance = new (VapiClass as any)(VAPI_PUBLIC_KEY);
+
+        vapiInstance.on("call-start", () => {
+          setCallStatus("on-call");
+          toast.success("Connected to generated demo agent.");
+        });
+
+        vapiInstance.on("call-end", () => {
+          setCallStatus("ended");
+          toast.info("Demo call ended.");
+        });
+
+        vapiInstance.on("error", (err: any) => {
+          console.error("Vapi error:", err);
+          setCallStatus("idle");
+          toast.error("Connection failed.");
+        });
+
+        setVapi(vapiInstance);
+      } catch (err) {
+        console.error("Failed to initialize Vapi:", err);
+      }
+    });
+
+    return () => {
+      if (vapi) {
+        vapi.stop();
+      }
+      // Best-effort unmount cleanup for the Vapi assistant.
+      // Removed endDemoSession here because React StrictMode triggers it instantly during dev, deleting the backend agent before the user can even test it!
+    };
+  }, []);
+
+  const handleStartBrowserCall = () => {
+    if (!vapi) {
+      toast.error("Vapi is initializing. Please try again.");
+      return;
+    }
+    if (!resolvedAssistantId) {
+      toast.error(
+        agentBuilding
+          ? "Your agent is still being built — this will be ready in a moment."
+          : "No agent is attached to this demo yet.",
+      );
+      return;
+    }
+    setCallStatus("connecting");
+    try {
+      vapi.start(resolvedAssistantId);
+    } catch (err) {
+      console.error(err);
+      setCallStatus("idle");
+    }
+  };
+
+  const handleEndBrowserCall = () => {
+    if (vapi) {
+      vapi.stop();
+    }
+    // Best-effort cleanup: delete the Vapi assistant on the backend
+    if (dynamicLeadId) {
+      endDemoSession(dynamicLeadId).catch((err) =>
+        console.error("endDemoSession failed (non-blocking):", err),
+      );
+    }
+  };
+
+
+  const handleCopyShareLink = () => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams({
+      name: personalization.name,
+      company: personalization.company,
+      problem: personalization.problem,
+      language: personalization.language,
+      tools: personalization.tools,
+    });
+    const shareUrl = `${baseUrl}?${params.toString()}`;
+
+    navigator.clipboard.writeText(shareUrl);
+    toast.success("Demo Sandbox URL copied to clipboard! (Link expires in 8 days)");
+  };
+
+  // Previously this only flipped local state and showed a toast — the feedback
+  // was never sent anywhere, so nothing ever reached the internal team. It now
+  // persists via the API and is read back below so the client can see what they
+  // submitted.
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackRating) return;
+
+    if (!dynamicLeadId) {
+      toast.error("This preview isn't linked to a request, so feedback can't be saved.");
+      return;
+    }
+
+    setFeedbackSending(true);
+    try {
+      const saved = await submitDemoFeedback(dynamicLeadId, {
+        rating: feedbackRating,
+        comment: feedbackText.trim() || undefined,
+      });
+      setPastFeedback((prev) => [saved, ...prev]);
+      setFeedbackSubmitted(true);
+      toast.success(
+        feedbackRating === "positive"
+          ? "Thanks — your feedback has been sent to the team."
+          : "Sent. The team will review what needs adjusting.",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't send your feedback.");
+    } finally {
+      setFeedbackSending(false);
+    }
+  };
+
+
+  return (
+    <div className={cn(theme === "dark" && "dark")}>
+      <div
+        className="flex-1 bg-background text-foreground relative overflow-hidden"
+        id="print-section"
+      >
+        {/* Print Stylesheet (N1) */}
+        <style>{`
+          @media print {
+            body {
+              background: #fff !important;
+              color: #000 !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+            .print-only {
+              display: block !important;
+            }
+            #print-section {
+              border: none !important;
+              padding: 0 !important;
+            }
+          }
+          .print-only {
+            display: none;
+          }
+        `}</style>
+
+        {/* Background Grid & Glows */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 no-print">
+          <div
+            className="absolute inset-0 opacity-[0.2] dark:opacity-[0.06]"
+            style={{
+              backgroundImage: [
+                `linear-gradient(to right, var(--border) 1px, transparent 1px)`,
+                `linear-gradient(to bottom, var(--border) 1px, transparent 1px)`,
+              ].join(", "),
+              backgroundSize: "64px 64px",
+            }}
+          />
+          <div
+            className="absolute top-[5%] left-[20%] w-[28rem] h-[28rem] bg-primary/[0.04] dark:bg-primary/[0.025] blur-[110px] rounded-full animate-pulse"
+            style={{ animationDuration: "9s" }}
+          />
+          <div
+            className="absolute top-[30%] right-[10%] w-[35rem] h-[35rem] bg-primary/[0.035] dark:bg-primary/[0.02] blur-[130px] rounded-full animate-pulse"
+            style={{ animationDuration: "12s" }}
+          />
+        </div>
+
+        {/* Header */}
+        <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 no-print">
+          <Link
+            to="/"
+            className="flex items-center gap-3 text-xs text-muted-foreground font-mono group"
+          >
+            <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary text-foreground font-bold text-[10px] uppercase tracking-tight group-hover:border-primary/50 transition-colors">
+              DQ
+            </div>
+            <span className="flex items-center gap-2 uppercase tracking-widest text-[10px]">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              Powered by DataQuartz AI
+            </span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              className="p-2 border border-border hover:bg-secondary text-foreground transition-colors cursor-pointer bg-transparent"
+              aria-label="Toggle Theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <motion.section
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 mx-auto max-w-6xl px-6 pt-4 pb-20 space-y-12"
+        >
+          {/* C1: Personalization Signaling banner */}
+          <div className="flex items-center gap-2.5 px-4 py-2 border border-primary/20 w-fit bg-primary/[0.04] mx-auto text-[10px] font-semibold text-primary uppercase tracking-widest font-mono">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
+            Prepared for {personalization.name} · {personalization.company}
+          </div>
+
+          <div className="rounded-3xl border border-border bg-card/85 backdrop-blur-sm p-10 md:p-14 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-primary to-blue-400" />
+
+            <div className="flex flex-col items-center gap-8 text-center">
+              {/* Company Logo representation */}
+              <motion.div variants={fadeUp} className="flex items-center gap-4">
+                <CompanyLogo company={companyRepresentation} size={56} />
+                <span className="text-muted-foreground text-xl font-light">×</span>
+                <div className="flex h-14 w-14 items-center justify-center border border-border bg-secondary text-foreground">
+                  <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+                </div>
+              </motion.div>
+
+              {/* Minimal headline */}
+              <motion.div variants={fadeUp} className="max-w-2xl space-y-4">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-foreground leading-[1.1]">
+                  {personalization.company}'s new receptionist never misses a call
+                </h1>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto font-sans">
+                  Trained on how you work. Call it right now — this is exactly what your
+                  customers would hear.
+                </p>
+              </motion.div>
+
+              {/* CV: Convoa Command Grid — Bento hero with central live-call orb */}
+              <motion.div
+                variants={fadeUp}
+                className="w-full no-print pt-2"
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 text-left">
+                  {/* Top-left — Human-like voice */}
+                  <FeatureCell
+                    text="Sounds human. Your customers won't ask to be put through to someone else."
+                    illustration={<VoiceRosterIllustration />}
+                  />
+
+                  {/* Center hub — eclipse orb, spans two rows on desktop, whole surface is clickable */}
+                  <button
+                    onClick={
+                      callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall
+                    }
+                    disabled={callStatus === "connecting" || !canCall}
+                    aria-label={
+                      callStatus === "on-call"
+                        ? "End the live voice call"
+                        : "Start a live voice call now"
+                    }
+                    className={cn(
+                      "lg:row-span-2 group relative flex flex-col items-center justify-start gap-5 rounded-3xl p-6 md:p-8 text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                      // Light mode: contain the orb as its own dark "spotlight" panel so the
+                      // glow never smudges the light page. Dark mode: let it float in the void.
+                      theme !== "dark" &&
+                        "overflow-hidden border border-border/50 shadow-[0_24px_70px_-24px_rgba(2,6,15,0.55)]",
+                    )}
+                    style={{
+                      background:
+                        theme === "dark"
+                          ? "radial-gradient(ellipse 78% 62% at 50% 54%, #05070d 0%, #05070d 44%, transparent 82%)"
+                          : "radial-gradient(ellipse 120% 100% at 50% 42%, #0d1a2b 0%, #060910 70%)",
+                    }}
+                  >
+                    {/* Brand + tagline */}
+                    <div className="relative z-10 space-y-3">
+                      <span
+                        className="block text-3xl md:text-4xl font-bold tracking-tight lowercase"
+                        style={{
+                          background: "linear-gradient(90deg, var(--color-primary), var(--color-primary))",
+                          WebkitBackgroundClip: "text",
+                          backgroundClip: "text",
+                          color: "transparent",
+                        }}
+                      >
+                        convoa
+                      </span>
+                      <p className="text-sm text-white/55 leading-relaxed max-w-xs mx-auto font-sans">
+                        Answers every call, books the job, and never puts anyone on hold.
+                      </p>
+                    </div>
+
+                    {/* Eclipse */}
+                    <div className="relative flex-1 flex items-center justify-center w-full min-h-[380px] md:min-h-[460px]">
+                      {/* Outer halo glow */}
+                      <div
+                        className="absolute h-[460px] w-[460px] rounded-full blur-3xl animate-pulse pointer-events-none"
+                        style={{
+                          background:
+                            "radial-gradient(circle, rgba(245,158,11,0.30) 0%, rgba(34,211,238,0.12) 44%, transparent 68%)",
+                          animationDuration: "7s",
+                        }}
+                      />
+                      {/* Dark disc: glowing teal rim + faint starfield */}
+                      <div
+                        className="absolute h-[300px] w-[300px] md:h-[360px] md:w-[360px] rounded-full transition-transform duration-500 group-hover:scale-[1.04] pointer-events-none"
+                        style={{
+                          background:
+                            "radial-gradient(circle, #03050a 50%, rgba(245,158,11,0.05) 68%, transparent 73%), radial-gradient(1.5px 1.5px at 30% 38%, rgba(255,255,255,0.55), transparent), radial-gradient(1px 1px at 68% 30%, rgba(255,255,255,0.4), transparent), radial-gradient(1.5px 1.5px at 58% 72%, rgba(255,255,255,0.45), transparent), radial-gradient(1px 1px at 38% 64%, rgba(255,255,255,0.3), transparent), radial-gradient(1px 1px at 74% 58%, rgba(255,255,255,0.35), transparent), radial-gradient(1px 1px at 46% 44%, rgba(255,255,255,0.25), transparent)",
+                          boxShadow:
+                            "0 0 0 1px rgba(245,158,11,0.30), 0 0 100px -6px rgba(245,158,11,0.55), 0 0 46px -4px rgba(245,158,11,0.4), inset 0 0 80px -16px rgba(45,212,191,0.7)",
+                        }}
+                      />
+                      {/* Organic ribbon knot — faint counter layer (depth) */}
+                      <EclipseRibbon
+                        className="absolute h-[230px] w-[230px] md:h-[262px] md:w-[262px] opacity-35"
+                        gradientId="ribbonGradFaint"
+                        rotate={-360}
+                        duration={95}
+                        strokeWidth={0.5}
+                      />
+                      {/* Organic ribbon knot — primary */}
+                      <EclipseRibbon
+                        className="absolute h-[188px] w-[188px] md:h-[216px] md:w-[216px]"
+                        gradientId="ribbonGradMain"
+                        rotate={360}
+                        duration={58}
+                        strokeWidth={0.7}
+                        glow
+                      />
+                      {/* Center label */}
+                      <div className="relative z-10 flex flex-col items-center gap-0.5 pointer-events-none">
+                        {callStatus === "on-call" ? (
+                          <>
+                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-destructive/70">
+                              In call
+                            </span>
+                            <span className="text-lg md:text-xl font-semibold text-destructive">
+                              tap to end
+                            </span>
+                          </>
+                        ) : callStatus === "connecting" ? (
+                          <>
+                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60">
+                              Connecting
+                            </span>
+                            <span className="text-lg md:text-xl font-semibold text-primary animate-pulse">
+                              one moment…
+                            </span>
+                          </>
+                        ) : !canCall ? (
+                          <>
+                            <span className="text-[11px] font-light uppercase tracking-[0.2em] text-white/40">
+                              {agentBuilding ? "Your agent is" : "Agent"}
+                            </span>
+                            <span className="text-xl md:text-2xl font-semibold tracking-tight text-white/55">
+                              {agentBuilding ? "almost ready…" : "not available"}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[11px] font-light uppercase tracking-[0.2em] text-white/40">
+                              Click here to
+                            </span>
+                            <span
+                              className="text-2xl md:text-3xl font-semibold tracking-tight"
+                              style={{
+                                background: "linear-gradient(90deg, var(--color-primary), var(--color-primary))",
+                                WebkitBackgroundClip: "text",
+                                backgroundClip: "text",
+                                color: "transparent",
+                              }}
+                            >
+                              talk now
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Top-right — Heat maps */}
+                  <FeatureCell
+                    text="See every call and every missed opportunity in one place."
+                    illustration={<HeatmapIllustration />}
+                  />
+
+                  {/* Bottom-left — 24/7 revenue */}
+                  <FeatureCell
+                    text="Answers at 2am, on weekends, and through the rush. Every call, every time."
+                    illustration={<RevenueIllustration />}
+                  />
+
+                  {/* Bottom-right — Real-time data */}
+                  <FeatureCell
+                    text="Every caller captured, qualified and ready for you to follow up."
+                    illustration={<TimelineIllustration />}
+                  />
+                </div>
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Act now — the two primary actions, directly below the demo so the
+              client reaches them without scrolling past secondary content. On lg
+              they sit side by side; they stack on narrow viewports. Emphasised and
+              scrolled into view when the call ends (see actNowRef / justEnded),
+              but always visible so they never depend on completing a call. */}
+          <motion.div ref={actNowRef} variants={fadeUp} className="scroll-mt-24 no-print">
+            {justEnded && (
+              <div className="mb-4 flex items-center justify-center gap-2 text-center text-sm font-sans text-primary animate-fade-in">
+                <Sparkles className="h-4 w-4 shrink-0" />
+                <span>That's your agent. What did you think — ready to take it live?</span>
+              </div>
+            )}
+            <div
+              className={cn(
+                "grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5 items-stretch rounded-3xl transition-all duration-500",
+                justEnded && "ring-2 ring-primary/40 ring-offset-4 ring-offset-background",
+              )}
+            >
+              {/* Feedback card */}
+              <div className="rounded-3xl border border-border bg-card/70 backdrop-blur-sm p-6 md:p-8 flex flex-col">
+                <div className="flex items-center gap-2.5 mb-5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary shrink-0">
+                    <MessageSquare className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-medium tracking-tight leading-tight">How was that?</h3>
+                    <p className="text-xs text-muted-foreground font-sans">Tell us if the agent got it right.</p>
+                  </div>
+                </div>
+                <div className="space-y-4 flex-1">
+              {!feedbackSubmitted ? (
+                <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-xs">
+                  {/* Rating Selector */}
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackRating("positive")}
+                      className={cn(
+                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer bg-transparent",
+                        feedbackRating === "positive"
+                          ? "border-success text-success bg-success/[0.05]"
+                          : "border-border text-foreground hover:bg-secondary",
+                      )}
+                    >
+                      <ThumbsUp className="h-4 w-4" /> Yes, Accurate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackRating("negative")}
+                      className={cn(
+                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer bg-transparent",
+                        feedbackRating === "negative"
+                          ? "border-destructive text-destructive bg-destructive/[0.05]"
+                          : "border-border text-foreground hover:bg-secondary",
+                      )}
+                    >
+                      <ThumbsDown className="h-4 w-4" /> Needs Tweaks
+                    </button>
+                  </div>
+
+                  {/* Rating text prompt */}
+                  {feedbackRating && (
+                    <div className="space-y-1.5 text-left animate-fade-in">
+                      <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/75">
+                        {feedbackRating === "positive"
+                          ? "What works well? (Optional)"
+                          : "What did the agent miss? (e.g. tools, workflow instructions) *"}
+                      </label>
+                      <textarea
+                        required={feedbackRating === "negative"}
+                        rows={2}
+                        value={feedbackText}
+                        onChange={(e) => setFeedbackText(e.target.value)}
+                        placeholder={
+                          feedbackRating === "positive"
+                            ? "Provide any comments..."
+                            : "Tell us what to adjust so we can rebuild your agent..."
+                        }
+                        className="w-full bg-secondary border border-border px-3 py-2 text-foreground focus:outline-none focus:border-primary text-xs font-mono resize-none"
+                      />
+                      <button
+                        type="submit"
+                        disabled={feedbackSending}
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all text-[11px] font-mono font-semibold uppercase tracking-wider py-2.5 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        {feedbackSending ? "Sending…" : "Send feedback"}
+                      </button>
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center py-2 space-y-2 font-mono">
+                    <div className="h-10 w-10 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
+                      <Check className="h-5 w-5" />
+                    </div>
+                    <p className="text-xs uppercase tracking-wider font-bold">Feedback sent</p>
+                    <p className="text-[11px] text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
+                      Thanks — this is now with the team.
+                    </p>
+                  </div>
+
+                  {/* The client's own submissions, read back from the server so they
+                      can see exactly what was sent and when. */}
+                  {pastFeedback.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        Your feedback
+                      </p>
+                      <ul className="space-y-2">
+                        {pastFeedback.map((fb) => (
+                          <li
+                            key={fb.id}
+                            className="border border-border bg-secondary/40 p-3 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-semibold",
+                                  fb.rating === "positive" ? "text-success" : "text-destructive",
+                                )}
+                              >
+                                {fb.rating === "positive" ? (
+                                  <ThumbsUp className="h-3 w-3" />
+                                ) : (
+                                  <ThumbsDown className="h-3 w-3" />
+                                )}
+                                {fb.rating === "positive" ? "Accurate" : "Needs tweaks"}
+                              </span>
+                              <time
+                                dateTime={fb.created_at}
+                                className="text-[10px] font-mono text-muted-foreground"
+                              >
+                                {new Date(fb.created_at).toLocaleString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </time>
+                            </div>
+                            {fb.comment && (
+                              <p className="text-[11px] font-sans text-foreground/80 leading-relaxed">
+                                {fb.comment}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFeedbackSubmitted(false);
+                          setFeedbackRating(null);
+                          setFeedbackText("");
+                        }}
+                        className="text-[11px] font-sans text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer bg-transparent border-0 p-0"
+                      >
+                        Add more feedback
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+                </div>
+              </div>
+
+              {/* Booking card */}
+              <div className="relative overflow-hidden rounded-3xl border border-primary/30 bg-primary/[0.03] p-6 md:p-8 flex flex-col">
+                <div
+                  className="absolute inset-x-0 -top-24 mx-auto h-48 w-96 max-w-full rounded-full blur-3xl pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(245,158,11,0.14), transparent 70%)" }}
+                />
+                <div className="relative z-10 flex flex-col flex-1">
+                  <div className="flex items-center gap-2.5 mb-5">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary shrink-0">
+                      <Calendar className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h3 className="text-base font-medium tracking-tight leading-tight">Take it live</h3>
+                      <p className="text-xs text-muted-foreground font-sans">Point your real number at it.</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed font-sans">
+                    Every day this isn't live is another day of calls going to voicemail. One
+                    short call and it starts answering for {personalization.company}.
+                  </p>
+                  <div className="mt-auto pt-6 space-y-2.5">
+                    <button
+                      onClick={() => setShowBookingModal(true)}
+                      className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all hover:bg-primary/90 cursor-pointer border-0"
+                    >
+                      <Calendar className="h-4 w-4" /> Book my setup call
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                    <button
+                      onClick={handleCopyShareLink}
+                      className="inline-flex w-full items-center justify-center gap-1.5 bg-transparent border-0 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer"
+                    >
+                      <Share2 className="h-3.5 w-3.5" /> Share this demo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* I1: Before/After ROI Narrative Comparison (Proof of Concept) */}
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            className="rounded-3xl border border-border p-8 md:p-10 space-y-8 bg-card/60 backdrop-blur-sm"
+          >
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono text-primary uppercase tracking-widest font-semibold">
+                With vs. without
+              </span>
+              <h2 className="text-2xl font-normal tracking-tight">
+                What {displayCompany} stops losing
+              </h2>
+            </div>
+
+            <div className="grid gap-0 md:grid-cols-2 rounded-2xl overflow-hidden border border-border/80 divide-y md:divide-y-0 md:divide-x divide-border">
+              {/* Manual State */}
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-2 text-destructive font-mono text-xs uppercase tracking-wider">
+                  <span className="h-1.5 w-1.5 rounded-full bg-destructive"></span>
+                  Today, without us
+                </div>
+                <ul className="space-y-3 text-xs text-foreground/75 leading-relaxed font-sans list-disc list-inside">
+                  {narrative.before.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Convoa State */}
+              <div className="p-6 space-y-4 bg-success/[0.02]">
+                <div className="flex items-center gap-2 text-success font-mono text-xs uppercase tracking-wider">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse"></span>
+                  From day one with Convoa
+                </div>
+                <ul className="space-y-3 text-xs text-foreground/75 leading-relaxed font-sans list-disc list-inside">
+                  {narrative.after.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* ROI Pill Banner */}
+            <div className="rounded-xl bg-success/[0.04] border border-success/20 p-4 text-center">
+              <p className="text-xs font-semibold text-success font-mono uppercase tracking-wider">
+                Projected: {narrative.projection}
+              </p>
+            </div>
+          </motion.div>
+
+        </motion.section>
+
+        {/* FAQ — real questions a caller to this business asks, with how the
+            agent handles them. Replaces a dead list of prompt buttons that only
+            fired a toast and showed no answers. Industry-aware via lookupNarrative. */}
+        <section className="relative z-10 mx-auto max-w-3xl px-6 pb-20">
+          <div className="space-y-2 mb-6 text-center">
+            <span className="text-[10px] font-mono text-primary uppercase tracking-widest font-semibold">
+              Objection handled
+            </span>
+            <h2 className="text-2xl font-normal tracking-tight">
+              The calls you're worried about — already handled
+            </h2>
+          </div>
+          <div className="divide-y divide-border rounded-2xl border border-border bg-card/60 backdrop-blur-sm overflow-hidden">
+            {narrative.faqs.map((item, i) => {
+              const open = openFaq === i;
+              return (
+                <div key={item.q}>
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenFaq(open ? null : i)}
+                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left cursor-pointer bg-transparent border-0 hover:bg-primary/[0.03] transition-colors"
+                  >
+                    <span className="text-sm font-medium text-foreground">{item.q}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                        open && "rotate-180 text-primary",
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="overflow-hidden"
+                      >
+                        <p className="px-5 pb-4 text-sm leading-relaxed text-muted-foreground font-sans">
+                          {item.a}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-4 text-center text-xs text-muted-foreground font-sans">
+            Don't take our word for it — call the agent above and ask it yourself.
+          </p>
+        </section>
+
+
+
+        {/* Footer */}
+        <footer className="relative z-10 border-t border-border bg-background">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-[11px] text-muted-foreground font-mono">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+              <span className="uppercase tracking-widest text-[9px]">
+                Your demo is live
+              </span>
+            </div>
+            <span>&copy; DataQuartz &middot; Built for {displayCompany}</span>
+          </div>
+        </footer>
+
+        {/* Calendar Booking Modal Widget (C3) */}
+        <AnimatePresence>
+          {showBookingModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-card border border-border w-full max-w-md p-6 font-mono relative shadow-2xl rounded-lg"
+              >
+                <button
+                  onClick={() => {
+                    setShowBookingModal(false);
+                    setBookingConfirmed(false);
+                    setSelectedTimeSlot(null);
+                  }}
+                  className="absolute top-4 right-4 text-foreground/50 hover:text-foreground bg-transparent border-0 cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+
+                {!bookingConfirmed ? (
+                  <div className="space-y-5 text-left">
+                    <div className="space-y-1">
+                      <span className="text-[9px] text-primary uppercase tracking-widest font-semibold">
+                        Scheduler
+                      </span>
+                      <h3 className="text-base font-bold uppercase">Claim Agent & Book Setup</h3>
+                      <p className="text-xs text-foreground/60 font-sans leading-relaxed">
+                        Select a 15-minute slot to connect this sandbox agent to your team's
+                        Descartes/Trimble live test databases.
+                      </p>
+                    </div>
+
+                    {/* Time slots */}
+                    <div className="space-y-2 font-mono">
+                      <p className="text-[10px] text-foreground/45 uppercase tracking-widest">
+                        Available Slots (Tomorrow)
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {["09:00 AM", "10:30 AM", "01:00 PM", "03:30 PM"].map((slot) => (
+                          <button
+                            key={slot}
+                            onClick={() => setSelectedTimeSlot(slot)}
+                            className={cn(
+                              "border py-2.5 font-mono cursor-pointer transition-colors bg-transparent",
+                              selectedTimeSlot === slot
+                                ? "border-primary text-primary bg-primary/5 font-semibold"
+                                : "border-border text-foreground hover:bg-secondary",
+                            )}
+                          >
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (!selectedTimeSlot) {
+                          toast.error("Please select a time slot first.");
+                          return;
+                        }
+                        setBookingConfirmed(true);
+                      }}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all py-3 text-xs font-semibold uppercase tracking-wider border-0 cursor-pointer"
+                    >
+                      Confirm Booking Slot
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 space-y-4">
+                    <div className="h-12 w-12 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
+                      <CheckCircle className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold uppercase tracking-wider">
+                        Booking Confirmed!
+                      </h4>
+                      <p className="text-xs text-foreground/60 font-sans leading-relaxed max-w-xs mx-auto">
+                        Your hand-off setup session is booked for tomorrow at{" "}
+                        <strong className="text-foreground">{selectedTimeSlot}</strong>. A calendar
+                        invite has been sent to your registered email.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowBookingModal(false);
+                        setBookingConfirmed(false);
+                        setSelectedTimeSlot(null);
+                      }}
+                      className="border border-border text-foreground hover:bg-secondary px-6 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                    >
+                      Close Window
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Convoa Command Grid — presentational sub-components
+   ───────────────────────────────────────────────────────────── */
+
+/* Precomputed organic "silk ribbon" knot — concentric wobbly closed
+   curves, each slightly larger and phase-rotated, so the strokes swirl
+   into a flowing knot instead of rigid rectangles. Computed once. */
+const RIBBON_PATHS: { d: string; opacity: number }[] = (() => {
+  const smoothClosedPath = (pts: number[][]): string => {
+    const n = pts.length;
+    let d = `M${pts[0][0].toFixed(2)} ${pts[0][1].toFixed(2)}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n];
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % n];
+      const p3 = pts[(i + 2) % n];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += `C${c1x.toFixed(2)} ${c1y.toFixed(2)} ${c2x.toFixed(2)} ${c2y.toFixed(2)} ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+    }
+    return d + "Z";
+  };
+
+  const rings = 22;
+  const points = 150;
+  return Array.from({ length: rings }, (_, i) => {
+    const radius = 10 + i * 3.3;
+    const phase = i * 0.19;
+    const pts: number[][] = [];
+    for (let k = 0; k < points; k++) {
+      const a = (k / points) * Math.PI * 2;
+      const r =
+        radius *
+        (1 + 0.11 * Math.sin(3 * a + phase) + 0.05 * Math.sin(5 * a - phase * 1.4));
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    return {
+      d: smoothClosedPath(pts),
+      opacity: +(0.12 + (i / rings) * 0.5).toFixed(3),
+    };
+  });
+})();
+
+/* One rotating organic ribbon layer for the eclipse orb */
+function EclipseRibbon({
+  className,
+  gradientId,
+  rotate,
+  duration,
+  strokeWidth = 0.7,
+  glow = false,
+}: {
+  className: string;
+  gradientId: string;
+  rotate: number;
+  duration: number;
+  strokeWidth?: number;
+  glow?: boolean;
+}) {
+  return (
+    <motion.svg
+      viewBox="-100 -100 200 200"
+      className={cn("pointer-events-none", className)}
+      animate={{ rotate }}
+      transition={{ duration, repeat: Infinity, ease: "linear" }}
+      style={glow ? { filter: "drop-shadow(0 0 7px rgba(245,158,11,0.45))" } : undefined}
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="var(--color-primary)" />
+          <stop offset="55%" stopColor="var(--color-primary)" />
+          <stop offset="100%" stopColor="var(--color-primary)" />
+        </linearGradient>
+      </defs>
+      <g fill="none" stroke={`url(#${gradientId})`} strokeWidth={strokeWidth}>
+        {RIBBON_PATHS.map((p, i) => (
+          <path key={i} d={p.d} opacity={p.opacity} />
+        ))}
+      </g>
+    </motion.svg>
+  );
+}
+
+function FeatureCell({
+  text,
+  illustration,
+}: {
+  text: string;
+  illustration: React.ReactNode;
+}) {
+  return (
+    <div className="group flex flex-col justify-between gap-5 rounded-3xl border border-border bg-card/60 backdrop-blur-sm p-6 md:p-7 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_8px_32px_-12px_rgba(45,212,191,0.25)]">
+      <div className="relative h-40 overflow-hidden rounded-2xl border border-border/60 bg-secondary/30 transition-colors group-hover:border-primary/25">
+        {illustration}
+      </div>
+      <p className="text-sm leading-relaxed text-foreground/75 font-sans">{text}</p>
+    </div>
+  );
+}
+
+/* Card 1 — stylized agent roster panel */
+function VoiceRosterIllustration() {
+  const rows = [
+    { label: "Calls taken", value: "995" },
+    { label: "Support", value: "56" },
+    { label: "Call back", value: "930" },
+    { label: "Traffic", value: "100%" },
+  ];
+  return (
+    <div className="absolute inset-0 p-3 flex flex-col gap-2 font-mono">
+      <div className="flex items-center gap-2">
+        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/60 to-success/60 flex items-center justify-center text-[9px] font-bold text-background">
+          EM
+        </div>
+        <div className="leading-tight">
+          <p className="text-[10px] font-semibold text-foreground/80">Emily</p>
+          <p className="text-[8px] text-foreground/40 uppercase tracking-wider">Problem Solver</p>
+        </div>
+        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-success/15 text-success font-semibold">
+          6%
+        </span>
+      </div>
+      <div className="flex-1 space-y-1">
+        {rows.map((r) => (
+          <div
+            key={r.label}
+            className="flex items-center justify-between text-[9px] px-2 py-1 rounded bg-background/50 border border-border/50"
+          >
+            <span className="text-foreground/50">{r.label}</span>
+            <span className="text-foreground/80 font-semibold">{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Card 2 — service heat map */
+function HeatmapIllustration() {
+  const blobs = [
+    { top: "20%", left: "25%", color: "oklch(0.62 0.19 149)", size: 42 },
+    { top: "55%", left: "60%", color: "oklch(0.72 0.2 30)", size: 54 },
+    { top: "35%", left: "72%", color: "oklch(0.79 0.17 70)", size: 38 },
+    { top: "68%", left: "30%", color: "oklch(0.7 0.16 250)", size: 40 },
+  ];
+  return (
+    <div className="absolute inset-0">
+      {/* faint street grid */}
+      <div
+        className="absolute inset-0 opacity-40"
+        style={{
+          backgroundImage: [
+            "linear-gradient(to right, var(--border) 1px, transparent 1px)",
+            "linear-gradient(to bottom, var(--border) 1px, transparent 1px)",
+          ].join(", "),
+          backgroundSize: "22px 22px",
+        }}
+      />
+      {blobs.map((b, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full blur-md animate-pulse"
+          style={{
+            top: b.top,
+            left: b.left,
+            width: b.size,
+            height: b.size,
+            background: b.color,
+            opacity: 0.55,
+            animationDuration: `${4 + i}s`,
+          }}
+        />
+      ))}
+      <span className="absolute top-2 left-2 text-[8px] font-mono uppercase tracking-widest text-foreground/50">
+        Heatmap
+      </span>
+    </div>
+  );
+}
+
+/* Card 3 — revenue area chart */
+function RevenueIllustration() {
+  return (
+    <div className="absolute inset-0 p-3 flex flex-col">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[9px] font-mono font-semibold text-foreground/70">Revenue</span>
+        <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground/50">
+          October
+        </span>
+      </div>
+      <svg viewBox="0 0 200 70" preserveAspectRatio="none" className="w-full flex-1">
+        <defs>
+          <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="oklch(0.72 0.19 149)" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="oklch(0.72 0.19 149)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M0,55 C20,40 30,50 45,30 C60,12 72,45 90,38 C108,31 120,52 140,28 C158,8 172,40 200,22 L200,70 L0,70 Z"
+          fill="url(#revGrad)"
+        />
+        <path
+          d="M0,55 C20,40 30,50 45,30 C60,12 72,45 90,38 C108,31 120,52 140,28 C158,8 172,40 200,22"
+          fill="none"
+          stroke="oklch(0.72 0.19 149)"
+          strokeWidth="1.5"
+        />
+      </svg>
+      <div className="flex items-center gap-3 mt-1 text-[8px] font-mono text-foreground/45">
+        <span className="flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-success" /> Sales
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-foreground/30" /> Profit
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* Card 4 — real-time call timings */
+function TimelineIllustration() {
+  const bars = [70, 45, 88, 32, 60, 50];
+  return (
+    <div className="absolute inset-0 p-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[9px] font-mono font-semibold text-foreground/70">Call timings</span>
+        {/* mini donut */}
+        <svg viewBox="0 0 36 36" className="h-7 w-7 -rotate-90">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="var(--border)" strokeWidth="4" />
+          <circle
+            cx="18"
+            cy="18"
+            r="15"
+            fill="none"
+            stroke="oklch(0.7 0.16 250)"
+            strokeWidth="4"
+            strokeDasharray="94"
+            strokeDashoffset="30"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+      <div className="flex-1 flex flex-col justify-center gap-1.5">
+        {bars.map((w, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <span className="text-[7px] font-mono text-foreground/35 w-6">0{i + 1}:00</span>
+            <div className="flex-1 h-1.5 rounded-full bg-background/60 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary/70 to-success/70"
+                style={{ width: `${w}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

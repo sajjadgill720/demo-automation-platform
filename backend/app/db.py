@@ -32,6 +32,40 @@ def init_db():
                     conn.execute(text("ALTER TABLE leads ADD COLUMN consent_recorded_at TIMESTAMP"))
                 else:
                     conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS consent_recorded_at TIMESTAMP"))
+            if "problem_statement" not in columns:
+                if DATABASE_URL.startswith("sqlite"):
+                    conn.execute(text("ALTER TABLE leads ADD COLUMN problem_statement VARCHAR"))
+                else:
+                    conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS problem_statement VARCHAR"))
+            if "voice_gender" not in columns:
+                if DATABASE_URL.startswith("sqlite"):
+                    conn.execute(text("ALTER TABLE leads ADD COLUMN voice_gender VARCHAR"))
+                else:
+                    conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS voice_gender VARCHAR"))
+            doc_columns = [c["name"] for c in inspector.get_columns("documents")]
+            if "file_name" not in doc_columns:
+                if DATABASE_URL.startswith("sqlite"):
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN file_name VARCHAR"))
+                else:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_name VARCHAR"))
+            # agent_status is a Postgres ENUM type; new members must be added to the
+            # type itself before the app can write them. ADD VALUE IF NOT EXISTS is
+            # idempotent, and each runs in its own autocommit connection because
+            # ALTER TYPE ... ADD VALUE cannot be followed by use of that value in
+            # the same transaction.
+            if not DATABASE_URL.startswith("sqlite"):
+                for new_status in ("summarizing_documents", "building_profile", "provisioning"):
+                    try:
+                        with engine.connect().execution_options(
+                            isolation_level="AUTOCOMMIT"
+                        ) as ac:
+                            ac.execute(
+                                text(
+                                    f"ALTER TYPE agentstatus ADD VALUE IF NOT EXISTS '{new_status}'"
+                                )
+                            )
+                    except Exception as e:
+                        print(f"Could not add enum value {new_status}: {e}")
             conn.commit()
     except Exception as e:
         print(f"Error altering database table: {e}")

@@ -1,6 +1,8 @@
-import { Bell, Search, HelpCircle, Sun, Moon } from "lucide-react";
+import { Search, Sun, Moon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useTheme } from "@/hooks/use-theme";
+import { HelpMenu } from "@/components/layout/HelpMenu";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 
 export function TopNav({ title, actions }: { title: string; actions?: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
@@ -27,19 +29,8 @@ export function TopNav({ title, actions }: { title: string; actions?: React.Reac
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
-        <button
-          aria-label="Help"
-          className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
-        >
-          <HelpCircle className="h-4 w-4" />
-        </button>
-        <button
-          aria-label="Notifications"
-          className="relative rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-        </button>
+        <HelpMenu />
+        <NotificationsBell />
         <Link
           to="/demo-preview"
           className="hidden rounded-lg border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors md:inline-block"

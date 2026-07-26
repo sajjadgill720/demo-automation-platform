@@ -48,7 +48,7 @@ function PortalGate() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#070a13] dark:bg-zinc-950 text-slate-200 px-4 font-mono relative overflow-hidden">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background text-muted-foreground px-4 font-mono relative overflow-hidden">
       {/* Fine-line crosshatch grid backdrop */}
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.35]"
@@ -61,7 +61,7 @@ function PortalGate() {
         }}
       />
       {/* Ambient amber glow */}
-      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] bg-amber-500/[0.045] blur-[130px] rounded-full z-0" />
+      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] bg-primary/[0.045] blur-[130px] rounded-full z-0" />
 
       {/* Global Page Guidelines */}
       <div className="pointer-events-none absolute inset-0 z-0">
@@ -80,17 +80,17 @@ function PortalGate() {
       </div>
 
       <div className="relative z-10 w-full max-w-md border border-zinc-800 bg-[#0c101d]/60 backdrop-blur-md p-8 rounded-xl shadow-2xl overflow-hidden transition-all duration-300">
-        <div className="absolute top-0 left-0 w-full h-[3px] bg-amber-500 animate-pulse" />
+        <div className="absolute top-0 left-0 w-full h-[3px] bg-primary animate-pulse" />
 
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 shadow-inner shadow-amber-500/5">
-            <Lock className="h-5 w-5 text-amber-500" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 shadow-inner shadow-primary/5">
+            <Lock className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h1 className="text-base font-bold tracking-tight text-white uppercase font-mono">
               Internal Access
             </h1>
-            <p className="text-xs text-slate-500 mt-1.5 font-sans">
+            <p className="text-xs text-muted-foreground mt-1.5 font-sans">
               Authorized Operations Personnel Only
             </p>
           </div>
@@ -100,7 +100,7 @@ function PortalGate() {
           <div className="space-y-2">
             <label
               htmlFor="passcode"
-              className="text-[10px] font-medium tracking-wider text-slate-400 uppercase font-mono"
+              className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase font-mono"
             >
               Enter Passcode
             </label>
@@ -111,7 +111,7 @@ function PortalGate() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full bg-[#070a13] border border-zinc-800 rounded px-3.5 py-2.5 text-sm tracking-widest placeholder:text-zinc-700 placeholder:tracking-normal focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-white font-sans transition-all"
+                className="w-full bg-[#070a13] border border-zinc-800 rounded px-3.5 py-2.5 text-sm tracking-widest placeholder:text-zinc-700 placeholder:tracking-normal focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-white font-sans transition-all"
                 required
                 disabled={loading}
                 autoFocus
@@ -120,7 +120,7 @@ function PortalGate() {
           </div>
 
           {error && (
-            <div className="flex items-start gap-2.5 rounded bg-rose-950/20 border border-rose-900/30 p-3 text-xs text-rose-400 font-sans">
+            <div className="flex items-start gap-2.5 rounded bg-destructive/20 border border-destructive/30 p-3 text-xs text-destructive font-sans">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -129,7 +129,7 @@ function PortalGate() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-amber-500 text-slate-950 hover:bg-amber-400 hover:shadow-lg transition-all rounded py-3 text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 font-mono border-0 active:scale-98"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary hover:shadow-lg transition-all rounded py-3 text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 font-mono border-0 active:scale-98"
           >
             {loading ? (
               "Verifying..."

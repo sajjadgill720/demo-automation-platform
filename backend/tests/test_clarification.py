@@ -343,7 +343,13 @@ def test_sanitization_and_prompt_unit():
         desired_customizations="Professional and prompt tone"
     )
     prompt_enriched = compile_lead_prompt("FastTrack Logistics", "Logistics", profile=profile)
-    if "Client-Specific Profile Context" in prompt_enriched and "Losing customer calls after 6 PM" in prompt_enriched:
+    # The modular template replaced the single flat "Client-Specific Profile Context"
+    # block with named sections, so assert on the profile content actually reaching the
+    # prompt rather than on the old heading text.
+    if ("Losing customer calls after 6 PM" in prompt_enriched
+            and "Trailer bookings" in prompt_enriched
+            and "+15559999" in prompt_enriched
+            and "Professional and prompt tone" in prompt_enriched):
         log_test("Prompt Compilation: Profile Informed", "PASS")
     else:
         log_test("Prompt Compilation: Profile Informed", "FAIL")

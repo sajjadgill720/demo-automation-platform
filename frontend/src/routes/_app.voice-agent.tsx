@@ -1,397 +1,274 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Mic,
-  Phone,
-  Webhook,
-  Calendar,
-  Database,
-  Mail,
-  Upload,
-  Trash2,
-  Save,
-  Plus,
-  FileText,
-  X,
-  Volume2,
-} from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { motion } from "framer-motion";
+import { Mic, Volume2, ExternalLink, RefreshCw, Search, Bot, Trash2, Loader2 } from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
-import { StatusBadge } from "@/components/common/StatusBadge";
+import { StatusBadge, statusToTone } from "@/components/common/StatusBadge";
+import { listLeads, deleteLeadAgent, type LeadResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/voice-agent")({
-  head: () => ({
-    meta: [{ title: "Voice agent — DataQuartz" }],
-  }),
+  head: () => ({ meta: [{ title: "Agent tester — DataQuartz" }] }),
   component: VoiceAgent,
 });
 
-interface FunctionItem {
-  id: string;
-  icon: React.ComponentType<{ className?: string }>;
-  name: string;
-  provider: string;
-  active: boolean;
-}
-
-interface KBFile {
-  name: string;
-  size: string;
-}
-
+/**
+ * Agent tester.
+ *
+ * This page used to be a fabricated "agent console" — a hardcoded agent id, phone
+ * number, webhook, three fake connected functions, three fake knowledge-base
+ * files, a simulated upload, and Update/Delete/Create buttons that only fired
+ * toasts. None of it touched the backend, and the product has no per-agent
+ * management API: agents are provisioned automatically, one per lead.
+ *
+ * It now shows the REAL provisioned agents (leads that have an assistant_id),
+ * their actual details, a one-click link to the live voice test on the demo
+ * page, and a genuine microphone check (the only interactive piece that was ever
+ * real here).
+ */
 function VoiceAgent() {
-  const [recording, setRecording] = useState(true);
-  const [temp, setTemp] = useState(0.4);
-  const [functions, setFunctions] = useState<FunctionItem[]>([
-    { id: "1", icon: Calendar, name: "book_meeting", provider: "Google Calendar", active: true },
-    { id: "2", icon: Database, name: "lookup_account", provider: "Salesforce", active: true },
-    { id: "3", icon: Mail, name: "send_followup", provider: "Resend", active: false },
-  ]);
-  const [kbFiles, setKbFiles] = useState<KBFile[]>([
-    { name: "Convoa-Product-Overview.pdf", size: "2.4 MB" },
-    { name: "ABC-Logistics-Case-Study.pdf", size: "1.1 MB" },
-    { name: "Freight-Industry-Glossary.md", size: "38 KB" },
-  ]);
+  const navigate = useNavigate();
+  const [leads, setLeads] = useState<LeadResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  // Dialog State
-  const [showFuncModal, setShowFuncModal] = useState(false);
-  const [newFuncName, setNewFuncName] = useState("");
-  const [newFuncProvider, setNewFuncProvider] = useState("Salesforce");
-
-  // Simulated File Upload State
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  const handleUpdateAgent = () => {
-    toast.success("Agent Convoa-EU-01 settings updated successfully!");
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const all = await listLeads({ limit: 200 });
+      // Only leads with a provisioned assistant are testable agents.
+      setLeads(all.filter((l) => !!l.assistant_id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load agents.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeleteAgent = () => {
-    toast.error("Deletion not permitted in demo environment.", {
-      description: "Please archive the active demo from the dashboard instead.",
-    });
-  };
+  useEffect(() => {
+    load();
+  }, []);
 
-  const handleCreateNewAgent = () => {
-    toast.info("Creating agent wizard is locked.", {
-      description: "Deployments are automatically provisioned during the Demo Generation flow.",
-    });
-  };
+  const agents = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return leads;
+    return leads.filter(
+      (l) =>
+        l.company_name.toLowerCase().includes(needle) ||
+        l.industry.toLowerCase().includes(needle) ||
+        (l.assistant_id ?? "").toLowerCase().includes(needle),
+    );
+  }, [leads, q]);
 
-  const handleAddFunctionSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFuncName.trim()) return;
+  const selected = useMemo(
+    () => agents.find((a) => a.id === selectedId) ?? agents[0] ?? null,
+    [agents, selectedId],
+  );
 
-    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-      "Google Calendar": Calendar,
-      Salesforce: Database,
-      Resend: Mail,
-      Other: Webhook,
-    };
-
-    const newFunc: FunctionItem = {
-      id: Date.now().toString(),
-      icon: iconMap[newFuncProvider] || Webhook,
-      name: newFuncName.toLowerCase().replace(/\s+/g, "_"),
-      provider: newFuncProvider,
-      active: true,
-    };
-
-    setFunctions([...functions, newFunc]);
-    toast.success(`Connected function '${newFunc.name}' added successfully!`);
-    setNewFuncName("");
-    setShowFuncModal(false);
-  };
-
-  const handleFileUploadSimulate = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    const interval = setInterval(() => {
-      setUploadProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-            setKbFiles((prev) => [...prev, { name: file.name, size: `${sizeMB} MB` }]);
-            setIsUploading(false);
-            toast.success(`Uploaded ${file.name} successfully to Retrieval Index.`);
-          }, 400);
-          return 100;
-        }
-        return p + 20;
-      });
-    }, 150);
-  };
-
-  const toggleFunctionActive = (id: string) => {
-    setFunctions((funcs) => funcs.map((f) => (f.id === id ? { ...f, active: !f.active } : f)));
-    const func = functions.find((f) => f.id === id);
-    if (func) {
-      toast.info(`Function '${func.name}' set to ${!func.active ? "Enabled" : "Disabled"}`);
+  const handleDeleteAgent = async () => {
+    if (!selected) return;
+    setDeleting(true);
+    try {
+      await deleteLeadAgent(selected.id);
+      toast.success(`Agent deleted — ${selected.company_name}`);
+      setConfirmingDelete(false);
+      setSelectedId(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete agent.");
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
     <>
-      <TopNav title="Voice agent · Convoa-EU-01" />
+      <TopNav title="Agent tester" />
       <div className="grid gap-6 p-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          {/* Waveform & Info */}
-          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-foreground">Convoa-EU-01</h2>
-                  <StatusBadge tone="success">Live</StatusBadge>
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  Deployed to ABC Logistics · agent id ag_9f4b21c0
-                </p>
-              </div>
-              <Waveform />
-            </div>
-
-            <dl className="mt-5 grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Provider" value="Vapi" />
-              <Field label="Voice" value="ElevenLabs · Rachel (EN-US)" />
-              <Field label="Language" value="English + German" />
-              <Field label="LLM" value="GPT-4o mini" />
-              <Field label="Temperature" value={temp.toFixed(2)}>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={temp}
-                  onChange={(e) => setTemp(Number(e.target.value))}
-                  className="mt-1.5 w-full accent-primary"
-                />
-              </Field>
-              <Field label="Phone number" value="+49 30 5683 4421" icon={Phone} />
-              <Field label="Webhook" value="https://api.dataquartz.ai/vapi/hooks" icon={Webhook} />
-            </dl>
+        {/* Agent list */}
+        <div className="space-y-3 xl:col-span-1">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search agents"
+              className="w-full border bg-card py-1.5 pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
+            />
           </div>
 
-          {/* Connected Functions */}
-          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold">Connected functions</h3>
-                <p className="text-xs text-muted-foreground">
-                  Actions the agent can invoke mid-call
-                </p>
-              </div>
-              <button
-                onClick={() => setShowFuncModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium hover:bg-muted"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add function
-              </button>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {functions.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => toggleFunctionActive(f.id)}
-                  className="group text-left"
-                >
-                  <FunctionCard
-                    icon={f.icon}
-                    name={f.name}
-                    provider={f.provider}
-                    active={f.active}
-                  />
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{agents.length} provisioned</span>
+            <button
+              onClick={load}
+              className="flex items-center gap-1.5 hover:text-foreground cursor-pointer"
+            >
+              <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+              Refresh
+            </button>
           </div>
 
-          {/* Knowledge Base */}
-          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold">Knowledge base</h3>
-              <p className="text-xs text-muted-foreground">
-                Documents grounded into the agent's retrieval index
-              </p>
+          {error ? (
+            <div className="border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              {error}
             </div>
-
-            <label className="block cursor-pointer rounded-lg border border-dashed p-6 text-center hover:bg-muted/40 transition-colors">
-              <input
-                type="file"
-                className="hidden"
-                accept=".pdf,.docx,.md"
-                onChange={handleFileUploadSimulate}
-                disabled={isUploading}
-              />
-              <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
-              <p className="mt-2 text-sm font-medium">Drop PDF, DOCX or MD files</p>
-              <p className="text-xs text-muted-foreground">Max 25 MB per file</p>
-            </label>
-
-            {isUploading && (
-              <div className="mt-3 p-3 rounded-lg border bg-muted/30">
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span>Uploading to retrieval index...</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <ul className="mt-3 space-y-2">
-              {kbFiles.map((f) => (
-                <li
-                  key={f.name}
-                  className="flex items-center justify-between rounded-lg border bg-background px-3 py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground/80">{f.name}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{f.size}</span>
+          ) : loading && leads.length === 0 ? (
+            <div className="border bg-card p-6 text-center text-sm text-muted-foreground">
+              Loading…
+            </div>
+          ) : agents.length === 0 ? (
+            <div className="border bg-card p-6 text-center text-sm text-muted-foreground">
+              No provisioned agents yet. Generate a demo to create one.
+            </div>
+          ) : (
+            <ul className="divide-y border bg-card">
+              {agents.map((a) => (
+                <li key={a.id}>
+                  <button
+                    onClick={() => {
+                      setSelectedId(a.id);
+                      setConfirmingDelete(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-3 py-2.5 text-left cursor-pointer hover:bg-muted/40",
+                      selected?.id === a.id && "bg-muted/60",
+                    )}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                      <Bot className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{a.company_name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {a.industry}
+                      </span>
+                    </span>
+                    <StatusBadge tone={statusToTone(a.agent_status)}>{a.agent_status}</StatusBadge>
+                  </button>
                 </li>
               ))}
             </ul>
-          </div>
+          )}
         </div>
 
-        <div className="space-y-6">
-          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
-            <h3 className="text-sm font-semibold">Call settings</h3>
-            <label className="mt-4 flex items-center justify-between text-sm cursor-pointer">
-              <span>
-                <span className="font-medium text-foreground">Call recording</span>
-                <p className="text-xs text-muted-foreground">Store and transcribe every call</p>
-              </span>
-              <button
-                onClick={() => {
-                  setRecording((r) => !r);
-                  toast.info(`Call recording ${!recording ? "Enabled" : "Disabled"}`);
-                }}
-                className={cn(
-                  "relative h-6 w-11 rounded-full transition-colors",
-                  recording ? "bg-primary" : "bg-muted",
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                    recording ? "translate-x-5" : "translate-x-0.5",
-                  )}
-                />
-              </button>
-            </label>
-          </div>
-
-          <div className="elevated-card rounded-xl border bg-card p-5 shadow-sm">
-            <h3 className="text-sm font-semibold">Agent actions</h3>
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={handleUpdateAgent}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                <Save className="h-4 w-4" /> Update agent
-              </button>
-              <button
-                onClick={handleCreateNewAgent}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"
-              >
-                <Plus className="h-4 w-4" /> Create new agent
-              </button>
-              <button
-                onClick={handleDeleteAgent}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/5"
-              >
-                <Trash2 className="h-4 w-4" /> Delete agent
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Function Interactive Modal */}
-      <AnimatePresence>
-        {showFuncModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
-              onClick={() => setShowFuncModal(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-md rounded-xl border bg-card p-6 shadow-lg z-10"
-            >
-              <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="text-sm font-semibold text-foreground">Add Custom Agent Function</h3>
-                <button
-                  onClick={() => setShowFuncModal(false)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <form onSubmit={handleAddFunctionSubmit} className="mt-4 space-y-4">
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Function Name</span>
-                  <input
-                    placeholder="e.g. create_dispatch_ticket"
-                    value={newFuncName}
-                    onChange={(e) => setNewFuncName(e.target.value)}
-                    required
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
-                  />
-                </label>
-
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Integrations Provider</span>
-                  <select
-                    value={newFuncProvider}
-                    onChange={(e) => setNewFuncProvider(e.target.value)}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="Salesforce">Salesforce CRM</option>
-                    <option value="Google Calendar">Google Calendar</option>
-                    <option value="Resend">Resend Emails</option>
-                    <option value="Other">Custom REST Webhook</option>
-                  </select>
-                </label>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t">
+        {/* Selected agent detail + test */}
+        <div className="space-y-6 xl:col-span-2">
+          {selected ? (
+            <>
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-semibold">{selected.company_name}</h2>
+                      <StatusBadge tone={statusToTone(selected.agent_status)}>
+                        {selected.agent_status}
+                      </StatusBadge>
+                    </div>
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                      {selected.industry}
+                    </p>
+                  </div>
                   <button
-                    type="button"
-                    onClick={() => setShowFuncModal(false)}
-                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                    disabled={!selected.assistant_id}
+                    onClick={() =>
+                      navigate({
+                        to: "/demo-preview",
+                        search: {
+                          assistant_id: selected.assistant_id ?? "",
+                          lead_id: selected.id,
+                        },
+                      })
+                    }
+                    className="inline-flex shrink-0 items-center gap-1.5 bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                  >
-                    Add Function
+                    <ExternalLink className="h-4 w-4" /> Open live voice test
                   </button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+
+                <dl className="mt-5 grid gap-4 border-t pt-4 sm:grid-cols-2">
+                  <Field label="Assistant ID" value={selected.assistant_id ?? "—"} mono />
+                  <Field label="Contact" value={selected.contact_email} />
+                  <Field label="Provisioned" value={formatDate(selected.created_at)} />
+                  <Field label="Last updated" value={formatDate(selected.updated_at)} />
+                  {selected.problem_statement && (
+                    <div className="sm:col-span-2">
+                      <Field label="Problem" value={selected.problem_statement} />
+                    </div>
+                  )}
+                  {selected.failure_reason && (
+                    <div className="sm:col-span-2">
+                      <Field label="Failure" value={selected.failure_reason} tone="destructive" />
+                    </div>
+                  )}
+                </dl>
+
+                {/* Delete agent — tears down the Vapi assistant, keeps the lead. */}
+                <div className="mt-4 border-t pt-4">
+                  {!confirmingDelete ? (
+                    <button
+                      onClick={() => setConfirmingDelete(true)}
+                      className="inline-flex items-center gap-1.5 border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete agent
+                    </button>
+                  ) : (
+                    <div className="flex flex-col gap-2 border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="text-xs text-foreground/80">
+                        Tear down this Vapi agent for {selected.company_name}? The demo link stops
+                        working. The lead record, profile and feedback are kept.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleDeleteAgent}
+                          disabled={deleting}
+                          className="inline-flex items-center gap-1.5 bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 cursor-pointer"
+                        >
+                          {deleting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          {deleting ? "Deleting…" : "Confirm delete"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingDelete(false)}
+                          disabled={deleting}
+                          className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">Microphone check</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Verify your mic before running a live voice test. This runs entirely in your
+                  browser — it doesn't call the agent.
+                </p>
+                <div className="mt-4 flex justify-center rounded-lg border bg-background/60 py-6">
+                  <Waveform />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+              Select an agent to see its details and test it.
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -399,78 +276,52 @@ function VoiceAgent() {
 function Field({
   label,
   value,
-  icon: Icon,
-  children,
+  mono,
+  tone,
 }: {
   label: string;
   value: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  children?: React.ReactNode;
+  mono?: boolean;
+  tone?: "destructive";
 }) {
   return (
     <div>
       <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 flex items-center gap-1.5 text-sm text-foreground">
-        {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
-        <span className="text-foreground/80">{value}</span>
+      <dd
+        className={cn(
+          "mt-0.5 break-words text-sm text-foreground/80",
+          mono && "font-mono text-xs",
+          tone === "destructive" && "text-destructive",
+        )}
+      >
+        {value}
       </dd>
-      {children}
     </div>
   );
 }
 
-function FunctionCard({
-  icon: Icon,
-  name,
-  provider,
-  active,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  name: string;
-  provider: string;
-  active: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-3 transition-colors duration-200 w-full",
-        active
-          ? "bg-background border-border"
-          : "bg-muted/10 border-border/40 opacity-70 hover:opacity-100",
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <div
-          className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-md",
-            active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <StatusBadge tone={active ? "success" : "muted"}>{active ? "On" : "Off"}</StatusBadge>
-      </div>
-      <p className="mt-2 font-mono text-xs text-foreground truncate">{name}</p>
-      <p className="text-[11px] text-muted-foreground truncate">{provider}</p>
-    </div>
-  );
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+/**
+ * Live microphone level meter. Genuinely functional — uses the Web Audio API to
+ * visualise the user's real mic input so they can confirm it works before a call.
+ */
 function Waveform() {
   const bars = 28;
   const [isMicTesting, setIsMicTesting] = useState(false);
   const [amplitudes, setAmplitudes] = useState<number[]>([]);
 
-  // Web Audio Nodes refs
   const audioCtxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Generate initial values for static pulse
-    setAmplitudes(
-      Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40),
-    );
+    setAmplitudes(Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40));
   }, []);
 
   const handleStartMic = async () => {
@@ -486,28 +337,24 @@ function Waveform() {
       audioCtxRef.current = audioCtx;
 
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64; // Small size for responsive mapping to 28 bars
+      analyser.fftSize = 64;
 
       const source = audioCtx.createMediaStreamSource(stream);
       source.connect(analyser);
 
       setIsMicTesting(true);
-      toast.success("Live microphone testing connected. Speak to test the agent!");
+      toast.success("Microphone connected. Speak to see the level move.");
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       const updateWave = () => {
         analyser.getByteFrequencyData(dataArray);
-
-        // Map bins to 28 heights
         const newAmps = Array.from({ length: bars }).map((_, idx) => {
           const val = dataArray[Math.floor((idx / bars) * dataArray.length)] || 0;
-          return Math.max(8, val * 0.45); // Map to sensible visual height
+          return Math.max(8, val * 0.45);
         });
-
         setAmplitudes(newAmps);
         animRef.current = requestAnimationFrame(updateWave);
       };
-
       updateWave();
     } catch (err) {
       console.warn(err);
@@ -519,51 +366,30 @@ function Waveform() {
 
   const handleStopMic = () => {
     if (animRef.current) cancelAnimationFrame(animRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-    }
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close();
-    }
-
-    // Reset states
+    if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+    if (audioCtxRef.current) audioCtxRef.current.close();
     audioCtxRef.current = null;
     streamRef.current = null;
     setIsMicTesting(false);
-    toast.info("Live microphone preview disconnected.");
-
-    // Reset bars
-    setAmplitudes(
-      Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40),
-    );
+    toast.info("Microphone preview disconnected.");
+    setAmplitudes(Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40));
   };
 
   useEffect(() => {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex h-10 items-end gap-[3px]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex h-12 items-end gap-[3px]">
         {amplitudes.map((amp, i) => (
           <motion.span
             key={i}
-            className={cn(
-              "w-[3px] rounded-full transition-all",
-              isMicTesting ? "bg-success" : "bg-primary/70",
-            )}
-            animate={
-              isMicTesting
-                ? { height: amp }
-                : {
-                    height: [amp * 0.4, amp, amp * 0.5],
-                  }
-            }
+            className={cn("w-[3px] rounded-full", isMicTesting ? "bg-success" : "bg-primary/70")}
+            animate={isMicTesting ? { height: amp } : { height: [amp * 0.4, amp, amp * 0.5] }}
             transition={
               isMicTesting
                 ? { type: "tween", duration: 0.1 }
@@ -583,9 +409,9 @@ function Waveform() {
       <button
         onClick={isMicTesting ? handleStopMic : handleStartMic}
         className={cn(
-          "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md border transition-all shadow-sm",
+          "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all cursor-pointer",
           isMicTesting
-            ? "border-success bg-success/10 text-success hover:bg-success/20 animate-pulse"
+            ? "border-success bg-success/10 text-success hover:bg-success/20"
             : "border-border bg-card text-muted-foreground hover:text-foreground",
         )}
       >

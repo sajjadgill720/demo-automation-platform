@@ -1,12 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, PlusCircle, Mic, Radio, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Mic, Radio, MessageSquare, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/new-demo", label: "New Demo", icon: PlusCircle },
-  { to: "/voice-agent", label: "Voice Agents", icon: Mic },
+  { to: "/voice-agent", label: "Agent Tester", icon: Mic },
   { to: "/active-demos", label: "Active Demos", icon: Radio },
+  { to: "/feedback", label: "Feedback", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -16,7 +16,7 @@ export function AppSidebar() {
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
       <div className="flex items-center gap-2 px-5 pt-6 pb-8">
-        <div className="h-8 w-8 rounded border border-dashed border-amber-500/60 dark:border-amber-500/40 flex items-center justify-center bg-amber-500/5 text-amber-500 font-bold text-xs uppercase tracking-tight shadow-sm shadow-amber-500/10 shrink-0">
+        <div className="h-8 w-8 rounded border border-dashed border-primary/60 dark:border-primary/40 flex items-center justify-center bg-primary/5 text-primary font-bold text-xs uppercase tracking-tight shadow-sm shadow-primary/10 shrink-0">
           DQ
         </div>
         <div>
@@ -44,9 +44,9 @@ export function AppSidebar() {
               )}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-amber-500" />
+                <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
               )}
-              <item.icon className={cn("h-4 w-4", active && "text-amber-500")} />
+              <item.icon className={cn("h-4 w-4", active && "text-primary")} />
               {item.label}
             </Link>
           );
