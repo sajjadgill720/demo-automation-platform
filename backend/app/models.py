@@ -173,3 +173,36 @@ class DemoFeedback(SQLModel, table=True):
     rating: FeedbackRating
     comment: Optional[str] = Field(default=None, nullable=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CallRecord(SQLModel, table=True):
+    """A single conversation the client (or anyone) had with a provisioned agent.
+
+    The native Vapi call report is the source of truth. When a browser demo call
+    ends, the frontend sends us the Vapi `call.id`; a background task then pulls
+    the call from Vapi's API (GET /call/{id}) and stores Vapi's own recording URL,
+    transcript, summary and outcome. `status` tracks that fetch: "processing"
+    while we wait for Vapi to finish the report, then "completed" (or "failed").
+    """
+    __tablename__ = "call_records"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lead_id: uuid.UUID = Field(foreign_key="leads.id", index=True)
+    # Vapi's own identifier for the call — the key we pull the native report with.
+    vapi_call_id: Optional[str] = Field(default=None, max_length=255, index=True, nullable=True)
+    assistant_id: Optional[str] = Field(default=None, max_length=255, nullable=True)
+    started_at: Optional[datetime] = Field(default=None, nullable=True)
+    ended_at: Optional[datetime] = Field(default=None, nullable=True)
+    duration_seconds: int = Field(default=0)
+    turn_count: int = Field(default=0)
+    # Vapi's transcript, stored as a JSON string of [{"role", "text"}] turns.
+    transcript: Optional[str] = Field(default=None, nullable=True)
+    # Vapi's own end-of-call summary.
+    summary: Optional[str] = Field(default=None, nullable=True)
+    # URL to Vapi's audio recording of the call.
+    recording_url: Optional[str] = Field(default=None, nullable=True)
+    ended_reason: Optional[str] = Field(default=None, max_length=255, nullable=True)
+    cost: Optional[float] = Field(default=None, nullable=True)
+    # processing | completed | failed — state of the native-report fetch.
+    status: str = Field(default="processing", max_length=32)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

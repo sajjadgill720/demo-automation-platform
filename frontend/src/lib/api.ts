@@ -134,6 +134,88 @@ export interface DemoFeedbackWithLead extends DemoFeedback {
   industry: string;
 }
 
+/* ── Call records (conversations with a provisioned agent) ── */
+
+export interface TranscriptTurn {
+  role: "assistant" | "user";
+  text: string;
+}
+
+export interface CallRecord {
+  id: string;
+  lead_id: string;
+  vapi_call_id: string | null;
+  assistant_id: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number;
+  turn_count: number;
+  transcript: TranscriptTurn[];
+  summary: string | null;
+  recording_url: string | null;
+  ended_reason: string | null;
+  cost: number | null;
+  status: string; // "processing" | "completed" | "failed"
+  created_at: string;
+}
+
+export interface CallRecordWithLead extends CallRecord {
+  company_name: string;
+  industry: string;
+}
+
+export interface CallRecordInput {
+  vapi_call_id: string;
+  assistant_id?: string;
+  started_at?: string;
+  ended_at?: string;
+}
+
+/** POST /api/demo-request/{lead_id}/calls — persist a finished agent conversation. */
+export async function saveCallRecord(
+  leadId: string,
+  payload: CallRecordInput,
+): Promise<CallRecord> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}/calls`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new NetworkError("Could not reach the server to save the call.");
+  }
+  if (!res.ok) throw new NetworkError(`Call could not be saved (${res.status})`);
+  return res.json();
+}
+
+/** GET /api/demo-request/{lead_id}/calls — calls recorded for one lead. */
+export async function getCallsForLead(leadId: string): Promise<CallRecord[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/demo-request/${leadId}/calls`);
+  } catch {
+    throw new NetworkError("Lost connection to the backend.");
+  }
+  if (!res.ok) throw new NetworkError(`Failed to load calls (${res.status})`);
+  return res.json();
+}
+
+/** GET /api/calls — every recorded call, joined with its company, for the team. */
+export async function listAllCalls(limit?: number): Promise<CallRecordWithLead[]> {
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/calls?${params.toString()}`);
+  } catch {
+    throw new NetworkError("Lost connection to the backend.");
+  }
+  if (!res.ok) throw new NetworkError(`Failed to load calls (${res.status})`);
+  return res.json();
+}
+
 /** POST /api/demo-request/{lead_id}/feedback — client submits demo feedback. */
 export async function submitDemoFeedback(
   leadId: string,

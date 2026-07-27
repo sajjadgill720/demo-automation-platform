@@ -48,6 +48,25 @@ def init_db():
                     conn.execute(text("ALTER TABLE documents ADD COLUMN file_name VARCHAR"))
                 else:
                     conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_name VARCHAR"))
+            # call_records may pre-date the native-Vapi columns if the table was
+            # created by an earlier build. create_all() above never ALTERs, so add
+            # any missing columns idempotently here.
+            if inspector.has_table("call_records"):
+                call_columns = [c["name"] for c in inspector.get_columns("call_records")]
+                is_sqlite = DATABASE_URL.startswith("sqlite")
+                real_type = "REAL" if is_sqlite else "DOUBLE PRECISION"
+                new_call_cols = [
+                    ("vapi_call_id", "VARCHAR"),
+                    ("recording_url", "VARCHAR"),
+                    ("cost", real_type),
+                    ("status", "VARCHAR"),
+                ]
+                for col, coltype in new_call_cols:
+                    if col not in call_columns:
+                        if is_sqlite:
+                            conn.execute(text(f"ALTER TABLE call_records ADD COLUMN {col} {coltype}"))
+                        else:
+                            conn.execute(text(f"ALTER TABLE call_records ADD COLUMN IF NOT EXISTS {col} {coltype}"))
             # agent_status is a Postgres ENUM type; new members must be added to the
             # type itself before the app can write them. ADD VALUE IF NOT EXISTS is
             # idempotent, and each runs in its own autocommit connection because

@@ -380,7 +380,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  padding: 1px;
+  padding: 2px;
   border-radius: inherit;
   background: conic-gradient(from var(--gradient-angle),
       oklch(0.79 0.17 70),

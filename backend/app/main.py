@@ -29,15 +29,17 @@ logger = logging.getLogger(__name__)
 from app.db import init_db, get_session
 from app.config import CORS_ORIGINS
 from app.models import (
-    DiscoveryResponse, 
-    VoiceAgent, 
-    Lead, 
-    AgentStatus, 
-    Document, 
+    DiscoveryResponse,
+    VoiceAgent,
+    Lead,
+    AgentStatus,
+    Document,
     CompanyProfileDB,
     DemoFeedback,
-    FeedbackRating
+    FeedbackRating,
+    CallRecord
 )
+from app.vapi_calls import fetch_vapi_call_task
 from app.agents import (
     compile_agent_prompt, 
     provision_vapi_assistant,
@@ -224,6 +226,157 @@ def list_all_feedback(
         )
         for fb, lead in session.exec(statement).all()
     ]
+
+
+# ── Call records (conversations with a provisioned agent) ──
+
+class TranscriptTurn(BaseModel):
+    role: str  # "assistant" | "user"
+    text: str
+
+
+class CallRecordCreate(BaseModel):
+    # Vapi's own call id — the key we pull the native report with. Required.
+    vapi_call_id: str
+    assistant_id: Optional[str] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+
+
+class CallRecordResponse(BaseModel):
+    id: uuid.UUID
+    lead_id: uuid.UUID
+    vapi_call_id: Optional[str] = None
+    assistant_id: Optional[str] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    duration_seconds: int
+    turn_count: int
+    transcript: list[TranscriptTurn]
+    summary: Optional[str] = None
+    recording_url: Optional[str] = None
+    ended_reason: Optional[str] = None
+    cost: Optional[float] = None
+    status: str
+    created_at: datetime
+
+
+class CallRecordWithLead(CallRecordResponse):
+    """A call joined with the company it belongs to, for the internal list."""
+    company_name: str
+    industry: str
+
+
+def _call_to_response(rec: CallRecord) -> CallRecordResponse:
+    """Builds the API shape from a row, decoding the JSON transcript column."""
+    turns: list[TranscriptTurn] = []
+    if rec.transcript:
+        try:
+            for t in json.loads(rec.transcript):
+                turns.append(TranscriptTurn(role=t.get("role", "user"), text=t.get("text", "")))
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            pass
+    return CallRecordResponse(
+        id=rec.id,
+        lead_id=rec.lead_id,
+        vapi_call_id=rec.vapi_call_id,
+        assistant_id=rec.assistant_id,
+        started_at=rec.started_at,
+        ended_at=rec.ended_at,
+        duration_seconds=rec.duration_seconds,
+        turn_count=rec.turn_count,
+        transcript=turns,
+        summary=rec.summary,
+        recording_url=rec.recording_url,
+        ended_reason=rec.ended_reason,
+        cost=rec.cost,
+        status=rec.status,
+        created_at=rec.created_at,
+    )
+
+
+@app.post("/api/demo-request/{lead_id}/calls", response_model=CallRecordResponse, status_code=201)
+def create_call_record(
+    lead_id: uuid.UUID,
+    payload: CallRecordCreate,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+):
+    """Registers a finished conversation with the lead's provisioned agent.
+
+    Posted by the demo preview when a browser call ends, carrying Vapi's call id.
+    We store a "processing" row immediately and kick a background task that pulls
+    the native report (recording, transcript, summary) from Vapi's API — so the
+    stored data is Vapi's own, not a client-side reconstruction.
+    """
+    lead = session.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+
+    vapi_call_id = (payload.vapi_call_id or "").strip()
+    if not vapi_call_id:
+        raise HTTPException(status_code=400, detail="vapi_call_id is required")
+
+    # One record per Vapi call — a retry (StrictMode double-fire, network retry)
+    # returns the existing row instead of creating a duplicate.
+    existing = session.exec(
+        select(CallRecord).where(CallRecord.vapi_call_id == vapi_call_id)
+    ).first()
+    if existing:
+        return _call_to_response(existing)
+
+    rec = CallRecord(
+        lead_id=lead_id,
+        vapi_call_id=vapi_call_id,
+        assistant_id=payload.assistant_id,
+        started_at=payload.started_at,
+        ended_at=payload.ended_at,
+        status="processing",
+    )
+    session.add(rec)
+    session.commit()
+    session.refresh(rec)
+
+    background_tasks.add_task(fetch_vapi_call_task, str(rec.id))
+
+    logger.info(
+        "Call record registered",
+        extra={"extra_data": {"lead_id": str(lead_id), "call_id": str(rec.id), "vapi_call_id": vapi_call_id}},
+    )
+    return _call_to_response(rec)
+
+
+@app.get("/api/demo-request/{lead_id}/calls", response_model=list[CallRecordResponse])
+def list_calls_for_lead(lead_id: uuid.UUID, session: Session = Depends(get_session)):
+    """Every call recorded for one lead, newest first — used by the lead drawer."""
+    statement = (
+        select(CallRecord)
+        .where(CallRecord.lead_id == lead_id)
+        .order_by(CallRecord.created_at.desc())
+    )
+    return [_call_to_response(r) for r in session.exec(statement).all()]
+
+
+@app.get("/api/calls", response_model=list[CallRecordWithLead])
+def list_all_calls(limit: int = 100, session: Session = Depends(get_session)):
+    """All calls, newest first, joined with their company — for the team view."""
+    statement = (
+        select(CallRecord, Lead)
+        .join(Lead, Lead.id == CallRecord.lead_id)
+        .order_by(CallRecord.created_at.desc())
+        .limit(max(1, min(limit, 500)))
+    )
+    out: list[CallRecordWithLead] = []
+    for rec, lead in session.exec(statement).all():
+        base = _call_to_response(rec)
+        out.append(
+            CallRecordWithLead(
+                **base.model_dump(),
+                company_name=lead.company_name,
+                industry=lead.industry,
+            )
+        )
+    return out
 
 
 @app.get("/api/leads", response_model=list[LeadResponse])

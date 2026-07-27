@@ -98,6 +98,11 @@ class ClarificationState(TypedDict):
     last_response_was_meta: Optional[bool]
     intro_shown: Optional[bool]
     form_problem: Optional[str]
+    # Profile fields we've already asked a question about — so we never re-ask the
+    # same topic even if the extractor failed to capture a short answer.
+    asked_fields: Optional[List[str]]
+    # How many scoping questions we've asked, to bound the interview length.
+    questions_asked: Optional[int]
 
 
 # ── Prompts ──
@@ -169,79 +174,97 @@ Industry: "{industry}"
 WHAT WE ALREADY KNOW ABOUT THIS BUSINESS
 {profile_json}
 
-WHAT WE ALREADY KNOW ABOUT THIS INDUSTRY
-We maintain a vetted playbook for {industry_display} deployments. We ALREADY have the
-following covered, so asking about any of it wastes the customer's time:
+WHAT OUR {industry_display} PLAYBOOK ALREADY COVERS (never ask about any of this)
 {library_rules}
 
 Callers in this industry routinely ask these, and we already handle them:
 {library_questions}
 
-STILL MISSING (these are what you need to fill)
-{missing_fields_list}
+QUESTIONS YOU HAVE ALREADY ASKED
+Never ask any of these again — not reworded, not from a slightly different angle, not
+about the same underlying topic. If it is on this list, that topic is CLOSED:
+{already_asked}
 
 CONVERSATION SO FAR
 {conversation_text}
 
-YOUR TASK
-Reason like a solutions engineer scoping a real deployment, not like someone working
-through a form. Look at what is already known, decide which single missing detail would
-most change how the agent actually behaves on a call, and ask about that one thing.
+WHERE TO GO NEXT
+{focus_instruction}
 
-Then formulate ONE question that is concrete, specific to this business, and answerable
-in a sentence.
+You are NOT working through a fixed form. The details below are what most change how the
+agent behaves on a real call — pick whichever is most valuable AND still genuinely unknown
+for THIS business. Use your own judgment; you may ask about something not listed if it
+matters more:
+{topic_menu}
+
+YOUR TASK
+Decide the single most valuable thing we do NOT yet know, and ask ONE concrete question
+about it, grounded in a real moment a caller might create. Each question must open a NEW
+area — never re-litigate an answer you already have with different wording.
 
 HARD RULES
-1. NEVER ask about something the industry playbook above already answers. If the playbook
-   says urgent calls get captured and escalated, do not ask "should urgent calls be
-   escalated?" — ask about the part that is genuinely specific to THIS business, such as
-   who receives that escalation, or what counts as urgent to them.
-2. NEVER ask about a profile field that is already filled in above. If you already know
-   their escalation preference, do not re-ask it in different words.
-3. Target ONE of the missing fields ({missing_fields_list}) so the answer is extractable.
-4. Ground the question in a concrete situation. Give the customer something to picture,
-   then ask what should happen.
-5. Keep it to one question. Do not stack two questions with "and" or "also".
-6. Speak as a knowledgeable peer: warm, direct, no filler, no "Great question!" style
-   padding, no restating what they just said back to them.
+1. NEVER repeat a topic from "QUESTIONS YOU HAVE ALREADY ASKED". If they already told you
+   who handles after-hours escalations, that topic is DONE — move to a completely different
+   area (hours, what to capture, tools, scheduling, tone, a common caller question, etc.).
+2. NEVER ask about anything the industry playbook already covers.
+3. Every question must MOVE FORWARD into new territory, not circle the last answer.
+4. Ground it in a concrete situation. Give them something to picture, then ask what should
+   happen.
+5. One question only. No "and"/"also" stacking.
+6. Speak as a knowledgeable peer: warm, direct, no filler, no restating their last answer.
 
-QUALITY BAR — these are GOOD questions:
-- "When someone calls at 9pm because their heat is out and it's below freezing, do you
-  want us waking the on-call tech, or booking them first thing and texting you the
-  details?"
-- "If a caller says they're in pain and asks to be seen today, who decides whether that
-  gets squeezed into the schedule — is there someone we should be reaching, or a rule we
-  should be following?"
-- "Once we've taken a rate request with the lane and the weight, where should that land
-  so it doesn't sit — straight to a rep's phone, or into the queue you check?"
+QUALITY BAR — GOOD questions (notice each opens a DIFFERENT area):
+- "When someone calls at 9pm because their heat is out and it's below freezing, do you want
+  us waking the on-call tech, or booking them first thing and texting you the details?"
+- "What's the one thing you need us to get off every caller before we let them go — a
+  callback number, an account or order number, something else?"
+- "When a caller asks a question you'd want answered a specific way — pricing, hours, where
+  you're located — should we answer from what you tell us, or always take a message?"
 
-QUALITY BAR — these are BAD questions. Do not write anything resembling these:
+QUALITY BAR — BAD questions. Do not write anything resembling these:
+- Re-asking a topic already covered in different words (the worst failure — it makes the
+  advisor look broken).
 - "What scenarios should the AI agent handle?"  (generic, textbook, asks them to do our job)
 - "What are your escalation preferences?"  (reads like a form field, not a conversation)
-- "How would you like the agent to handle customer inquiries?"  (vague — 'inquiries' could
-  mean anything, and there is no situation to react to)
-- "Do you have any specific requirements for tone, escalation, and scheduling?"  (three
-  questions at once, none of them concrete)
+- "Do you have any specific requirements for tone, escalation, and scheduling?"  (three at once)
 
 RECOMMENDED ANSWERS
 Provide 2 to 4 short clickable answer options, 2-7 words each. They must be plausible,
-DIFFERENT answers to THIS specific question — not generic filler, and not restatements of
-each other. If your question asks who receives after-hours escalations, good options look
-like "Wake the on-call tech" / "Text me, book next morning" / "Take a message only".
-Never reuse the same option set across different questions.
+DIFFERENT answers to THIS specific question — not filler, not restatements of each other.
+Never reuse an option set across questions.
 
 OUTPUT FORMAT
 Return a valid JSON object with EXACTLY these two keys:
 - "question": string — the single question to ask.
 - "recommendations": array of 2-4 short strings — the clickable answer options.
 
-Both keys are REQUIRED. "recommendations" must never be an empty array: the UI shows
-these as click-to-answer chips, and an empty array falls back to generic options that
-do not match your question.
+Both keys are REQUIRED. "recommendations" must never be empty.
 
 Example of a well-formed response:
-{{"question": "When someone calls at 9pm and their heat is out, do you want us waking the on-call tech, or booking them first thing and texting you?", "recommendations": ["Wake the on-call tech", "Text me, book next morning", "Take a message only"]}}
+{{"question": "What's the one detail you need us to get off every caller before they hang up — a callback number, an order number, or something else?", "recommendations": ["Callback number", "Order or tracking number", "Full name and address"]}}
 """
+
+# High-value scoping areas the advisor can draw from — deliberately broader than the five
+# structured profile fields, so the interview isn't just those five reworded. The question
+# writer is told to pick whatever is most valuable and still unknown, or invent its own.
+TOPIC_MENU = """- Who exactly an urgent call should reach (name/role), how to reach them, and what counts as "urgent" to this business
+- Operating hours, and how after-hours handling should differ from during-hours
+- The details to capture from every caller before they hang up (name spelling, callback number, account/order/tracking number, address)
+- Booking / scheduling / dispatch specifics: what gets scheduled and into which system or calendar
+- The one or two questions callers ask most that the agent must answer correctly
+- Where captured information must land (CRM, calendar, a dispatch board, a specific person's phone)
+- Tone and boundaries: how it should sound, and anything it must never say or promise
+- Anything unusual about THIS business that a generic receptionist would get wrong"""
+
+# Human-readable focus phrasing per structured field, used to steer (not force) the next
+# question toward a still-missing profile gap without sounding like a form.
+_FIELD_FOCUS = {
+    "primary_problem": "the core problem they came to solve",
+    "current_workflow_summary": "how their calls are handled today",
+    "must_handle_scenarios": "the specific call types the agent must get right",
+    "escalation_preferences": "when a call should be escalated, and to whom",
+    "desired_customizations": "how they want the agent to sound or behave",
+}
 
 class GeneratedQuestion(BaseModel):
     question: str = Field(description="The friendly, conversational next question to ask the user as Convoa AI Advisor.")
@@ -757,6 +780,38 @@ def generate_question_node(state: ClarificationState) -> ClarificationState:
     known = {k: v for k, v in (profile or {}).items()
              if v not in (None, "", "UNKNOWN", [])}
 
+    # Pick the next focus. A structured gap we have NOT already asked about comes
+    # first; once those are exhausted the advisor asks its own broader questions.
+    # Tracking asked_fields (not just current gaps) is what stops the loop: a field
+    # the extractor keeps failing to fill is still only asked once.
+    asked_fields = state.get("asked_fields") or []
+    remaining_fields = [f for f in missing if f not in asked_fields]
+    target_field = remaining_fields[0] if remaining_fields else None
+
+    if target_field:
+        focus_instruction = (
+            f"The most useful gap we still have is {_FIELD_FOCUS.get(target_field, target_field)}. "
+            f"Aim your next question there — but frame it as a real situation, not a form field. "
+            f"If that area already came up naturally in the conversation above, skip it and pick "
+            f"the next most valuable unknown instead."
+        )
+    else:
+        focus_instruction = (
+            "You've already covered the core gaps. Now ask the single most valuable thing we "
+            "still don't know about running this business's phone line — use your own judgment "
+            "about what would most change how the agent behaves on a real call."
+        )
+
+    # Every prior question, so the model can see exactly what NOT to repeat. The
+    # one-time intro is excluded — it isn't a question.
+    asked_qs = [
+        m.get("content", "").strip()
+        for m in history
+        if m.get("role") == "assistant"
+        and not m.get("content", "").strip().startswith("Hi! Before we dive in")
+    ]
+    already_asked = "\n".join(f"- {q}" for q in asked_qs) or "- (none yet — this is the first question)"
+
     prompt = QUESTION_PROMPT.format(
         company_name=company,
         industry=industry,
@@ -764,7 +819,9 @@ def generate_question_node(state: ClarificationState) -> ClarificationState:
         profile_json=json.dumps(known, indent=2) if known else "Nothing yet — this is the first question.",
         library_rules="\n".join(f"- {r}" for r in library_rules) or "- (no playbook entries)",
         library_questions="\n".join(f"- {q}" for q in (library.get("common_questions") or [])) or "- (none)",
-        missing_fields_list=", ".join(missing),
+        already_asked=already_asked,
+        focus_instruction=focus_instruction,
+        topic_menu=TOPIC_MENU,
         conversation_text=compile_conversation(history)
     )
 
@@ -834,6 +891,12 @@ def generate_question_node(state: ClarificationState) -> ClarificationState:
     # before interrupt() (the LLM call and the DB append above) would run twice
     # per question. Handing the question to await_answer via state means this
     # node's work is checkpointed and never replayed.
+    # Mark this turn's focus field as asked so it is never targeted again, and
+    # count the question toward the interview budget.
+    new_asked_fields = list(asked_fields)
+    if target_field and target_field not in new_asked_fields:
+        new_asked_fields.append(target_field)
+
     return {
         **state,
         "conversation_history": updated_history,
@@ -841,6 +904,8 @@ def generate_question_node(state: ClarificationState) -> ClarificationState:
         "pending_recommendations": recommendations,
         "pending_is_final": False,
         "intro_shown": state.get("intro_shown") or intro_written,
+        "asked_fields": new_asked_fields,
+        "questions_asked": (state.get("questions_asked") or 0) + 1,
     }
 
 
@@ -1064,11 +1129,25 @@ workflow.set_entry_point("parse_documents")
 workflow.add_edge("parse_documents", "extract_profile")
 workflow.add_edge("extract_profile", "detect_gaps")
 
+#: Interview length bounds. We ask at least MIN (so even a lead whose fields fill
+#: in fast still gets a few tailored questions for breadth), and never more than
+#: MAX (so the conversation always ends). Between the two, we keep going only while
+#: there is a still-unasked gap.
+MIN_QUESTIONS = 3
+MAX_QUESTIONS = 5
+
+
 def route_after_gaps(state: ClarificationState):
     missing = state.get("missing_fields", [])
+    asked_fields = state.get("asked_fields") or []
+    questions_asked = state.get("questions_asked") or 0
     final_asked = state.get("final_question_asked", False)
-    
-    if missing:
+
+    # Only structured gaps we have NOT already asked about count as "remaining" —
+    # a field the extractor keeps failing to fill is asked once, not forever.
+    remaining_fields = [f for f in missing if f not in asked_fields]
+
+    if questions_asked < MAX_QUESTIONS and (remaining_fields or questions_asked < MIN_QUESTIONS):
         return "generate_question"
     if not final_asked:
         return "ask_final_question"
@@ -1139,6 +1218,8 @@ def start_clarification(lead_id: str) -> ClarificationStatus:
         "last_response_was_meta": False,
         "intro_shown": False,
         "form_problem": form_problem,
+        "asked_fields": [],
+        "questions_asked": 0,
     }
 
     config = {"configurable": {"thread_id": lead_id}}

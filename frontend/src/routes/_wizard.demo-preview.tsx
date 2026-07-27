@@ -29,6 +29,7 @@ import {
   getDemoRequestStatus,
   submitDemoFeedback,
   getFeedbackForLead,
+  saveCallRecord,
   type DemoFeedback,
 } from "@/lib/api";
 import { lookupNarrative } from "@/lib/industry-narratives";
@@ -222,6 +223,24 @@ function DemoPreview() {
   const [vapi, setVapi] = useState<any>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "on-call" | "ended">("idle");
 
+  // Native call capture. Vapi is the source of truth: when a call starts we grab
+  // Vapi's call id, and when it ends we hand that id to the backend, which pulls
+  // the official report (recording, transcript, summary) from Vapi's API. Refs
+  // (not state) so the once-registered event handlers always read the latest
+  // values without re-subscribing.
+  const vapiCallIdRef = useRef<string | null>(null);
+  const callStartRef = useRef<number | null>(null);
+  const assistantIdRef = useRef<string | null>(null);
+  const leadIdRef = useRef<string | null>(dynamicLeadId);
+
+  // Keep the refs in sync so the once-registered call-end handler always saves
+  // against the currently-resolved agent and lead (the assistant id can arrive
+  // asynchronously while provisioning finishes).
+  useEffect(() => {
+    assistantIdRef.current = resolvedAssistantId;
+    leadIdRef.current = dynamicLeadId;
+  }, [resolvedAssistantId, dynamicLeadId]);
+
   // The two primary actions (feedback + booking) live in this block, directly
   // below the demo. When a call ends — the moment the client is most primed to
   // act — we scroll it into view and emphasise it. It stays visible at all other
@@ -287,14 +306,36 @@ function DemoPreview() {
         }
         const vapiInstance = new (VapiClass as any)(VAPI_PUBLIC_KEY);
 
-        vapiInstance.on("call-start", () => {
+        vapiInstance.on("call-start", (payload: any) => {
           setCallStatus("on-call");
+          callStartRef.current = Date.now();
+          // Some SDK versions surface the call id on the event; otherwise it comes
+          // from the start() promise (see handleStartBrowserCall).
+          const idFromEvent = payload?.call?.id || payload?.id;
+          if (typeof idFromEvent === "string") vapiCallIdRef.current = idFromEvent;
           toast.success("Connected to generated demo agent.");
         });
 
         vapiInstance.on("call-end", () => {
           setCallStatus("ended");
           toast.info("Demo call ended.");
+
+          // Hand Vapi's call id to the backend, which pulls the native report.
+          const leadId = leadIdRef.current;
+          const vapiCallId = vapiCallIdRef.current;
+          const startedMs = callStartRef.current;
+          if (leadId && vapiCallId) {
+            const endedAt = new Date();
+            const startedAt = startedMs ? new Date(startedMs) : endedAt;
+            saveCallRecord(leadId, {
+              vapi_call_id: vapiCallId,
+              assistant_id: assistantIdRef.current ?? undefined,
+              started_at: startedAt.toISOString(),
+              ended_at: endedAt.toISOString(),
+            }).catch((err) => console.error("saveCallRecord failed (non-blocking):", err));
+          }
+          vapiCallIdRef.current = null;
+          callStartRef.current = null;
         });
 
         vapiInstance.on("error", (err: any) => {
@@ -333,7 +374,16 @@ function DemoPreview() {
     }
     setCallStatus("connecting");
     try {
-      vapi.start(resolvedAssistantId);
+      // start() resolves to Vapi's Call object; capture its id so we can pull the
+      // native report after the call ends.
+      const maybeCall = vapi.start(resolvedAssistantId);
+      Promise.resolve(maybeCall)
+        .then((call: any) => {
+          if (call?.id) vapiCallIdRef.current = call.id;
+        })
+        .catch(() => {
+          /* id may still arrive via the call-start event */
+        });
     } catch (err) {
       console.error(err);
       setCallStatus("idle");
