@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Mic, Radio, MessageSquare, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Mic, Radio, MessageSquare, Settings, Sparkles, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -12,6 +13,7 @@ const nav = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
@@ -54,14 +56,23 @@ export function AppSidebar() {
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-sm font-semibold">
-            EM
+        <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-sm font-semibold shrink-0">
+              EM
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">Elena Marchetti</p>
+              <p className="truncate text-[11px] text-sidebar-foreground/60">elena@dataquartz.ai</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">Elena Marchetti</p>
-            <p className="truncate text-[11px] text-sidebar-foreground/60">elena@dataquartz.ai</p>
-          </div>
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 rounded-lg border border-sidebar-border hover:bg-sidebar-accent text-sidebar-foreground transition-colors cursor-pointer bg-transparent shrink-0"
+            aria-label="Toggle Theme"
+          >
+            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </button>
         </div>
       </div>
     </aside>

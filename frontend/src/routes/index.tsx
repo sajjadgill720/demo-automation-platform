@@ -347,18 +347,50 @@ function LandingPage() {
       {/* Background grid + ambient glows */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div
-          className="absolute inset-0 opacity-[0.2] dark:opacity-[0.06]"
+          className="absolute inset-0 opacity-[0.08] dark:opacity-[0.04]"
           style={{
-            backgroundImage: [
-              `linear-gradient(to right, var(--border) 1px, transparent 1px)`,
-              `linear-gradient(to bottom, var(--border) 1px, transparent 1px)`,
-            ].join(", "),
-            backgroundSize: "80px 80px",
+            backgroundImage: "radial-gradient(circle at 1px 1px, var(--border) 1.5px, transparent 1.5px)",
+            backgroundSize: "32px 32px",
+            maskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
+            WebkitMaskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
           }}
         />
-        <div className="absolute top-[10%] left-[10%] w-[40rem] h-[40rem] bg-primary/[0.04] dark:bg-primary/[0.025] blur-[140px] rounded-full" />
-        <div className="absolute top-[40%] right-[5%] w-[35rem] h-[35rem] bg-primary/[0.035] dark:bg-primary/[0.02] blur-[120px] rounded-full" />
-        <div className="absolute bottom-[10%] left-[20%] w-[30rem] h-[30rem] bg-success/[0.03] dark:bg-success/[0.015] blur-[100px] rounded-full" />
+        <motion.div
+          animate={{
+            y: [0, -15, 0],
+            x: [0, 10, 0],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-[10%] left-[10%] w-[40rem] h-[40rem] bg-primary/[0.04] dark:bg-primary/[0.025] blur-[140px] rounded-full"
+        />
+        <motion.div
+          animate={{
+            y: [0, 20, 0],
+            x: [0, -15, 0],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-[40%] right-[5%] w-[35rem] h-[35rem] bg-primary/[0.035] dark:bg-primary/[0.02] blur-[120px] rounded-full"
+        />
+        <motion.div
+          animate={{
+            y: [0, -10, 0],
+            x: [0, 15, 0],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute bottom-[10%] left-[20%] w-[30rem] h-[30rem] bg-success/[0.03] dark:bg-success/[0.015] blur-[100px] rounded-full"
+        />
       </div>
 
       {/* Page guide lines */}

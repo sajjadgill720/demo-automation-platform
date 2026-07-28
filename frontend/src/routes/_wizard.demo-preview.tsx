@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Phone,
-  Calendar,
   Sun,
   Moon,
   Sparkles,
@@ -17,6 +16,7 @@ import {
   X,
   ChevronDown,
   MessageSquare,
+  DollarSign,
 } from "lucide-react";
 import { CompanyLogo } from "@/components/common/CompanyCard";
 import { cn } from "@/lib/utils";
@@ -223,6 +223,27 @@ function DemoPreview() {
   const [vapi, setVapi] = useState<any>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "on-call" | "ended">("idle");
 
+  const connectionSteps = [
+    "Establishing secure connection...",
+    "Checking audio and microphone parameters...",
+    "Provisioning virtual receptionist agent...",
+    "Calibrating digital audio feeds...",
+    "Ready! Preparing voice greeting...",
+  ];
+  const [connectStepIndex, setConnectStepIndex] = useState(0);
+
+  useEffect(() => {
+    if (callStatus !== "connecting") {
+      setConnectStepIndex(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setConnectStepIndex((prev) => (prev < connectionSteps.length - 1 ? prev + 1 : prev));
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [callStatus]);
+
+
   // Native call capture. Vapi is the source of truth: when a call starts we grab
   // Vapi's call id, and when it ends we hand that id to the backend, which pulls
   // the official report (recording, transcript, summary) from Vapi's API. Refs
@@ -278,12 +299,6 @@ function DemoPreview() {
       cancelled = true;
     };
   }, [dynamicLeadId]);
-
-
-  // Booking Modal
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
-  const [bookingConfirmed, setBookingConfirmed] = useState(false);
 
 
   // Dynamic load of Vapi
@@ -484,13 +499,12 @@ function DemoPreview() {
         {/* Background Grid & Glows */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 no-print">
           <div
-            className="absolute inset-0 opacity-[0.2] dark:opacity-[0.06]"
+            className="absolute inset-0 opacity-[0.1] dark:opacity-[0.04]"
             style={{
-              backgroundImage: [
-                `linear-gradient(to right, var(--border) 1px, transparent 1px)`,
-                `linear-gradient(to bottom, var(--border) 1px, transparent 1px)`,
-              ].join(", "),
-              backgroundSize: "64px 64px",
+              backgroundImage: "radial-gradient(circle at 1px 1px, var(--border) 1.5px, transparent 1.5px)",
+              backgroundSize: "32px 32px",
+              maskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
+              WebkitMaskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
             }}
           />
           <div
@@ -503,34 +517,7 @@ function DemoPreview() {
           />
         </div>
 
-        {/* Header */}
-        <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 no-print">
-          <Link
-            to="/"
-            className="flex items-center gap-3 text-xs text-muted-foreground font-mono group"
-          >
-            <div className="h-7 w-7 border border-border flex items-center justify-center bg-secondary text-foreground font-bold text-[10px] uppercase tracking-tight group-hover:border-primary/50 transition-colors">
-              DQ
-            </div>
-            <span className="flex items-center gap-2 uppercase tracking-widest text-[10px]">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              Powered by DataQuartz AI
-            </span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleTheme}
-              className="p-2 border border-border hover:bg-secondary text-foreground transition-colors cursor-pointer bg-transparent"
-              aria-label="Toggle Theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-3.5 w-3.5" />
-              ) : (
-                <Moon className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </div>
-        </header>
+
 
         {/* Hero Section */}
         <motion.section
@@ -610,7 +597,7 @@ function DemoPreview() {
                     }}
                   >
                     {/* Brand + tagline */}
-                    <div className="relative z-10 space-y-3">
+                    <div className="relative z-10 space-y-3 min-h-[110px] md:min-h-[120px] flex flex-col items-center justify-start w-full">
                       <span
                         className="block text-3xl md:text-4xl font-bold tracking-tight lowercase"
                         style={{
@@ -622,9 +609,43 @@ function DemoPreview() {
                       >
                         convoa
                       </span>
-                      <p className="text-sm text-white/55 leading-relaxed max-w-xs mx-auto font-sans">
-                        Answers every call, books the job, and never puts anyone on hold.
-                      </p>
+                      <div className="h-[60px] flex items-center justify-center w-full px-4 overflow-hidden">
+                        <AnimatePresence mode="wait">
+                          {callStatus === "idle" || callStatus === "ended" || callStatus === "connecting" ? (
+                            <motion.p
+                              key="idle"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              transition={{ duration: 0.2 }}
+                              className="text-sm text-white/55 leading-relaxed max-w-xs mx-auto font-sans"
+                            >
+                              Answers every call, books the job, and never puts anyone on hold.
+                            </motion.p>
+                          ) : (
+                            <motion.div
+                              key="on-call"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              transition={{ duration: 0.2 }}
+                              className="space-y-1 text-center"
+                            >
+                              <p className="text-[11px] font-mono uppercase tracking-widest text-primary/80 font-bold animate-pulse">
+                                🎙️ Connected & Listening
+                              </p>
+                              <p className="text-xs text-white/70 font-sans max-w-xs mx-auto leading-normal">
+                                Try asking: {narrative.faqs[0] ? `"${narrative.faqs[0].q}"` : `"Who are you?"`}
+                              </p>
+                              {narrative.faqs[1] && (
+                                <p className="text-[10px] text-white/40 font-sans max-w-xs mx-auto leading-normal truncate">
+                                  or: "{narrative.faqs[1].q}"
+                                </p>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
 
                     {/* Eclipse */}
@@ -669,6 +690,7 @@ function DemoPreview() {
                       <div className="relative z-10 flex flex-col items-center gap-0.5 pointer-events-none">
                         {callStatus === "on-call" ? (
                           <>
+                            <VoiceWaveform />
                             <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-destructive/70">
                               In call
                             </span>
@@ -678,11 +700,12 @@ function DemoPreview() {
                           </>
                         ) : callStatus === "connecting" ? (
                           <>
-                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60">
+                            <LoadingPulseRing />
+                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 mb-1">
                               Connecting
                             </span>
-                            <span className="text-lg md:text-xl font-semibold text-primary animate-pulse">
-                              one moment…
+                            <span className="text-sm md:text-base font-semibold text-primary animate-pulse text-center max-w-[220px] leading-snug">
+                              {connectionSteps[connectStepIndex]}
                             </span>
                           </>
                         ) : !canCall ? (
@@ -769,14 +792,14 @@ function DemoPreview() {
                 </div>
                 <div className="space-y-4 flex-1">
               {!feedbackSubmitted ? (
-                <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-xs">
+                <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-sm">
                   {/* Rating Selector */}
                   <div className="flex gap-4 justify-center">
                     <button
                       type="button"
                       onClick={() => setFeedbackRating("positive")}
                       className={cn(
-                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer bg-transparent",
+                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent",
                         feedbackRating === "positive"
                           ? "border-success text-success bg-success/[0.05]"
                           : "border-border text-foreground hover:bg-secondary",
@@ -788,7 +811,7 @@ function DemoPreview() {
                       type="button"
                       onClick={() => setFeedbackRating("negative")}
                       className={cn(
-                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer bg-transparent",
+                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent",
                         feedbackRating === "negative"
                           ? "border-destructive text-destructive bg-destructive/[0.05]"
                           : "border-border text-foreground hover:bg-secondary",
@@ -800,15 +823,15 @@ function DemoPreview() {
 
                   {/* Rating text prompt */}
                   {feedbackRating && (
-                    <div className="space-y-1.5 text-left animate-fade-in">
-                      <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/75">
+                    <div className="space-y-2 text-left animate-fade-in">
+                      <label className="text-xs font-mono uppercase tracking-wider text-foreground/75 font-semibold">
                         {feedbackRating === "positive"
                           ? "What works well? (Optional)"
                           : "What did the agent miss? (e.g. tools, workflow instructions) *"}
                       </label>
                       <textarea
                         required={feedbackRating === "negative"}
-                        rows={2}
+                        rows={3}
                         value={feedbackText}
                         onChange={(e) => setFeedbackText(e.target.value)}
                         placeholder={
@@ -816,12 +839,12 @@ function DemoPreview() {
                             ? "Provide any comments..."
                             : "Tell us what to adjust so we can rebuild your agent..."
                         }
-                        className="w-full bg-secondary border border-border px-3 py-2 text-foreground focus:outline-none focus:border-primary text-xs font-mono resize-none"
+                        className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm font-sans resize-none"
                       />
                       <button
                         type="submit"
                         disabled={feedbackSending}
-                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all text-[11px] font-mono font-semibold uppercase tracking-wider py-2.5 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all text-sm font-mono font-semibold uppercase tracking-wider py-3 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Send className="h-3.5 w-3.5" />
                         {feedbackSending ? "Sending…" : "Send feedback"}
@@ -835,8 +858,8 @@ function DemoPreview() {
                     <div className="h-10 w-10 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
                       <Check className="h-5 w-5" />
                     </div>
-                    <p className="text-xs uppercase tracking-wider font-bold">Feedback sent</p>
-                    <p className="text-[11px] text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
+                    <p className="text-sm uppercase tracking-wider font-bold">Feedback sent</p>
+                    <p className="text-xs text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
                       Thanks — this is now with the team.
                     </p>
                   </div>
@@ -845,19 +868,19 @@ function DemoPreview() {
                       can see exactly what was sent and when. */}
                   {pastFeedback.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
                         Your feedback
                       </p>
                       <ul className="space-y-2">
                         {pastFeedback.map((fb) => (
                           <li
                             key={fb.id}
-                            className="border border-border bg-secondary/40 p-3 space-y-1.5"
+                            className="border border-border bg-secondary/40 p-3.5 space-y-1.5"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span
                                 className={cn(
-                                  "inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-semibold",
+                                  "inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider font-semibold",
                                   fb.rating === "positive" ? "text-success" : "text-destructive",
                                 )}
                               >
@@ -870,7 +893,7 @@ function DemoPreview() {
                               </span>
                               <time
                                 dateTime={fb.created_at}
-                                className="text-[10px] font-mono text-muted-foreground"
+                                className="text-xs font-mono text-muted-foreground"
                               >
                                 {new Date(fb.created_at).toLocaleString(undefined, {
                                   month: "short",
@@ -881,7 +904,7 @@ function DemoPreview() {
                               </time>
                             </div>
                             {fb.comment && (
-                              <p className="text-[11px] font-sans text-foreground/80 leading-relaxed">
+                              <p className="text-sm font-sans text-foreground/90 leading-relaxed">
                                 {fb.comment}
                               </p>
                             )}
@@ -895,7 +918,7 @@ function DemoPreview() {
                           setFeedbackRating(null);
                           setFeedbackText("");
                         }}
-                        className="text-[11px] font-sans text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer bg-transparent border-0 p-0"
+                        className="text-xs font-sans text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer bg-transparent border-0 p-0"
                       >
                         Add more feedback
                       </button>
@@ -915,25 +938,27 @@ function DemoPreview() {
                 <div className="relative z-10 flex flex-col flex-1">
                   <div className="flex items-center gap-2.5 mb-5">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary shrink-0">
-                      <Calendar className="h-4 w-4" aria-hidden="true" />
+                      <DollarSign className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div>
                       <h3 className="text-base font-medium tracking-tight leading-tight">Take it live</h3>
-                      <p className="text-xs text-muted-foreground font-sans">Point your real number at it.</p>
+                      <p className="text-xs text-muted-foreground font-sans">Pricing & Plans</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed font-sans">
-                    Every day this isn't live is another day of calls going to voicemail. One
-                    short call and it starts answering for {personalization.company}.
+                    Every day this isn't live is another day of calls going to voicemail. Choose a
+                    pricing plan that suits your call volume and start answering for {personalization.company}.
                   </p>
                   <div className="mt-auto pt-6 space-y-2.5">
-                    <button
-                      onClick={() => setShowBookingModal(true)}
-                      className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all hover:bg-primary/90 cursor-pointer border-0"
+                    <a
+                      href="https://convoa.com/pricing/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all hover:bg-primary/90 cursor-pointer border-0 text-center select-none"
                     >
-                      <Calendar className="h-4 w-4" /> Book my setup call
+                      <DollarSign className="h-4 w-4" /> See Convoa Pricing
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </button>
+                    </a>
                     <button
                       onClick={handleCopyShareLink}
                       className="inline-flex w-full items-center justify-center gap-1.5 bg-transparent border-0 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer"
@@ -965,12 +990,12 @@ function DemoPreview() {
 
             <div className="grid gap-0 md:grid-cols-2 rounded-2xl overflow-hidden border border-border/80 divide-y md:divide-y-0 md:divide-x divide-border">
               {/* Manual State */}
-              <div className="p-6 space-y-4">
+              <div className="p-6 md:p-8 space-y-4">
                 <div className="flex items-center gap-2 text-destructive font-mono text-xs uppercase tracking-wider">
                   <span className="h-1.5 w-1.5 rounded-full bg-destructive"></span>
                   Today, without us
                 </div>
-                <ul className="space-y-3 text-xs text-foreground/75 leading-relaxed font-sans list-disc list-inside">
+                <ul className="space-y-3.5 text-sm sm:text-base text-foreground/80 leading-relaxed font-sans list-disc list-inside">
                   {narrative.before.map((line) => (
                     <li key={line}>{line}</li>
                   ))}
@@ -978,12 +1003,12 @@ function DemoPreview() {
               </div>
 
               {/* Convoa State */}
-              <div className="p-6 space-y-4 bg-success/[0.02]">
+              <div className="p-6 md:p-8 space-y-4 bg-success/[0.02]">
                 <div className="flex items-center gap-2 text-success font-mono text-xs uppercase tracking-wider">
                   <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse"></span>
                   From day one with Convoa
                 </div>
-                <ul className="space-y-3 text-xs text-foreground/75 leading-relaxed font-sans list-disc list-inside">
+                <ul className="space-y-3.5 text-sm sm:text-base text-foreground/80 leading-relaxed font-sans list-disc list-inside">
                   {narrative.after.map((line) => (
                     <li key={line}>{line}</li>
                   ))}
@@ -1072,107 +1097,7 @@ function DemoPreview() {
           </div>
         </footer>
 
-        {/* Calendar Booking Modal Widget (C3) */}
-        <AnimatePresence>
-          {showBookingModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-card border border-border w-full max-w-md p-6 font-mono relative shadow-2xl rounded-lg"
-              >
-                <button
-                  onClick={() => {
-                    setShowBookingModal(false);
-                    setBookingConfirmed(false);
-                    setSelectedTimeSlot(null);
-                  }}
-                  className="absolute top-4 right-4 text-foreground/50 hover:text-foreground bg-transparent border-0 cursor-pointer"
-                >
-                  <X className="h-5 w-5" />
-                </button>
 
-                {!bookingConfirmed ? (
-                  <div className="space-y-5 text-left">
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-primary uppercase tracking-widest font-semibold">
-                        Scheduler
-                      </span>
-                      <h3 className="text-base font-bold uppercase">Claim Agent & Book Setup</h3>
-                      <p className="text-xs text-foreground/60 font-sans leading-relaxed">
-                        Select a 15-minute slot to connect this sandbox agent to your team's
-                        Descartes/Trimble live test databases.
-                      </p>
-                    </div>
-
-                    {/* Time slots */}
-                    <div className="space-y-2 font-mono">
-                      <p className="text-[10px] text-foreground/45 uppercase tracking-widest">
-                        Available Slots (Tomorrow)
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {["09:00 AM", "10:30 AM", "01:00 PM", "03:30 PM"].map((slot) => (
-                          <button
-                            key={slot}
-                            onClick={() => setSelectedTimeSlot(slot)}
-                            className={cn(
-                              "border py-2.5 font-mono cursor-pointer transition-colors bg-transparent",
-                              selectedTimeSlot === slot
-                                ? "border-primary text-primary bg-primary/5 font-semibold"
-                                : "border-border text-foreground hover:bg-secondary",
-                            )}
-                          >
-                            {slot}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        if (!selectedTimeSlot) {
-                          toast.error("Please select a time slot first.");
-                          return;
-                        }
-                        setBookingConfirmed(true);
-                      }}
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all py-3 text-xs font-semibold uppercase tracking-wider border-0 cursor-pointer"
-                    >
-                      Confirm Booking Slot
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-center py-6 space-y-4">
-                    <div className="h-12 w-12 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
-                      <CheckCircle className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold uppercase tracking-wider">
-                        Booking Confirmed!
-                      </h4>
-                      <p className="text-xs text-foreground/60 font-sans leading-relaxed max-w-xs mx-auto">
-                        Your hand-off setup session is booked for tomorrow at{" "}
-                        <strong className="text-foreground">{selectedTimeSlot}</strong>. A calendar
-                        invite has been sent to your registered email.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowBookingModal(false);
-                        setBookingConfirmed(false);
-                        setSelectedTimeSlot(null);
-                      }}
-                      className="border border-border text-foreground hover:bg-secondary px-6 py-2 text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                    >
-                      Close Window
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );
@@ -1260,6 +1185,45 @@ function EclipseRibbon({
         ))}
       </g>
     </motion.svg>
+  );
+}
+
+function VoiceWaveform() {
+  return (
+    <div className="flex items-center justify-center gap-1.5 h-6 mb-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <motion.div
+          key={i}
+          className="w-1 bg-primary rounded-full"
+          initial={{ height: 4 }}
+          animate={{ height: [4, 24, 4] }}
+          transition={{
+            duration: 0.6 + (i % 3) * 0.15,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LoadingPulseRing() {
+  return (
+    <div className="relative flex items-center justify-center h-8 w-8 mb-2">
+      <motion.div
+        className="absolute h-full w-full rounded-full border-2 border-primary/20"
+      />
+      <motion.div
+        className="absolute h-full w-full rounded-full border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent"
+        animate={{ rotate: 360 }}
+        transition={{
+          duration: 1,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+    </div>
   );
 }
 
