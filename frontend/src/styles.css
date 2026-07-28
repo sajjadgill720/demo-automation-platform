@@ -724,3 +724,182 @@ details>summary {
   border-radius: 2px;
   opacity: 0.7;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DataQuartz Console — internal team theme (scoped to the _app layout)
+   A cooler, deeper palette with an indigo → cyan accent, tuned for both
+   light and dark. Scoped via `.dq-console` so the client-facing wizard
+   and marketing pages are completely unaffected.
+   ═══════════════════════════════════════════════════════════════════ */
+.dq-console {
+  --radius: 0.7rem;
+
+  --background: oklch(0.98 0.006 265);
+  --foreground: oklch(0.21 0.03 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.03 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.03 265);
+
+  --primary: oklch(0.53 0.2 274);
+  --primary-foreground: oklch(0.99 0.002 265);
+  --brand: oklch(0.53 0.2 274);
+  --brand-foreground: oklch(0.99 0.002 265);
+
+  --secondary: oklch(0.955 0.012 265);
+  --secondary-foreground: oklch(0.26 0.03 265);
+
+  --muted: oklch(0.955 0.012 265);
+  --muted-foreground: oklch(0.52 0.028 265);
+
+  --accent: oklch(0.68 0.14 215);
+  --accent-foreground: oklch(0.2 0.03 265);
+
+  --success: oklch(0.6 0.15 155);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.68 0.15 75);
+  --warning-foreground: oklch(0.2 0.03 265);
+  --destructive: oklch(0.57 0.22 22);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --border: oklch(0.9 0.012 265);
+  --input: oklch(1 0 0);
+  --ring: oklch(0.53 0.2 274);
+
+  --sidebar: oklch(0.985 0.006 265);
+  --sidebar-foreground: oklch(0.21 0.03 265);
+  --sidebar-primary: oklch(0.53 0.2 274);
+  --sidebar-primary-foreground: oklch(0.99 0.002 265);
+  --sidebar-accent: oklch(0.95 0.016 265);
+  --sidebar-accent-foreground: oklch(0.26 0.03 265);
+  --sidebar-border: oklch(0.9 0.012 265);
+  --sidebar-ring: oklch(0.53 0.2 274);
+}
+
+.dq-console.dark,
+.dark .dq-console {
+  --background: oklch(0.165 0.021 265);
+  --foreground: oklch(0.96 0.008 265);
+  --card: oklch(0.212 0.025 265);
+  --card-foreground: oklch(0.96 0.008 265);
+  --popover: oklch(0.212 0.025 265);
+  --popover-foreground: oklch(0.96 0.008 265);
+
+  --primary: oklch(0.64 0.185 272);
+  --primary-foreground: oklch(0.99 0.002 265);
+  --brand: oklch(0.64 0.185 272);
+  --brand-foreground: oklch(0.99 0.002 265);
+
+  --secondary: oklch(0.26 0.026 265);
+  --secondary-foreground: oklch(0.96 0.008 265);
+
+  --muted: oklch(0.26 0.026 265);
+  --muted-foreground: oklch(0.68 0.022 265);
+
+  --accent: oklch(0.72 0.13 210);
+  --accent-foreground: oklch(0.16 0.02 265);
+
+  --success: oklch(0.7 0.16 155);
+  --success-foreground: oklch(0.14 0.02 265);
+  --warning: oklch(0.78 0.15 80);
+  --warning-foreground: oklch(0.16 0.02 265);
+  --destructive: oklch(0.62 0.2 22);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --border: oklch(0.3 0.022 265);
+  --input: oklch(0.26 0.026 265);
+  --ring: oklch(0.64 0.185 272);
+
+  --sidebar: oklch(0.185 0.023 265);
+  --sidebar-foreground: oklch(0.96 0.008 265);
+  --sidebar-primary: oklch(0.64 0.185 272);
+  --sidebar-primary-foreground: oklch(0.99 0.002 265);
+  --sidebar-accent: oklch(0.26 0.026 265);
+  --sidebar-accent-foreground: oklch(0.96 0.008 265);
+  --sidebar-border: oklch(0.3 0.022 265);
+  --sidebar-ring: oklch(0.64 0.185 272);
+}
+
+/* Ambient page wash — soft indigo/cyan glow + fine dot grid. */
+.console-ambient {
+  position: relative;
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(42rem 42rem at 100% -8%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 60%),
+    radial-gradient(38rem 38rem at -6% 108%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 60%);
+}
+
+.console-ambient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in oklch, var(--foreground) 8%, transparent) 1px, transparent 0);
+  background-size: 22px 22px;
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 70%);
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+}
+
+
+/* Premium Dropdown shadow/glow to make menus stand out */
+.dropdown-menu-shadow {
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    0 0 0 1px color-mix(in oklch, var(--primary) 25%, var(--border)) !important;
+}
+
+.dark .dropdown-menu-shadow {
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.8),
+    0 8px 24px rgba(0, 0, 0, 0.65),
+    0 0 0 1px color-mix(in oklch, var(--primary) 35%, var(--border)) !important;
+}
+
+/* Console surface: rounded, bordered card with quiet depth + hover lift. */
+.console-card {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.04), 0 1px 3px oklch(0 0 0 / 0.03);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.dark .console-card {
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
+}
+
+.console-card-interactive:hover {
+  border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+  box-shadow: 0 10px 30px -14px color-mix(in oklch, var(--primary) 55%, transparent);
+  transform: translateY(-2px);
+}
+
+/* Primary CTA with a soft accent glow. */
+.console-cta {
+  box-shadow: 0 6px 18px -8px color-mix(in oklch, var(--primary) 60%, transparent);
+  transition: box-shadow 0.25s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+
+.console-cta:hover {
+  box-shadow: 0 10px 26px -8px color-mix(in oklch, var(--primary) 70%, transparent);
+  transform: translateY(-1px);
+}
+
+.console-cta:active {
+  transform: translateY(0);
+}
+
+/* Indigo → cyan brand gradient for wordmarks / accents. */
+.console-brand-gradient {
+  background: linear-gradient(100deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Thin accent rail used on the active sidebar item. */
+.console-active-rail {
+  background: linear-gradient(to bottom, var(--primary), var(--accent));
+}

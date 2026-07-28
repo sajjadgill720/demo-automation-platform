@@ -320,7 +320,7 @@ function PhoneField({ country, digits, error, disabled, onCountry, onDigits, onK
           </button>
 
           {isOpen && (
-            <div className="absolute left-0 top-full mt-1.5 z-50 min-w-[240px] max-h-[260px] overflow-y-auto rounded-xl border border-border bg-card shadow-2xl p-1.5 animate-in fade-in slide-in-from-top-1 duration-150 scrollbar-thin">
+            <div className="absolute left-0 top-full mt-1.5 z-50 min-w-[240px] max-h-[260px] overflow-y-auto rounded-xl border border-border bg-card dropdown-menu-shadow shadow-2xl p-1.5 animate-in fade-in slide-in-from-top-1 duration-150 scrollbar-thin">
               {COUNTRIES.map((o) => (
                 <button
                   key={o.code}

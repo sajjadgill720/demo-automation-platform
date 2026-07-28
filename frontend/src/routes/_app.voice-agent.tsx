@@ -99,7 +99,7 @@ function VoiceAgent() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search agents"
-              className="w-full border bg-card py-1.5 pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
+              className="w-full rounded-lg border border-border/80 bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 transition-shadow"
             />
           </div>
 
@@ -115,19 +115,19 @@ function VoiceAgent() {
           </div>
 
           {error ? (
-            <div className="border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
               {error}
             </div>
           ) : loading && leads.length === 0 ? (
-            <div className="border bg-card p-6 text-center text-sm text-muted-foreground">
+            <div className="console-card p-6 text-center text-sm text-muted-foreground">
               Loading…
             </div>
           ) : agents.length === 0 ? (
-            <div className="border bg-card p-6 text-center text-sm text-muted-foreground">
+            <div className="console-card p-6 text-center text-sm text-muted-foreground">
               No provisioned agents yet. Generate a demo to create one.
             </div>
           ) : (
-            <ul className="divide-y border bg-card">
+            <ul className="console-card divide-y divide-border/60 overflow-hidden">
               {agents.map((a) => (
                 <li key={a.id}>
                   <button
@@ -136,8 +136,8 @@ function VoiceAgent() {
                       setConfirmingDelete(false);
                     }}
                     className={cn(
-                      "flex w-full items-center gap-3 px-3 py-2.5 text-left cursor-pointer hover:bg-muted/40",
-                      selected?.id === a.id && "bg-muted/60",
+                      "flex w-full items-center gap-3 px-3 py-2.5 text-left cursor-pointer transition-colors hover:bg-primary/5",
+                      selected?.id === a.id && "bg-primary/10",
                     )}
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
@@ -161,7 +161,7 @@ function VoiceAgent() {
         <div className="space-y-6 xl:col-span-2">
           {selected ? (
             <>
-              <div className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="console-card p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -185,7 +185,7 @@ function VoiceAgent() {
                         },
                       })
                     }
-                    className="inline-flex shrink-0 items-center gap-1.5 bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    className="console-cta inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
                   >
                     <ExternalLink className="h-4 w-4" /> Open live voice test
                   </button>
@@ -249,7 +249,7 @@ function VoiceAgent() {
                 </div>
               </div>
 
-              <div className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="console-card p-5">
                 <div className="mb-1 flex items-center gap-2">
                   <h3 className="text-sm font-semibold">Microphone check</h3>
                 </div>
@@ -263,7 +263,7 @@ function VoiceAgent() {
               </div>
             </>
           ) : (
-            <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+            <div className="console-card p-10 text-center text-sm text-muted-foreground">
               Select an agent to see its details and test it.
             </div>
           )}

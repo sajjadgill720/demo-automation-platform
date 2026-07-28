@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ThumbsUp, ThumbsDown, RefreshCw, Search } from "lucide-react";
+import { ThumbsUp, ThumbsDown, RefreshCw, Search, MessagesSquare } from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
 import { listAllFeedback, type DemoFeedbackWithLead } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/feedback")({
   head: () => ({ meta: [{ title: "Client feedback — DataQuartz" }] }),
@@ -61,11 +62,11 @@ function FeedbackPage() {
   return (
     <>
       <TopNav title="Client feedback" />
-      <div className="space-y-3 p-6">
-        <div className="grid grid-cols-3 gap-px border bg-border">
-          <Stat label="Total" value={rows.length} loading={loading} />
-          <Stat label="Accurate" value={positive} loading={loading} tone="success" />
-          <Stat label="Needs tweaks" value={negative} loading={loading} tone="destructive" />
+      <div className="space-y-6 p-6">
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="Total" value={rows.length} loading={loading} icon={MessagesSquare} tone="primary" />
+          <Stat label="Accurate" value={positive} loading={loading} icon={ThumbsUp} tone="success" />
+          <Stat label="Needs tweaks" value={negative} loading={loading} icon={ThumbsDown} tone="destructive" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -75,21 +76,25 @@ function FeedbackPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search company, industry, comment"
-              className="w-full border bg-card py-1.5 pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
+              className="w-full rounded-lg border border-border/80 bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 transition-shadow"
             />
           </div>
-          <select
+          <Select
             value={rating}
-            onChange={(e) => setRating(e.target.value as RatingFilter)}
-            className="border bg-card px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+            onValueChange={(val) => setRating(val as RatingFilter)}
           >
-            <option value="all">All ratings</option>
-            <option value="positive">Accurate</option>
-            <option value="negative">Needs tweaks</option>
-          </select>
+            <SelectTrigger className="w-[140px] border border-border/80 bg-card px-2.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 cursor-pointer shadow-sm hover:shadow transition-shadow">
+              <SelectValue placeholder="All ratings" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ratings</SelectItem>
+              <SelectItem value="positive">Accurate</SelectItem>
+              <SelectItem value="negative">Needs tweaks</SelectItem>
+            </SelectContent>
+          </Select>
           <button
             onClick={load}
-            className="flex items-center gap-1.5 border bg-card px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer transition-colors"
           >
             <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
             Refresh
@@ -100,39 +105,39 @@ function FeedbackPage() {
         </div>
 
         {error ? (
-          <div className="border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
             {error}
           </div>
         ) : loading && rows.length === 0 ? (
-          <div className="border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="console-card p-10 text-center text-sm text-muted-foreground">
             Loading…
           </div>
         ) : filtered.length === 0 ? (
-          <div className="border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="console-card p-10 text-center text-sm text-muted-foreground">
             No feedback yet.
           </div>
         ) : (
-          <ul className="divide-y border bg-card">
+          <ul className="console-card divide-y divide-border/60 overflow-hidden">
             {filtered.map((r) => (
-              <li key={r.id} className="flex gap-3 p-3">
+              <li key={r.id} className="flex gap-3 p-4 transition-colors hover:bg-muted/30">
                 <span
                   className={cn(
-                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ring-inset",
                     r.rating === "positive"
-                      ? "border-success/40 bg-success/10 text-success"
-                      : "border-destructive/40 bg-destructive/10 text-destructive",
+                      ? "bg-success/10 text-success ring-success/25"
+                      : "bg-destructive/10 text-destructive ring-destructive/25",
                   )}
                   aria-hidden="true"
                 >
                   {r.rating === "positive" ? (
-                    <ThumbsUp className="h-3 w-3" />
+                    <ThumbsUp className="h-3.5 w-3.5" />
                   ) : (
-                    <ThumbsDown className="h-3 w-3" />
+                    <ThumbsDown className="h-3.5 w-3.5" />
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-sm font-medium">{r.company_name}</span>
+                    <span className="text-sm font-semibold">{r.company_name}</span>
                     <span className="text-xs text-muted-foreground">{r.industry}</span>
                     <time
                       dateTime={r.created_at}
@@ -165,19 +170,34 @@ function Stat({
   label,
   value,
   loading,
+  icon: Icon,
   tone,
 }: {
   label: string;
   value: number;
   loading: boolean;
-  tone?: "success" | "destructive";
+  icon: React.ComponentType<{ className?: string }>;
+  tone?: "primary" | "success" | "destructive";
 }) {
+  const toneCls =
+    tone === "success"
+      ? "bg-success/10 text-success ring-success/20"
+      : tone === "destructive"
+        ? "bg-destructive/10 text-destructive ring-destructive/20"
+        : "bg-primary/10 text-primary ring-primary/20";
   return (
-    <div className="bg-card px-3 py-3">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="console-card console-card-interactive p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-inset", toneCls)}>
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+      </div>
       <div
         className={cn(
-          "mt-1 text-2xl font-semibold tabular-nums",
+          "mt-2 text-3xl font-semibold tabular-nums tracking-tight",
           tone === "success" && "text-success",
           tone === "destructive" && "text-destructive",
         )}

@@ -501,6 +501,22 @@ def extract_profile_node(state: ClarificationState) -> ClarificationState:
 
     logger.info(f"[{lead_id_str}] extract_profile node started")
 
+    # Fast-path optimization: when there are no documents and no conversation history,
+    # the LLM can extract nothing about workflow/scenarios/preferences. Avoid a 12-15s LLM call.
+    if not docs_text and not history:
+        logger.info(f"[{lead_id_str}] extract_profile: No documents and no history. Bypassing LLM call.")
+        extracted_dict = {
+            "primary_problem": form_problem or "UNKNOWN",
+            "current_workflow_summary": "UNKNOWN",
+            "must_handle_scenarios": [],
+            "escalation_preferences": "UNKNOWN",
+            "desired_customizations": "UNKNOWN",
+        }
+        return {
+            **state,
+            "extracted_profile": extracted_dict
+        }
+
     prompt = EXTRACTION_PROMPT.format(
         company_name=company,
         industry=industry,

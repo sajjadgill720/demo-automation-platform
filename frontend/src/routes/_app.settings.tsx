@@ -35,8 +35,8 @@ function Settings() {
       <TopNav title="Settings" />
       <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
         {/* Appearance */}
-        <section className="border bg-card">
-          <div className="border-b px-4 py-3">
+        <section className="console-card overflow-hidden">
+          <div className="border-b border-border/70 bg-muted/30 px-4 py-3">
             <h2 className="text-sm font-semibold">Appearance</h2>
             <p className="text-xs text-muted-foreground">How the dashboard looks on this device.</p>
           </div>
@@ -49,11 +49,11 @@ function Settings() {
               )}
               <span className="font-medium">Theme</span>
             </div>
-            <div className="inline-flex overflow-hidden border">
+            <div className="inline-flex overflow-hidden rounded-lg border border-border/80">
               <button
                 onClick={() => theme !== "light" && toggleTheme()}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer",
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors",
                   theme === "light"
                     ? "bg-primary text-primary-foreground"
                     : "bg-card text-muted-foreground hover:text-foreground",
@@ -64,7 +64,7 @@ function Settings() {
               <button
                 onClick={() => theme !== "dark" && toggleTheme()}
                 className={cn(
-                  "flex items-center gap-1.5 border-l px-3 py-1.5 text-xs cursor-pointer",
+                  "flex items-center gap-1.5 border-l border-border/80 px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors",
                   theme === "dark"
                     ? "bg-primary text-primary-foreground"
                     : "bg-card text-muted-foreground hover:text-foreground",
@@ -77,8 +77,8 @@ function Settings() {
         </section>
 
         {/* Voice infrastructure (read-only) */}
-        <section className="border bg-card">
-          <div className="border-b px-4 py-3">
+        <section className="console-card overflow-hidden">
+          <div className="border-b border-border/70 bg-muted/30 px-4 py-3">
             <h2 className="flex items-center gap-1.5 text-sm font-semibold">
               <ServerCog className="h-4 w-4 text-muted-foreground" /> Voice infrastructure
             </h2>
@@ -86,7 +86,7 @@ function Settings() {
               Configured server-side via environment variables — not editable from the dashboard.
             </p>
           </div>
-          <dl className="divide-y text-sm">
+          <dl className="divide-y divide-border/60 text-sm">
             <ConfigRow
               label="Vapi API key (server)"
               icon={KeyRound}

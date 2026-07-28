@@ -19,9 +19,9 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground">
+    <div className="dq-console flex min-h-screen w-full bg-background text-foreground">
       <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="console-ambient flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
     </div>

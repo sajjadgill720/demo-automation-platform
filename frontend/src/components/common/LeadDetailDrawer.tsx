@@ -137,10 +137,10 @@ export function LeadDetailDrawer({
       <aside
         role="dialog"
         aria-label={`Details for ${lead.company_name}`}
-        className="relative z-10 h-full w-full max-w-md overflow-y-auto border-l bg-card shadow-xl"
+        className="relative z-10 h-full w-full max-w-md overflow-y-auto rounded-l-2xl border-l border-border/70 bg-card shadow-2xl"
       >
         {/* Header */}
-        <div className="sticky top-0 flex items-start justify-between gap-3 border-b bg-card px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border/70 bg-card/85 px-5 py-4 backdrop-blur-xl">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold">{lead.company_name}</h2>
             <p className="truncate text-xs text-muted-foreground">{lead.industry}</p>
@@ -168,7 +168,7 @@ export function LeadDetailDrawer({
                   search: { assistant_id: lead.assistant_id ?? "", lead_id: lead.id },
                 })
               }
-              className="inline-flex items-center gap-1.5 bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="console-cta inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
             >
               <ExternalLink className="h-3.5 w-3.5" /> Open demo
             </button>
@@ -177,7 +177,7 @@ export function LeadDetailDrawer({
                 navigator.clipboard.writeText(demoUrl);
                 toast.success("Demo link copied");
               }}
-              className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-medium hover:bg-muted cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 px-3 py-1.5 text-xs font-medium hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-colors cursor-pointer"
             >
               <Copy className="h-3.5 w-3.5" /> Copy link
             </button>
@@ -305,7 +305,7 @@ export function LeadDetailDrawer({
             ) : (
               <ul className="space-y-2">
                 {feedback.map((fb) => (
-                  <li key={fb.id} className="border bg-secondary/40 p-3 space-y-1.5">
+                  <li key={fb.id} className="rounded-lg border border-border/70 bg-secondary/40 p-3 space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span
                         className={cn(
@@ -350,7 +350,7 @@ function CallItem({ call }: { call: CallRecord }) {
   const processing = call.status === "processing";
   const failed = call.status === "failed";
   return (
-    <li className="border bg-secondary/40">
+    <li className="rounded-lg border border-border/70 bg-secondary/40 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

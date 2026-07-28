@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Upload,
   X,
@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldCheck,
   MessagesSquare,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,35 @@ function UploadRoute() {
   // What the busy state is actually doing, so the loading copy never claims to be
   // "processing documents" on the skip path (or when no file was attached).
   const [busyMode, setBusyMode] = useState<"docs" | "scoping" | null>(null);
+
+  // Step-by-step progress states for document parsing/scoping
+  const [ingestStepIndex, setIngestStepIndex] = useState(0);
+
+  const ingestStepsDocs = [
+    "Uploading document payload...",
+    "Scanning document structure...",
+    "Analyzing policies and workflows...",
+    "Structuring business profile...",
+    "Scoping custom clarification questions...",
+  ];
+
+  const ingestStepsNoDocs = [
+    "Initializing scoping session...",
+    "Structuring baseline profile...",
+    "Determining clarification gap rules...",
+  ];
+
+  useEffect(() => {
+    if (!isIngesting) {
+      setIngestStepIndex(0);
+      return;
+    }
+    const steps = uploadedFiles.length > 0 ? ingestStepsDocs : ingestStepsNoDocs;
+    const interval = setInterval(() => {
+      setIngestStepIndex((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 2500); // Progress steps every 2.5s
+    return () => clearInterval(interval);
+  }, [isIngesting, uploadedFiles.length]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -365,13 +395,54 @@ function UploadRoute() {
 
         {/* Loading State Overlay */}
         {isIngesting && (
-          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 gap-3 font-mono rounded-xl">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <span className="text-xs uppercase tracking-widest text-primary animate-pulse font-bold">
-              {busyMode === "docs"
-                ? "Reading your documents..."
-                : "Starting your scoping session..."}
-            </span>
+          <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-6 rounded-xl animate-fade-in">
+            <div className="w-full max-w-sm space-y-6">
+              <div className="flex items-center gap-3 justify-center mb-2">
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                  {uploadedFiles.length > 0 ? "Analyzing Documents" : "Scoping Business"}
+                </span>
+              </div>
+              
+              <ul className="space-y-4 text-left">
+                {(uploadedFiles.length > 0 ? ingestStepsDocs : ingestStepsNoDocs).map((stepText, idx) => {
+                  const isDone = idx < ingestStepIndex;
+                  const isActive = idx === ingestStepIndex;
+                  const isTodo = idx > ingestStepIndex;
+                  
+                  return (
+                    <li key={idx} className="flex items-center gap-3 transition-opacity duration-300">
+                      <span
+                        className={cn(
+                          "flex h-5 w-5 items-center justify-center rounded-full border shrink-0 text-[10px]",
+                          isDone && "bg-success/15 border-success/40 text-success",
+                          isActive && "bg-primary/15 border-primary/40 text-primary",
+                          isTodo && "border-border text-foreground/25"
+                        )}
+                      >
+                        {isDone ? (
+                          <Check className="h-3 w-3" aria-hidden="true" />
+                        ) : isActive ? (
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                        ) : (
+                          idx + 1
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-xs font-sans",
+                          isActive && "text-foreground font-semibold",
+                          isDone && "text-foreground/60",
+                          isTodo && "text-foreground/30"
+                        )}
+                      >
+                        {stepText}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
         )}
 

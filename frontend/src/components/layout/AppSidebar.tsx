@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Mic, Radio, MessageSquare, Settings, Sparkles, Moon, Sun } from "lucide-react";
+import { LayoutDashboard, Mic, Radio, MessageSquare, Settings, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -16,19 +16,21 @@ export function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
-      <div className="flex items-center gap-2 px-5 pt-6 pb-8">
-        <div className="h-8 w-8 rounded border border-dashed border-primary/60 dark:border-primary/40 flex items-center justify-center bg-primary/5 text-primary font-bold text-xs uppercase tracking-tight shadow-sm shadow-primary/10 shrink-0">
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-5 pt-6 pb-7">
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground font-bold text-xs uppercase tracking-tight shadow-lg shadow-primary/25">
           DQ
+          <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-white/20" />
         </div>
-        <div>
-          <p className="text-sm font-semibold leading-tight">DataQuartz</p>
-          <p className="text-[11px] leading-tight text-sidebar-foreground/60">AI Demo Automation</p>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-tight tracking-tight">DataQuartz</p>
+          <p className="text-[11px] leading-tight text-sidebar-foreground/55">AI Demo Automation</p>
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40">
           Workspace
         </p>
         {nav.map((item) => {
@@ -39,36 +41,41 @@ export function AppSidebar() {
               key={item.to}
               to={item.to}
               className={cn(
-                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-primary/15"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                <span className="console-active-rail absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full" />
               )}
-              <item.icon className={cn("h-4 w-4", active && "text-primary")} />
+              <item.icon
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-colors",
+                  active ? "text-primary" : "text-sidebar-foreground/55 group-hover:text-sidebar-foreground",
+                )}
+              />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
-        <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2">
+      <div className="p-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-sm font-semibold shrink-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 to-accent/25 text-sidebar-foreground text-sm font-semibold ring-1 ring-inset ring-primary/20 shrink-0">
               EM
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">Elena Marchetti</p>
-              <p className="truncate text-[11px] text-sidebar-foreground/60">elena@dataquartz.ai</p>
+              <p className="truncate text-sm font-medium leading-tight">Elena Marchetti</p>
+              <p className="truncate text-[11px] text-sidebar-foreground/55">elena@dataquartz.ai</p>
             </div>
           </div>
           <button
             onClick={toggleTheme}
-            className="p-1.5 rounded-lg border border-sidebar-border hover:bg-sidebar-accent text-sidebar-foreground transition-colors cursor-pointer bg-transparent shrink-0"
+            className="p-1.5 rounded-lg border border-sidebar-border bg-sidebar hover:bg-sidebar-accent hover:text-primary text-sidebar-foreground transition-colors cursor-pointer shrink-0"
             aria-label="Toggle Theme"
           >
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
