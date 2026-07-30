@@ -97,38 +97,32 @@ def test_extraction_and_gaps_unit():
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     
     try:
-        from app.clarification import CompanyProfile, detect_gaps_node
-        
-        # Test Case 1: Gap detection on fully empty profile
+        from app.clarification import CompanyProfile, detect_gaps_node, PROFILE_FIELDS
+
+        # Test Case 1: Gap detection on fully empty profile. Built over the full
+        # (now expanded) PROFILE_FIELDS so it stays correct as the profile grows.
         empty_profile = {
-            "primary_problem": "UNKNOWN",
-            "current_workflow_summary": "UNKNOWN",
-            "must_handle_scenarios": [],
-            "escalation_preferences": "UNKNOWN",
-            "desired_customizations": "UNKNOWN"
+            f: ([] if f == "must_handle_scenarios" else "UNKNOWN") for f in PROFILE_FIELDS
         }
         state = {"extracted_profile": empty_profile, "lead_id": "test_lead_uuid"}
         res = detect_gaps_node(state)
         missing = res["missing_fields"]
-        
-        if len(missing) == 5:
-            log_test("Gap Detection: Empty Profile Gaps", "PASS", "— correctly identified all 5 missing fields")
+
+        if len(missing) == len(PROFILE_FIELDS):
+            log_test("Gap Detection: Empty Profile Gaps", "PASS", f"— correctly identified all {len(PROFILE_FIELDS)} missing fields")
         else:
-            log_test("Gap Detection: Empty Profile Gaps", "FAIL", f"— found {len(missing)} fields instead of 5")
-            
-        # Test Case 2: Gap detection on partial profile
-        partial_profile = {
-            "primary_problem": "Missed reservation calls during weekends",
-            "current_workflow_summary": "We have an answering machine",
-            "must_handle_scenarios": [], # missing
-            "escalation_preferences": "UNKNOWN", # missing
-            "desired_customizations": "Polite tone"
-        }
+            log_test("Gap Detection: Empty Profile Gaps", "FAIL", f"— found {len(missing)} fields instead of {len(PROFILE_FIELDS)}")
+
+        # Test Case 2: Gap detection on partial profile — every field filled except
+        # two, which must be the only ones reported missing.
+        partial_profile = {f: f"filled value for {f}" for f in PROFILE_FIELDS}
+        partial_profile["must_handle_scenarios"] = []       # missing
+        partial_profile["escalation_preferences"] = "UNKNOWN"  # missing
         state = {"extracted_profile": partial_profile, "lead_id": "test_lead_uuid"}
         res = detect_gaps_node(state)
         missing = res["missing_fields"]
-        
-        if "must_handle_scenarios" in missing and "escalation_preferences" in missing and len(missing) == 2:
+
+        if set(missing) == {"must_handle_scenarios", "escalation_preferences"}:
             log_test("Gap Detection: Partial Profile Gaps", "PASS", "— correctly identified 2 missing fields")
         else:
             log_test("Gap Detection: Partial Profile Gaps", "FAIL", f"— found {missing} fields instead of ['must_handle_scenarios', 'escalation_preferences']")

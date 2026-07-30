@@ -49,7 +49,7 @@
 }
 
 :root {
-  --radius: 0px;
+  --radius: 0.5rem;
 
   /* Base surfaces */
   --background: oklch(0.99 0.005 240);
@@ -137,6 +137,10 @@
   --sidebar-ring: oklch(0.769 0.163 70);
 }
 
+.skydda-sentinel-theme {
+  --radius: 0.75rem;
+}
+
 /* Skydda Sentinel Landing Page Theme overrides — dark mode only (light inherits from :root) */
 
 .skydda-sentinel-theme.dark,
@@ -172,6 +176,42 @@
   /* zinc-800 border */
   --input: oklch(0.232 0.005 256);
   --ring: oklch(0.439 0 0);
+}
+
+/* ── Build-demo form: raise input contrast so fields read clearly ──
+   The default skydda tokens make --input/--border (0.232) sit almost on top
+   of the card (0.178), so inputs disappear on the black background. Inside
+   the form we override those tokens with a lifted "well" surface and a
+   distinctly brighter edge — tuned separately for light and dark. */
+/* Form fields get a clearly distinguishable surface + edge in both themes.
+   Colors are applied as direct literals (no CSS-var indirection) because
+   Tailwind's @theme vars are pinned at :root and arbitrary var() utilities
+   mis-resolve on <input>/<textarea>. Selector order matters: light base →
+   dark base → error → focus, so error beats the base and focus beats error. */
+
+/* Light: a subtle grey well against the white card, with a defined edge. */
+.dq-form-surface .field-box {
+  background-color: oklch(0.975 0.004 256);
+  border-color: oklch(0.8 0.014 256);
+}
+
+/* Dark: a lifted well above the 0.178 card, with a distinctly brighter edge. */
+.dark .dq-form-surface .field-box,
+.skydda-sentinel-theme.dark.dq-form-surface .field-box,
+.dark .skydda-sentinel-theme.dq-form-surface .field-box {
+  background-color: oklch(0.238 0.008 256);
+  border-color: oklch(0.42 0.012 256);
+}
+
+/* Error edge (both themes). */
+.dq-form-surface .field-box[aria-invalid="true"],
+.dq-form-surface .field-box[data-invalid="true"] {
+  border-color: color-mix(in oklch, var(--destructive) 65%, transparent);
+}
+
+/* Focus edge (both themes) — amber, matching input-glow. Wins over error. */
+.dq-form-surface .field-box:focus-within {
+  border-color: oklch(0.79 0.17 70 / 0.6);
 }
 
 @layer base {
@@ -903,3 +943,532 @@ details>summary {
 .console-active-rail {
   background: linear-gradient(to bottom, var(--primary), var(--accent));
 }
+
+@keyframes pulse-focus {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0px color-mix(in oklch, var(--primary) 50%, transparent), 0 10px 30px -10px color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 12px color-mix(in oklch, var(--primary) 0%, transparent), 0 15px 40px -8px color-mix(in oklch, var(--primary) 50%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0px color-mix(in oklch, var(--primary) 0%, transparent), 0 10px 30px -10px color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+}
+
+.animate-pulse-focus {
+  animation: pulse-focus 2.2s infinite ease-in-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUTTON THEMED SHADOW SYSTEM
+   Light / White theme  → warm amber-yellow glow
+   Dark theme           → cool sky-blue glow
+   Applied via .btn-themed-shadow on every <Button /> variant
+   (ghost & link variants opt-out with shadow-none overrides)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* --- Light theme: dense amber-yellow shadow --- */
+.btn-themed-shadow {
+  box-shadow:
+    0 2px 6px oklch(0 0 0 / 0.10),
+    0 1px 3px oklch(0 0 0 / 0.08);
+  transition:
+    box-shadow 0.22s ease-out,
+    transform 0.18s ease-out,
+    background-color 0.15s ease-out;
+}
+
+.btn-themed-shadow:hover:not(:disabled) {
+  /* Dense, wide amber-yellow glow — light/white theme */
+  box-shadow:
+    0 0 0 3px oklch(0.92 0.21 82 / 0.30),
+    0 0 18px 2px oklch(0.88 0.20 78 / 0.45),
+    0 6px 28px -2px oklch(0.82 0.19 74 / 0.60),
+    0 12px 48px -6px oklch(0.80 0.18 70 / 0.35),
+    0 2px 8px oklch(0 0 0 / 0.10);
+}
+
+.btn-themed-shadow:active:not(:disabled) {
+  box-shadow:
+    0 0 0 2px oklch(0.92 0.21 82 / 0.20),
+    0 0 10px 1px oklch(0.88 0.20 78 / 0.30),
+    0 3px 14px -2px oklch(0.82 0.19 74 / 0.40);
+}
+
+/* --- Dark theme: dense sky-blue glow --- */
+.dark .btn-themed-shadow:hover:not(:disabled) {
+  box-shadow:
+    0 0 0 3px oklch(0.72 0.19 208 / 0.35),
+    0 0 20px 3px oklch(0.68 0.20 212 / 0.50),
+    0 6px 30px -2px oklch(0.62 0.21 216 / 0.65),
+    0 14px 54px -6px oklch(0.60 0.20 215 / 0.40),
+    0 2px 8px oklch(0 0 0 / 0.25);
+}
+
+.dark .btn-themed-shadow:active:not(:disabled) {
+  box-shadow:
+    0 0 0 2px oklch(0.72 0.19 208 / 0.22),
+    0 0 12px 2px oklch(0.68 0.20 212 / 0.35),
+    0 3px 16px -2px oklch(0.62 0.21 216 / 0.45);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DOCUMENT INGESTION SECTION — Ambient Atmospheric Glow
+   The entire upload section pulses with a warm (light) or cool (dark)
+   atmospheric glow to signal it is a premium, active, AI-powered zone.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes doc-glow-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.04); }
+}
+
+.doc-ingestion-section {
+  position: relative;
+}
+
+/* Ambient glow layer behind the card — light mode: warm amber pool */
+.doc-ingestion-section::before {
+  content: "";
+  position: absolute;
+  inset: -32px -24px;
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 50%,
+      oklch(0.90 0.20 78 / 0.22) 0%,
+      oklch(0.85 0.18 72 / 0.12) 40%,
+      transparent 75%);
+  filter: blur(24px);
+  animation: doc-glow-pulse 4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dark mode override — cool sky-blue glow */
+.dark .doc-ingestion-section::before {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 50%,
+      oklch(0.68 0.21 212 / 0.28) 0%,
+      oklch(0.62 0.20 216 / 0.15) 40%,
+      transparent 75%);
+}
+
+/* Ensure child content sits above the glow */
+.doc-ingestion-section > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Drag-zone glow on active drag state — light */
+.doc-drop-zone-active {
+  box-shadow:
+    0 0 0 2px oklch(0.88 0.20 78),
+    0 0 32px 4px oklch(0.88 0.20 78 / 0.40),
+    0 8px 40px -8px oklch(0.80 0.18 70 / 0.50);
+  transition: box-shadow 0.2s ease-out;
+}
+
+/* Drag-zone glow — dark */
+.dark .doc-drop-zone-active {
+  box-shadow:
+    0 0 0 2px oklch(0.68 0.21 212),
+    0 0 36px 6px oklch(0.68 0.21 212 / 0.45),
+    0 8px 44px -8px oklch(0.62 0.20 216 / 0.55);
+}
+
+/* Softer hover glow (idle hover, not dragging) — light */
+.doc-drop-zone {
+  transition:
+    box-shadow 0.22s ease-out,
+    border-color 0.22s ease-out,
+    background-color 0.18s ease-out;
+}
+
+.doc-drop-zone:hover {
+  box-shadow:
+    0 0 0 1px oklch(0.90 0.20 80 / 0.40),
+    0 0 20px 2px oklch(0.88 0.20 78 / 0.22),
+    0 6px 28px -6px oklch(0.82 0.18 74 / 0.30);
+}
+
+/* Softer hover glow — dark */
+.dark .doc-drop-zone:hover {
+  box-shadow:
+    0 0 0 1px oklch(0.70 0.20 210 / 0.45),
+    0 0 22px 3px oklch(0.68 0.21 212 / 0.28),
+    0 6px 30px -6px oklch(0.62 0.20 216 / 0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PM-THINKING UX/UI ENHANCEMENTS
+   Feature: Skeleton loading shimmers, tooltips, kbd chips,
+            notification dots, empty states, scroll fades,
+            progress shimmer, action FAB
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* --- 1. Skeleton Loading Shimmer --- */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  border-radius: var(--radius-md, 6px);
+  background: linear-gradient(
+    90deg,
+    oklch(0.92 0.005 240) 25%,
+    oklch(0.96 0.005 240) 50%,
+    oklch(0.92 0.005 240) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.22 0.015 265) 25%,
+    oklch(0.28 0.015 265) 50%,
+    oklch(0.22 0.015 265) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* --- 2. Keyboard Shortcut Chip (e.g. ⌘K, Ctrl+S hints) --- */
+.kbd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  line-height: 1.5;
+  color: oklch(0.45 0.02 240);
+  background: oklch(0.94 0.008 240);
+  border: 1px solid oklch(0.82 0.01 240);
+  box-shadow: 0 1px 0 oklch(0.75 0.01 240);
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.dark .kbd-chip {
+  color: oklch(0.72 0.02 265);
+  background: oklch(0.24 0.018 265);
+  border-color: oklch(0.35 0.02 265);
+  box-shadow: 0 1px 0 oklch(0.18 0.015 265);
+}
+
+/* --- 3. Notification / Status Pulse Dot --- */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot-live {
+  background: var(--color-success, oklch(0.62 0.19 149));
+  animation: status-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 3px oklch(0.62 0.19 149 / 0.2);
+}
+
+.status-dot-pending {
+  background: var(--color-warning, oklch(0.68 0.15 75));
+}
+
+.status-dot-error {
+  background: var(--color-destructive, oklch(0.55 0.22 27));
+}
+
+/* --- 4. Empty State Container --- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  border-radius: var(--radius-lg, 8px);
+  border: 1.5px dashed oklch(0.82 0.01 240);
+  background: oklch(0.975 0.004 240 / 0.5);
+  transition: border-color 0.3s ease;
+}
+
+.dark .empty-state {
+  border-color: oklch(0.3 0.02 265);
+  background: oklch(0.2 0.015 265 / 0.4);
+}
+
+.empty-state:hover {
+  border-color: oklch(0.79 0.17 70 / 0.45);
+}
+
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: oklch(0.93 0.01 240);
+  border: 1px solid oklch(0.86 0.01 240);
+  color: oklch(0.55 0.02 240);
+}
+
+.dark .empty-state-icon {
+  background: oklch(0.24 0.02 265);
+  border-color: oklch(0.32 0.02 265);
+  color: oklch(0.65 0.02 265);
+}
+
+/* --- 5. Scroll Fade Edges (signals more content below/above) --- */
+.scroll-fade-bottom {
+  position: relative;
+}
+
+.scroll-fade-bottom::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--color-background));
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* --- 6. Tooltip Fade-In Animation --- */
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-radix-popper-content-wrapper] {
+  animation: tooltip-in 0.15s ease-out;
+}
+
+/* --- 7. Progress Bar Shimmer (active loading bars) --- */
+@keyframes progress-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    oklch(0.88 0.18 70) 50%,
+    var(--color-primary) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.5s ease-in-out infinite;
+}
+
+.dark .progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    oklch(0.75 0.16 215) 50%,
+    var(--color-primary) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* --- 8. Interactive Table Row (better feedback than just bg-change) --- */
+.table-row-interactive {
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+  position: relative;
+}
+
+.table-row-interactive:hover {
+  background-color: oklch(0.79 0.17 70 / 0.04);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.dark .table-row-interactive:hover {
+  background-color: oklch(0.65 0.2 215 / 0.06);
+  box-shadow: inset 3px 0 0 oklch(0.65 0.2 215);
+}
+
+/* --- 9. Floating Action Button (FAB) --- */
+.fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  box-shadow:
+    0 4px 16px -4px oklch(0.79 0.17 70 / 0.5),
+    0 2px 8px oklch(0 0 0 / 0.12);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 40;
+}
+
+.fab:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow:
+    0 8px 24px -4px oklch(0.79 0.17 70 / 0.6),
+    0 4px 12px oklch(0 0 0 / 0.15);
+}
+
+.fab:active {
+  transform: scale(0.96);
+}
+
+.dark .fab:hover {
+  box-shadow:
+    0 8px 24px -4px oklch(0.65 0.2 215 / 0.6),
+    0 4px 12px oklch(0 0 0 / 0.4);
+}
+
+/* --- 10. Contextual Action Bar (appears on row selection) --- */
+@keyframes action-bar-slide-up {
+  from { opacity: 0; transform: translateY(12px) translateX(-50%); }
+  to { opacity: 1; transform: translateY(0) translateX(-50%); }
+}
+
+.action-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: oklch(0.15 0.02 240 / 0.95);
+  border: 1px solid oklch(0.3 0.02 240);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.25);
+  color: oklch(0.97 0.01 240);
+  font-size: 13px;
+  z-index: 50;
+  animation: action-bar-slide-up 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  white-space: nowrap;
+}
+
+.dark .action-bar {
+  background: oklch(0.18 0.02 265 / 0.95);
+  border-color: oklch(0.32 0.022 265);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
+}
+
+/* --- 11. Badge / Tag with colored glow --- */
+.tag-glow {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.tag-glow:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px -2px currentColor;
+}
+
+/* --- 12. Input focus enhancement (global, all themes) --- */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 4px oklch(0.79 0.17 70 / 0.35);
+}
+
+.dark input:focus-visible,
+.dark textarea:focus-visible,
+.dark select:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 4px oklch(0.65 0.2 215 / 0.45);
+}
+
+/* --- 13. Micro-animation: slide-in-right for drawers/panels --- */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* --- 14. Ripple click effect for interactive surfaces --- */
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.35; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+.ripple-surface {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-surface::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: currentColor;
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ripple-surface:active::after {
+  animation: ripple 0.45s ease-out forwards;
+}
+
+/* --- 15. Shimmer on hover for stat cards / data surfaces --- */
+@keyframes data-shimmer {
+  0% { opacity: 0; background-position: -100% 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; background-position: 100% 0; }
+}
+
+.stat-hover-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-hover-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, oklch(1 0 0 / 0.08) 50%, transparent 60%);
+  background-size: 200% 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+}
+
+.stat-hover-shimmer:hover::after {
+  animation: data-shimmer 0.6s ease-out forwards;
+}

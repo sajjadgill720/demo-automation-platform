@@ -13,7 +13,7 @@ import {
 import { z } from "zod";
 
 const INPUT_CLS =
-  "w-full bg-secondary border-2 border-border px-4 py-3 text-foreground focus:outline-none focus:border-primary/65 font-sans text-sm transition-all duration-200 input-glow";
+  "field-box w-full border-2 px-4 py-3 text-foreground placeholder:text-foreground/55 focus:outline-none font-sans text-sm transition-all duration-200 input-glow";
 
 const clarificationSearchSchema = z.object({
   leadId: z.string(),
@@ -234,7 +234,7 @@ function ClarificationRoute() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-4">
-      <div className="w-full max-w-5xl mx-auto glass-card gradient-border p-10 md:p-14 relative overflow-hidden text-left space-y-8 animate-fade-in transition-all rounded-2xl border-2 border-border/60 bg-card">
+      <div className="dq-form-surface w-full max-w-5xl mx-auto glass-card gradient-border p-10 md:p-14 relative overflow-hidden text-left space-y-8 animate-fade-in transition-all rounded-2xl border-2 border-border/60 bg-card">
         <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
 
         {/* Convoa AI Advisor Chat */}
@@ -398,7 +398,7 @@ function ClarificationRoute() {
                 <div className="flex justify-end animate-fade-in">
                   <div className="bg-success/15 border-2 border-success/30 text-foreground p-3.5 rounded-2xl rounded-tr-none max-w-[85%] shadow-sm">
                     <div className="text-[10px] font-sans font-bold text-success uppercase tracking-wider mb-1.5">
-                      [YOU]
+                      You
                     </div>
                     <p className="leading-relaxed font-sans text-sm md:text-base mt-1.5 text-foreground/90">
                       {optimisticAnswer}
@@ -486,7 +486,7 @@ function ClarificationRoute() {
             Skip remaining questions
           </button>
 
-          {clarificationStatus?.status === "completed" ? (
+          {clarificationStatus?.status === "completed" && (
             <button
               type="button"
               onClick={() => navigate({ to: "/pipeline", search: { leadId } })}
@@ -494,20 +494,6 @@ function ClarificationRoute() {
             >
               <span>Continue to Demo Setup</span>
               <ArrowRight className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSendClarificationAnswer}
-              disabled={isQuerying || !currentQuestionText.trim()}
-              className={cn(
-                "font-mono font-medium text-xs tracking-wider uppercase px-6 py-3 rounded-md transition-all",
-                isQuerying || !currentQuestionText.trim()
-                  ? "bg-secondary text-foreground/40 cursor-not-allowed border border-border"
-                  : "bg-primary text-primary-foreground hover:bg-primary/95 cursor-pointer border-0 active:scale-98 shadow-sm"
-              )}
-            >
-              Submit Answer →
             </button>
           )}
         </div>

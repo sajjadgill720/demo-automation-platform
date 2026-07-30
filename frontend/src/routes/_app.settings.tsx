@@ -52,8 +52,9 @@ function Settings() {
             <div className="inline-flex overflow-hidden rounded-lg border border-border/80">
               <button
                 onClick={() => theme !== "light" && toggleTheme()}
+                title="Switch to light mode"
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium cursor-pointer transition-all duration-200 rounded-l-lg hover:-translate-y-[1px] active:translate-y-0 btn-themed-shadow",
                   theme === "light"
                     ? "bg-primary text-primary-foreground"
                     : "bg-card text-muted-foreground hover:text-foreground",
@@ -63,8 +64,9 @@ function Settings() {
               </button>
               <button
                 onClick={() => theme !== "dark" && toggleTheme()}
+                title="Switch to dark mode"
                 className={cn(
-                  "flex items-center gap-1.5 border-l border-border/80 px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                  "flex items-center gap-1.5 border-l border-border/80 px-3 py-1.5 text-xs font-medium cursor-pointer transition-all duration-200 rounded-r-lg hover:-translate-y-[1px] active:translate-y-0 btn-themed-shadow",
                   theme === "dark"
                     ? "bg-primary text-primary-foreground"
                     : "bg-card text-muted-foreground hover:text-foreground",

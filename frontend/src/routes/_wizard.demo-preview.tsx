@@ -799,7 +799,7 @@ function DemoPreview() {
                       type="button"
                       onClick={() => setFeedbackRating("positive")}
                       className={cn(
-                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent",
+                        "flex items-center gap-2 rounded-xl border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent transition-all duration-200 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
                         feedbackRating === "positive"
                           ? "border-success text-success bg-success/[0.05]"
                           : "border-border text-foreground hover:bg-secondary",
@@ -811,7 +811,7 @@ function DemoPreview() {
                       type="button"
                       onClick={() => setFeedbackRating("negative")}
                       className={cn(
-                        "flex items-center gap-2 border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent",
+                        "flex items-center gap-2 rounded-xl border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent transition-all duration-200 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
                         feedbackRating === "negative"
                           ? "border-destructive text-destructive bg-destructive/[0.05]"
                           : "border-border text-foreground hover:bg-secondary",
@@ -844,7 +844,7 @@ function DemoPreview() {
                       <button
                         type="submit"
                         disabled={feedbackSending}
-                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all text-sm font-mono font-semibold uppercase tracking-wider py-3 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-200 text-sm font-mono font-semibold uppercase tracking-wider py-3 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
                       >
                         <Send className="h-3.5 w-3.5" />
                         {feedbackSending ? "Sending…" : "Send feedback"}
@@ -954,7 +954,7 @@ function DemoPreview() {
                       href="https://convoa.com/pricing/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all hover:bg-primary/90 cursor-pointer border-0 text-center select-none"
+                      className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all duration-200 hover:bg-primary/90 cursor-pointer border-0 text-center select-none btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
                     >
                       <DollarSign className="h-4 w-4" /> See Convoa Pricing
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />

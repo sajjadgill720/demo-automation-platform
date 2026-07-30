@@ -17,17 +17,22 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 def call_structured_llm(
     prompt: str,
     schema: Type[T],
-    retry_on_failure: bool = True
+    retry_on_failure: bool = True,
+    max_tokens: int = 1024,
 ) -> T:
     """Dispatches a prompt to the configured LLM provider and parses structured JSON output into schema.
-    
+
     Tries up to 2 times on transient failures (5xx, rate limits, timeouts) only.
     Validation errors are raised immediately for caller correction.
+
+    max_tokens caps the completion length. The default (1024) suits the short
+    structured extractions most callers make; longer generations — e.g. the
+    company-context prompt block — pass a higher value.
     """
     provider = os.getenv("LLM_PROVIDER", "groq").lower().strip()
-    
+
     if provider == "groq":
-        return _call_groq_structured(prompt, schema, retry_on_failure)
+        return _call_groq_structured(prompt, schema, retry_on_failure, max_tokens)
     elif provider == "other_provider":
         # Confirm exact API endpoint, auth header format, and request/response shape before implementing — do not guess.
         raise NotImplementedError(
@@ -37,7 +42,9 @@ def call_structured_llm(
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
 
-def _call_groq_structured(prompt: str, schema: Type[T], retry_on_failure: bool) -> T:
+def _call_groq_structured(
+    prompt: str, schema: Type[T], retry_on_failure: bool, max_tokens: int = 1024
+) -> T:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is not set.")
@@ -54,7 +61,7 @@ def _call_groq_structured(prompt: str, schema: Type[T], retry_on_failure: bool) 
         "messages": messages,
         "response_format": {"type": "json_object"},
         "temperature": 0.1,
-        "max_tokens": 1024,
+        "max_tokens": max_tokens,
     }).encode("utf-8")
 
     req = urllib.request.Request(

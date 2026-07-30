@@ -17,13 +17,27 @@ HOW IT WORKS
   * HTML comments (like this one) are stripped at render time. They are for the
     humans editing this file and never reach the model.
 
-HOW TO EDIT THIS FILE SAFELY
-  * An LLM never writes any part of this file, and never writes any part of the
-    rendered output. Composition is pure conditional assembly plus variable
-    substitution. That is what keeps a lead's uploaded document from being able
-    to redefine how the agent behaves — please do not relax this.
+HYBRID COMPOSITION — WHICH SECTIONS AN LLM MAY WRITE
+  * The CONVERSATION-BEHAVIOUR sections — opening_and_purpose,
+    patience_and_turn_taking, general_role_and_tone,
+    follow_up_and_clarification_rules, restrictions, closing_behavior — are NEVER
+    written by an LLM. They are this vetted template text, rendered by pure
+    conditional assembly plus variable substitution. That is what keeps a lead's
+    uploaded document or chat answers from redefining how the agent behaves. Do
+    not relax this: these sections must stay deterministic.
+  * The COMPANY-SPECIFIC sections — business_context,
+    primary_purpose_and_scenarios, escalation_rules, customization_notes (see
+    COMPANY_SECTIONS in agents.py) — are normally REPLACED at render time by a
+    single block that an LLM writes in app/prompt_generator.py, from the intake
+    form, the clarification Q&A, the extracted profile and the document brief. The
+    deterministic versions below are the FALLBACK used when generation fails, and
+    they still work standalone. Because the behaviour sections above bracket the
+    generated block (restrictions included, since it is emitted second-to-last),
+    nothing the LLM writes can override how the agent behaves.
   * If you add a SECTION here you must also add it to SECTION_ORDER in agents.py,
-    otherwise it will simply never be emitted.
+    otherwise it will simply never be emitted. If the new section is
+    company-specific and should be covered by the generated block, also add it to
+    COMPANY_SECTIONS.
   * Write prose and explicit rules, not vague qualities. These sections are read
     by a voice model improvising in real time: "wait two seconds before replying"
     is actionable, "be patient" is not.

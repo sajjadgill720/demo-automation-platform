@@ -129,7 +129,7 @@ function PortalGate() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary text-primary-foreground hover:bg-primary hover:shadow-lg transition-all rounded-lg py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 font-sans border-0 active:scale-98"
+            className="w-full bg-primary text-primary-foreground transition-all duration-200 rounded-lg py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 font-sans border-0 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
             {loading ? (
               "Verifying..."

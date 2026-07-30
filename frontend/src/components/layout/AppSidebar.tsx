@@ -75,8 +75,9 @@ export function AppSidebar() {
           </div>
           <button
             onClick={toggleTheme}
-            className="p-1.5 rounded-lg border border-sidebar-border bg-sidebar hover:bg-sidebar-accent hover:text-primary text-sidebar-foreground transition-colors cursor-pointer shrink-0"
-            aria-label="Toggle Theme"
+            className="p-1.5 rounded-lg border border-sidebar-border bg-sidebar hover:bg-sidebar-accent hover:text-primary text-sidebar-foreground transition-all duration-200 cursor-pointer shrink-0 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0 active:scale-[0.95]"
+            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
           >
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </button>

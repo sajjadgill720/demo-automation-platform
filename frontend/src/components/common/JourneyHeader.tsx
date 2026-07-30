@@ -42,7 +42,7 @@ export function JourneyHeader() {
       aria-label="Progress"
       className="w-full border-b border-border/60 bg-background/80 backdrop-blur-sm z-50 sticky top-0"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between min-h-[64px] gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between min-h-[76px] gap-4">
         {/* Left Side: Logo */}
         <Link to="/" className="flex items-center gap-2 text-foreground font-mono font-bold tracking-widest text-[11px] uppercase group shrink-0">
           <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold text-[10px] group-hover:bg-primary/15 transition-colors">
@@ -59,7 +59,7 @@ export function JourneyHeader() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <current.icon className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
-                <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground truncate">
+                <span className="text-xs font-mono font-extrabold uppercase tracking-wider text-foreground truncate">
                   {current.label}
                 </span>
               </div>
@@ -93,7 +93,7 @@ export function JourneyHeader() {
                     <span
                       aria-hidden="true"
                       className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-full border transition-colors shrink-0",
+                        "flex h-9 w-9 items-center justify-center rounded-full border transition-colors shrink-0",
                         state === "done" && "border-primary bg-primary text-primary-foreground",
                         state === "active" &&
                           "border-primary bg-primary/10 text-primary shadow-sm shadow-primary/20",
@@ -101,26 +101,25 @@ export function JourneyHeader() {
                       )}
                     >
                       {state === "done" ? (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-[18px] w-[18px]" />
                       ) : (
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-[18px] w-[18px]" />
                       )}
                     </span>
                     <span
                       className={cn(
                         "hidden md:flex flex-col leading-tight",
-                        state === "upcoming" ? "text-foreground/40" : "text-foreground/85",
-                        state === "active" && "text-primary",
+                        state === "active" ? "text-primary" : "text-foreground",
                       )}
                     >
                       <span
                         aria-current={state === "active" ? "step" : undefined}
-                        className="text-[10px] font-mono font-bold uppercase tracking-wider"
+                        className="text-[11px] font-mono font-extrabold uppercase tracking-wider"
                       >
                         {step.label}
                       </span>
                       {"optional" in step && step.optional && (
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-foreground/40">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-foreground/60">
                           Optional
                         </span>
                       )}

@@ -20,7 +20,6 @@ import {
   Play,
   MessageSquare,
   Headphones,
-  Bot,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
@@ -319,6 +318,312 @@ function AnimatedStat({ value, label }: { value: string; label: string }) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Animated Demo Portal — Mock preview of the dashboard & agent
+   ───────────────────────────────────────────────────────────── */
+
+const RIBBON_PATHS: { d: string; opacity: number }[] = (() => {
+  const smoothClosedPath = (pts: number[][]): string => {
+    const n = pts.length;
+    let d = `M${pts[0][0].toFixed(2)} ${pts[0][1].toFixed(2)}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n];
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % n];
+      const p3 = pts[(i + 2) % n];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += `C${c1x.toFixed(2)} ${c1y.toFixed(2)} ${c2x.toFixed(2)} ${c2y.toFixed(2)} ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+    }
+    return d + "Z";
+  };
+
+  const rings = 12;
+  const points = 100;
+  return Array.from({ length: rings }, (_, i) => {
+    const radius = 15 + i * 4.5;
+    const phase = i * 0.22;
+    const pts: number[][] = [];
+    for (let k = 0; k < points; k++) {
+      const a = (k / points) * Math.PI * 2;
+      const r =
+        radius *
+        (1 + 0.12 * Math.sin(3 * a + phase) + 0.05 * Math.sin(5 * a - phase * 1.5));
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    return {
+      d: smoothClosedPath(pts),
+      opacity: +(0.15 + (i / rings) * 0.55).toFixed(3),
+    };
+  });
+})();
+
+function EclipseRibbon({
+  className,
+  gradientId,
+  rotate,
+  duration,
+  strokeWidth = 0.8,
+  glow = false,
+}: {
+  className: string;
+  gradientId: string;
+  rotate: number;
+  duration: number;
+  strokeWidth?: number;
+  glow?: boolean;
+}) {
+  return (
+    <motion.svg
+      viewBox="-100 -100 200 200"
+      className={cn("pointer-events-none", className)}
+      animate={{ rotate }}
+      transition={{ duration, repeat: Infinity, ease: "linear" }}
+      style={glow ? { filter: "drop-shadow(0 0 8px var(--color-primary))" } : undefined}
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="var(--color-primary)" />
+          <stop offset="100%" stopColor="oklch(0.62 0.19 149)" />
+        </linearGradient>
+      </defs>
+      <g fill="none" stroke={`url(#${gradientId})`} strokeWidth={strokeWidth}>
+        {RIBBON_PATHS.map((p, i) => (
+          <path key={i} d={p.d} opacity={p.opacity} />
+        ))}
+      </g>
+    </motion.svg>
+  );
+}
+
+function AnimatedDemoPortal() {
+  const [currentLine, setCurrentLine] = useState(0);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "logs">("dashboard");
+  const [callDuration, setCallDuration] = useState(12);
+
+  // Auto-increment timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCallDuration((prev) => (prev < 99 ? prev + 1 : 12));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const dialog = [
+    { speaker: "ai", text: "Convoa Dispatch. Let's get that delivery scheduled." },
+    { speaker: "caller", text: "Hi, I need a carrier for a dry van load from Chicago to Atlanta." },
+    { speaker: "ai", text: "I can search Descartes. Does this load pickup tomorrow?" },
+    { speaker: "caller", text: "Yes, tomorrow morning works." },
+    { speaker: "ai", text: "Perfect. Searching carrier rates... Okay, booked! Salesforce lead #4819 updated." }
+  ];
+
+  // Loop conversation transcript
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentLine((prev) => (prev + 1) % (dialog.length + 2));
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="relative w-full max-w-[480px] aspect-[1.3] bg-[#070a13] border border-border/40 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans text-left text-xs select-none">
+      {/* Browser Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#0d1324] border-b border-border/30 shrink-0">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
+          <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
+          <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
+        </div>
+        <div className="bg-[#121a30] px-4 py-0.5 rounded text-[9px] font-mono text-foreground/45 border border-border/10 w-1/2 text-center truncate">
+          convoa.ai/demo/abc-logistics
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+          <span className="text-[8px] font-mono text-success uppercase tracking-widest hidden sm:inline">LIVE PORTAL</span>
+        </div>
+      </div>
+
+      {/* Main Split Layout */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-[100px] sm:w-[125px] bg-[#090f1d] border-r border-border/20 p-2.5 flex flex-col gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 text-foreground font-semibold text-[9px] uppercase tracking-wider font-mono">
+            <Headphones className="h-3 w-3 text-primary" />
+            <span>Convoa</span>
+          </div>
+          <nav className="flex flex-col gap-1 text-[9px] font-mono uppercase tracking-wider text-foreground/45">
+            <button
+              onClick={() => setActiveTab("dashboard")}
+              className={cn(
+                "flex items-center gap-1.5 p-1 rounded transition-all text-left border-0 cursor-pointer text-[9px]",
+                activeTab === "dashboard" ? "bg-primary/10 text-primary font-bold" : "hover:bg-[#121a30]"
+              )}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              <span>Dashboard</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("logs")}
+              className={cn(
+                "flex items-center gap-1.5 p-1 rounded transition-all text-left border-0 cursor-pointer text-[9px]",
+                activeTab === "logs" ? "bg-primary/10 text-primary font-bold" : "hover:bg-[#121a30]"
+              )}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              <span>Call Logs</span>
+            </button>
+          </nav>
+          
+          <div className="mt-auto border border-border/20 rounded bg-[#101726]/40 p-1.5 text-[8px] font-mono">
+            <div className="flex items-center justify-between text-foreground/45 mb-1">
+              <span>Agent ID</span>
+              <span className="text-primary font-bold">abc-log</span>
+            </div>
+            <div className="w-full bg-[#1b263b] h-0.5 rounded-full overflow-hidden">
+              <div className="bg-primary h-full w-[85%]" />
+            </div>
+          </div>
+        </div>
+
+        {/* Dashboard Area */}
+        <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-[#070a13] scrollbar-hide flex flex-col justify-between">
+          {activeTab === "dashboard" ? (
+            <>
+              {/* Header Title */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-foreground text-xs leading-tight">ABC Logistics Dispatch</h4>
+                  <p className="text-[9px] text-foreground/40 font-mono">Voice Agent + API Integration Enabled</p>
+                </div>
+                <div className="px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[8px] font-mono text-primary font-bold uppercase tracking-wider scale-90">
+                  Active
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="bg-[#0b1222] border border-border/30 p-1.5 rounded">
+                  <p className="text-[8px] font-mono text-foreground/40 uppercase">Active Call</p>
+                  <p className="text-xs font-mono font-bold text-foreground mt-0.5">00:{String(callDuration).padStart(2, '0')}</p>
+                </div>
+                <div className="bg-[#0b1222] border border-border/30 p-1.5 rounded">
+                  <p className="text-[8px] font-mono text-foreground/40 uppercase">Sync Status</p>
+                  <p className="text-xs font-mono font-bold text-success mt-0.5 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> Active
+                  </p>
+                </div>
+              </div>
+
+              {/* Two Panel Layout */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 mt-1">
+                {/* Voice Orb Area */}
+                <div className="bg-[#0b1222] border border-border/30 p-2.5 rounded flex flex-col items-center justify-center min-h-[90px] relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center scale-75">
+                    <EclipseRibbon
+                      className="w-full h-full max-w-[80px] max-h-[80px] opacity-40"
+                      gradientId="orbFaint"
+                      rotate={-360}
+                      duration={30}
+                      strokeWidth={0.6}
+                    />
+                    <EclipseRibbon
+                      className="absolute w-full h-full max-w-[65px] max-h-[65px]"
+                      gradientId="orbMain"
+                      rotate={360}
+                      duration={15}
+                      strokeWidth={0.8}
+                      glow
+                    />
+                  </div>
+                  <div className="relative z-10 flex flex-col items-center mt-auto">
+                    <div className="flex items-center gap-0.5 h-3 mb-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="w-0.5 bg-primary rounded-full"
+                          initial={{ height: 3 }}
+                          animate={{ height: [3, 12, 3] }}
+                          transition={{
+                            duration: 0.5 + (i % 3) * 0.15,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-[8px] font-mono text-primary/80 tracking-widest uppercase">AI Speaking</span>
+                  </div>
+                </div>
+
+                {/* Simulated Logs / Actions */}
+                <div className="bg-[#0b1222] border border-border/30 p-2 rounded flex flex-col justify-between min-h-[90px] text-[8px] font-mono text-foreground/50">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between border-b border-border/10 pb-0.5">
+                      <span className="font-semibold text-foreground/70">INTEGRATIONS LOG</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1 text-[8px] text-foreground/80 leading-normal">
+                        <span className="h-1 w-1 bg-success rounded-full" />
+                        <span className="truncate">Descartes API... OK</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[8px] text-foreground/80 leading-normal">
+                        <span className="h-1 w-1 bg-success rounded-full" />
+                        <span className="truncate">Trimble Route... OK</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[8px] text-foreground/80 leading-normal">
+                        <span className="h-1 w-1 bg-success rounded-full" />
+                        <span className="truncate">Salesforce Dispatch... OK</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border border-primary/20 bg-primary/[0.03] p-1 rounded flex items-center justify-between text-[7px] text-primary">
+                    <span>Actions Sync: 3</span>
+                    <span className="font-bold">LIVE-SYNC</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Call Logs / Transcript simulator */
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex items-center justify-between border-b border-border/20 pb-1.5">
+                <h4 className="font-semibold text-foreground text-xs leading-none">Call Logs & Transcript</h4>
+                <span className="text-[8px] font-mono text-foreground/40">ID: c_84a1bc2e</span>
+              </div>
+              <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[140px] py-1.5 pr-0.5 scrollbar-hide">
+                {dialog.slice(0, Math.min(currentLine + 1, dialog.length)).map((line, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={cn(
+                      "flex",
+                      line.speaker === "ai" ? "justify-start" : "justify-end"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-[85%] px-2 py-1 text-[10px] leading-relaxed rounded-xl",
+                        line.speaker === "ai"
+                          ? "bg-primary/10 text-foreground border border-primary/25 rounded-bl-sm"
+                          : "bg-secondary text-foreground/80 rounded-br-sm"
+                      )}
+                    >
+                      {line.text}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/")(  {
   head: () => ({
@@ -424,14 +729,15 @@ function LandingPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg border border-border/50 hover:bg-secondary text-foreground transition-colors cursor-pointer bg-transparent"
+              className="p-2 rounded-lg border border-border/50 hover:bg-secondary text-foreground transition-all duration-200 cursor-pointer bg-transparent btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0 active:scale-[0.95]"
               aria-label="Toggle Theme"
+              title="Toggle theme"
             >
               {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </button>
             <Link
               to="/build-demo"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-mono font-medium text-xs tracking-wider uppercase px-5 py-2.5 cursor-pointer border-0 inline-flex items-center gap-2 rounded-lg shadow-lg shadow-primary/10"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 font-mono font-medium text-xs tracking-wider uppercase px-5 py-2.5 cursor-pointer border-0 inline-flex items-center gap-2 rounded-xl shadow-lg shadow-primary/10 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
             >
               Get My Demo
               <ArrowRight className="h-3.5 w-3.5" />
@@ -461,13 +767,6 @@ function LandingPage() {
             animate="visible"
             className="space-y-8 text-center lg:text-left"
           >
-            <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/5">
-              <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-              <span className="text-[11px] font-mono text-primary font-medium uppercase tracking-widest">
-                Live AI Receptionist
-              </span>
-            </motion.div>
-
             <motion.h1
               variants={itemVariants}
               className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-normal tracking-tight leading-[1.08] gradient-text hero-text-shadow"
@@ -487,14 +786,14 @@ function LandingPage() {
             <motion.div variants={itemVariants} className="flex items-center gap-4 flex-wrap justify-center lg:justify-start">
               <Link
                 to="/build-demo"
-                className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 transition-all px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer border-0 rounded-lg shadow-xl shadow-primary/15"
+                className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer border-0 rounded-2xl shadow-xl shadow-primary/15 btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]"
               >
                 Build My Demo
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="/demo-preview"
-                className="frosted-badge px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer transition-all group rounded-lg"
+                className="frosted-badge px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer transition-all duration-200 group rounded-2xl btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]"
               >
                 <Play className="h-4 w-4 text-primary fill-primary/20 group-hover:scale-110 transition-transform" />
                 Watch Demo
@@ -614,38 +913,29 @@ function LandingPage() {
             {[
               {
                 step: "01",
-                icon: MessageSquare,
                 title: "Describe Your Business",
                 desc: "Tell us what you do, who calls you, and how you handle bookings. 60 seconds.",
                 color: "text-blue-500",
-                borderColor: "border-blue-500/30",
-                bg: "from-blue-500/20 to-blue-500/5",
               },
               {
                 step: "02",
-                icon: Bot,
                 title: "AI Builds Your Agent",
                 desc: "We train a voice agent on your docs, FAQs, and business rules — automatically.",
                 color: "text-primary",
-                borderColor: "border-primary/30",
-                bg: "from-primary/20 to-primary/5",
               },
               {
                 step: "03",
-                icon: Headphones,
                 title: "Test It Live",
                 desc: "Call your AI receptionist. Hear it answer like your best employee — on day one.",
                 color: "text-success",
-                borderColor: "border-success/30",
-                bg: "from-success/20 to-success/5",
               },
             ].map((step, idx) => (
               <motion.div
                 key={step.step}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: idx * 0.15 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.55, delay: idx * 0.45, ease: "easeOut" }}
                 className={cn(
                   "relative p-10 border border-border/40 bg-background",
                   idx < 2 && "md:border-r-0"
@@ -655,11 +945,6 @@ function LandingPage() {
                 <span className={cn("text-[10px] font-mono font-bold uppercase tracking-widest mb-6 block", step.color)}>
                   Step {step.step}
                 </span>
-
-                {/* Icon */}
-                <div className={cn("h-14 w-14 rounded-xl bg-gradient-to-br border flex items-center justify-center mb-5", step.bg, step.borderColor, step.color)}>
-                  <step.icon className="h-6 w-6" />
-                </div>
 
                 <h3 className="text-lg font-semibold text-foreground tracking-tight mb-2">{step.title}</h3>
                 <p className="text-sm text-foreground/50 leading-relaxed font-sans">{step.desc}</p>
@@ -703,31 +988,43 @@ function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="border border-border/50 bg-card/50 rounded-xl p-10 relative overflow-hidden"
+            className="border border-border/50 bg-card/40 backdrop-blur-md rounded-2xl p-6 sm:p-8 lg:p-10 relative overflow-hidden max-w-5xl mx-auto"
           >
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+            {/* Top border ambient glow */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
             
-            <div className="flex flex-col items-center gap-6">
-              <div className="relative">
-                <div className="absolute inset-0 bg-primary/10 blur-[30px] rounded-full" />
-                <div className="relative h-16 w-16 rounded-xl bg-gradient-to-br from-primary/15 to-primary/10 border border-primary/25 flex items-center justify-center">
-                  <Sparkles className="h-7 w-7 text-primary" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+              {/* Left Side: CTA Focus */}
+              <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-primary/20 bg-primary/5 text-[10px] font-semibold text-primary uppercase tracking-widest font-mono">
+                    <Sparkles className="h-3 w-3 text-primary animate-pulse" /> Live Experience
+                  </div>
+                  <h3 className="text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
+                    Interactive Demo Portal
+                  </h3>
+                  <p className="text-sm text-foreground/50 leading-relaxed font-sans">
+                    Voice agent + dashboard — fully personalized. Call the agent, ask questions, and see database metrics update in real-time.
+                  </p>
                 </div>
-                <span className="absolute -top-1 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/15 border border-success/30 text-success text-[8px] font-mono font-bold uppercase tracking-wider">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                  Live
-                </span>
+
+                <div className="relative group w-full sm:w-auto">
+                  {/* Glowing background aura */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-primary to-amber-500 rounded-lg blur-lg opacity-70 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse" />
+                  
+                  <Link
+                    to="/demo-preview"
+                    className="relative w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4.5 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all border-0 font-mono rounded-lg shadow-xl cursor-pointer"
+                  >
+                    <Play className="h-4 w-4 fill-current" /> View Sample Demo
+                  </Link>
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-foreground font-medium text-lg">Interactive Demo Portal</p>
-                <p className="text-sm text-foreground/40 font-mono">Voice agent + dashboard — fully personalized</p>
+
+              {/* Right Side: Animated Mockup */}
+              <div className="lg:col-span-7 flex justify-center w-full">
+                <AnimatedDemoPortal />
               </div>
-              <a
-                href="/demo-preview"
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 text-xs font-semibold uppercase tracking-wider hover:bg-primary/90 transition-all border-0 font-mono rounded-lg shadow-lg shadow-primary/10"
-              >
-                <Play className="h-3.5 w-3.5" /> View Sample Demo
-              </a>
             </div>
           </motion.div>
         </div>
@@ -765,7 +1062,7 @@ function LandingPage() {
           >
             <Link
               to="/build-demo"
-              className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 transition-all px-12 py-5 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-3 cursor-pointer border-0 rounded-lg shadow-xl shadow-primary/15"
+              className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 px-12 py-5 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-3 cursor-pointer border-0 rounded-2xl shadow-xl shadow-primary/15 btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]"
             >
               Build My AI Receptionist
               <ArrowRight className="h-4 w-4" />

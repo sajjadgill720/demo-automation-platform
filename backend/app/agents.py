@@ -83,7 +83,7 @@ def _call_vapi_create_assistant(
     prompt: str,
     file_id: Optional[str] = None,
     first_message: Optional[str] = None,
-    voice_id: str = "Emma",
+    voice_id: str = "Naina",
 ) -> str:
     """Creates a Vapi assistant using the API.
 
@@ -203,6 +203,19 @@ SECTION_ORDER = [
     "closing_behavior",
 ]
 
+# The company-specific sections. In HYBRID mode these are replaced wholesale by a
+# single LLM-generated block (see compile_lead_prompt's company_context_block
+# argument and app/prompt_generator.py). Everything NOT in this set is
+# conversation-behaviour template text that no LLM ever writes, so it always
+# brackets the generated block — restrictions included — and behaviour can never
+# be redefined by the generated content.
+COMPANY_SECTIONS = {
+    "business_context",
+    "primary_purpose_and_scenarios",
+    "escalation_rules",
+    "customization_notes",
+}
+
 _SECTION_RE = re.compile(
     r"<!--\s*SECTION:\s*(?P<name>[a-z_]+)\s*-->(?P<body>.*?)<!--\s*/SECTION\s*-->",
     re.DOTALL,
@@ -263,10 +276,31 @@ def compile_lead_prompt(
     industry: str,
     profile: Optional[Union[dict, Any]] = None,
     business_brief: str = "",
+    company_context_block: Optional[str] = None,
 ) -> str:
     """Assembles the Vapi system prompt from vetted template sections.
 
-    Deterministic: same inputs always produce the same output. No LLM involved.
+    HYBRID COMPOSITION
+    ------------------
+    The conversation-behaviour sections (opening, patience/turn-taking, tone,
+    follow-ups, restrictions, closing) are ALWAYS vetted template text rendered by
+    pure string substitution — no LLM writes them, ever. They are what keeps agent
+    behaviour reviewable and stops lead-supplied text from redefining it.
+
+    The company-specific sections (business context, scenarios, escalation,
+    specific requests — see COMPANY_SECTIONS) are produced one of two ways:
+
+      * company_context_block is provided (the normal path): the block was written
+        by the LLM in app/prompt_generator.py from the intake form, the full
+        clarification Q&A, the extracted profile and the document brief. It is
+        emitted verbatim in place of the four deterministic company sections, at
+        the position of the first company section in SECTION_ORDER. The behaviour
+        sections still bracket it, restrictions included, so nothing in the block
+        can override how the agent behaves.
+      * company_context_block is None/empty (the fallback path): the four company
+        sections are rendered deterministically from the profile + scenario
+        library exactly as before, so a generation failure still yields a complete,
+        correct prompt.
 
     Sections are emitted only when they have real content, so a lead with two
     profile fields gets a shorter complete prompt rather than a full-length one
@@ -438,8 +472,20 @@ def compile_lead_prompt(
         "closing_behavior": True,
     }
 
+    hybrid_block = (company_context_block or "").strip()
+    company_block_emitted = False
+
     parts = []
     for name in SECTION_ORDER:
+        # Hybrid path: the four company sections are collapsed into the single
+        # LLM-generated block, emitted once at the position of the first company
+        # section reached, and the deterministic company rendering is skipped.
+        if hybrid_block and name in COMPANY_SECTIONS:
+            if not company_block_emitted:
+                parts.append(hybrid_block)
+                company_block_emitted = True
+            continue
+
         if not has_content.get(name):
             continue
         body = sections.get(name)
@@ -454,9 +500,9 @@ def compile_lead_prompt(
 
 
 #: Vapi built-in voices offered to the client. Male maps to Elliot per product
-#: decision; female keeps Emma, which was the previous hardcoded default.
-VOICE_IDS = {"male": "Elliot", "female": "Emma"}
-DEFAULT_VOICE = "Emma"
+#: decision; female uses Naina.
+VOICE_IDS = {"male": "Elliot", "female": "Naina"}
+DEFAULT_VOICE = "Naina"
 
 
 def resolve_voice_id(voice_gender: Optional[str]) -> str:
@@ -606,13 +652,55 @@ def provision_vapi_assistant_task(lead_id: str):
                         }},
                     )
 
-            # ── Stage 2: assemble the prompt (deterministic, no LLM) ──────────
+            # ── Stage 2: assemble the prompt (hybrid: template + LLM block) ───
+            # The LLM writes only the company-specific block from everything we
+            # gathered; the behaviour sections stay vetted template text and
+            # bracket it. On any generation failure the block is "" and
+            # compile_lead_prompt falls back to deterministic company sections,
+            # so provisioning never breaks on a degraded generator.
             _set_stage(session, lead, AgentStatus.building_profile, logger)
+
+            from app.models import ClarificationMessage
+            from app.prompt_generator import generate_company_context_block
+
+            msg_stmt = (
+                select(ClarificationMessage)
+                .where(ClarificationMessage.lead_id == db_lead_id)
+                .order_by(ClarificationMessage.created_at.asc())
+            )
+            clar_msgs = session.exec(msg_stmt).all()
+            conversation_history = [
+                {"role": m.role.value, "content": m.content} for m in clar_msgs
+            ]
+
+            library = lookup_industry(lead.industry)
+            company_context_block = generate_company_context_block(
+                lead.company_name,
+                lead.industry,
+                profile_data,
+                business_brief=business_brief,
+                conversation_history=conversation_history,
+                library=library,
+                voice_gender=getattr(lead, "voice_gender", None),
+                lead_id=str(lead_id),
+            )
+            if company_context_block:
+                logger.info(
+                    "Company context block generated by LLM",
+                    extra={"extra_data": {"lead_id": lead_id, "block_chars": len(company_context_block)}},
+                )
+            else:
+                logger.warning(
+                    "Company context block empty — falling back to deterministic company sections",
+                    extra={"extra_data": {"lead_id": lead_id}},
+                )
+
             rendered_prompt = compile_lead_prompt(
                 lead.company_name,
                 lead.industry,
                 profile_data,
                 business_brief=business_brief,
+                company_context_block=company_context_block,
             )
             lead.rendered_prompt = rendered_prompt
 

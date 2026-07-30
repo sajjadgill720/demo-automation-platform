@@ -34,29 +34,77 @@ logger = logging.getLogger("app.clarification")
 # ── Pydantic Models for Ingestion ──
 
 class CompanyProfile(BaseModel):
+    """The richer business profile the interview works to fill.
+
+    Deliberately broader than the original five fields. A demo agent has to stay
+    correct for a real business for a year or more, and the details that make that
+    true — what they actually sell, their hours and seasonality, who handles what,
+    what may and may not be quoted, what to capture on every call — are exactly the
+    ones a five-field form never captured. Every field is optional in practice:
+    the interview fills what it can and the prompt generator handles the rest.
+    """
     primary_problem: str = Field(
         description="the pain point or gap that led them to look for a solution and we tell them that Convoa is tailor-made for them"
     )
-    current_workflow_summary: str = Field(
-        description="how calls/inquiries are handled today (from SOP text if documents were uploaded, otherwise from what the user describes in chat)"
+    services_and_offerings: str = Field(
+        default="UNKNOWN",
+        description="what the business actually sells or does — its service lines, products, or specialities"
     )
     must_handle_scenarios: List[str] = Field(
         default_factory=list,
         description="specific call types/situations the agent needs to handle correctly"
     )
+    current_workflow_summary: str = Field(
+        description="how calls/inquiries are handled today (from SOP text if documents were uploaded, otherwise from what the user describes in chat)"
+    )
+    hours_and_availability: str = Field(
+        default="UNKNOWN",
+        description="operating hours, after-hours handling, and any seasonal or peak-period patterns"
+    )
     escalation_preferences: str = Field(
         description="when/how they want a call handed to a human"
     )
+    data_to_capture: str = Field(
+        default="UNKNOWN",
+        description="what the agent must collect from every caller (name, callback number, account/order number, address) and where that information should land"
+    )
+    key_people_and_roles: str = Field(
+        default="UNKNOWN",
+        description="who handles what at the business — named people or roles the agent may route to or reference"
+    )
+    pricing_and_quote_policy: str = Field(
+        default="UNKNOWN",
+        description="what pricing or fees the agent may state, and what it must never quote or promise"
+    )
+    top_caller_questions: str = Field(
+        default="UNKNOWN",
+        description="the questions callers ask most often and the correct answers the agent should give"
+    )
+    service_area_and_locations: str = Field(
+        default="UNKNOWN",
+        description="where the business operates — locations, branches, or the geographic area it serves"
+    )
     desired_customizations: str = Field(
-        description="tone, restrictions, specific behavior requested"
+        description="tone, restrictions, brand voice, and specific behavior requested — including anything the agent must never say or promise"
     )
 
+# Ordered by how much each gap changes agent behaviour on a real call, so the
+# interview spends its early questions on the highest-value unknowns. The
+# original five names are preserved so the deterministic fallback in agents.py
+# and existing tests keep working; the rest feed the LLM prompt generator.
 PROFILE_FIELDS = [
     "primary_problem",
-    "current_workflow_summary",
+    "services_and_offerings",
     "must_handle_scenarios",
+    "current_workflow_summary",
+    "hours_and_availability",
     "escalation_preferences",
-    "desired_customizations"
+    "data_to_capture",
+    "key_people_and_roles",
+    "pricing_and_quote_policy",
+    "top_caller_questions",
+    "service_area_and_locations",
+    "desired_customizations",
 ]
 
 
@@ -127,14 +175,22 @@ Clarification Conversation History:
 
 Your task is to analyze the stated problem, the documents and the conversation history to extract a structured profile for this company.
 Treat the stated problem above as an authoritative description of their primary_problem unless the documents or conversation clearly refine or contradict it.
-Each field in the returned JSON object must be a flat value:
-- primary_problem: a plain string/text description of the main pain point (NOT a nested JSON object).
-- current_workflow_summary: a plain string/text description of how calls are handled today (NOT a nested JSON object).
-- must_handle_scenarios: a flat list of strings, each string representing a call type/situation (NOT a list of objects).
-- escalation_preferences: a plain string/text description of when/how they want a call handed to a human (NOT a nested JSON object).
-- desired_customizations: a plain string/text description of tone, restrictions, specific behavior requested (NOT a nested JSON object).
+Each field in the returned JSON object must be a flat value (a plain string, except must_handle_scenarios which is a flat list of strings — never nested objects):
+- primary_problem: the main pain point that led them to Convoa.
+- services_and_offerings: what the business actually sells or does — its service lines, products, or specialities.
+- must_handle_scenarios: a flat list of strings, each a call type/situation the agent must handle correctly.
+- current_workflow_summary: how calls are handled today.
+- hours_and_availability: operating hours, after-hours handling, and any seasonal or peak patterns.
+- escalation_preferences: when/how they want a call handed to a human.
+- data_to_capture: what to collect from every caller and where that information should land.
+- key_people_and_roles: who handles what — named people or roles the agent may route to or reference.
+- pricing_and_quote_policy: what pricing/fees the agent may state, and what it must never quote or promise.
+- top_caller_questions: the questions callers ask most, with the correct answers.
+- service_area_and_locations: where the business operates — locations, branches, or the area served.
+- desired_customizations: tone, restrictions, brand voice, and anything the agent must never say or promise.
 
 For any field, if you find information in either the documents or the conversation history, extract it. If a field has information from both, prefer the more recent details from the conversation history.
+Only extract what is actually stated or clearly implied — never invent hours, prices, names, or locations that do not appear in the inputs.
 If a field is still completely unknown, set it to "UNKNOWN" (or empty list [] for must_handle_scenarios).
 
 Return your response as a valid JSON object matching the requested schema.
@@ -247,11 +303,14 @@ Example of a well-formed response:
 # High-value scoping areas the advisor can draw from — deliberately broader than the five
 # structured profile fields, so the interview isn't just those five reworded. The question
 # writer is told to pick whatever is most valuable and still unknown, or invent its own.
-TOPIC_MENU = """- Who exactly an urgent call should reach (name/role), how to reach them, and what counts as "urgent" to this business
-- Operating hours, and how after-hours handling should differ from during-hours
+TOPIC_MENU = """- What the business actually sells or does — the specific services, products, or specialities a caller might ask for by name
+- Who exactly an urgent call should reach (name/role), how to reach them, and what counts as "urgent" to this business
+- Operating hours, how after-hours handling should differ, and any seasonal or peak periods that change how calls should be handled
+- Where the business operates — locations, branches, or the geographic area it serves
+- What pricing, fees, or figures the agent is allowed to quote, versus what it must never state or promise
 - The details to capture from every caller before they hang up (name spelling, callback number, account/order/tracking number, address)
 - Booking / scheduling / dispatch specifics: what gets scheduled and into which system or calendar
-- The one or two questions callers ask most that the agent must answer correctly
+- The one or two questions callers ask most that the agent must answer correctly, and the correct answer
 - Where captured information must land (CRM, calendar, a dispatch board, a specific person's phone)
 - Tone and boundaries: how it should sound, and anything it must never say or promise
 - Anything unusual about THIS business that a generic receptionist would get wrong"""
@@ -260,9 +319,16 @@ TOPIC_MENU = """- Who exactly an urgent call should reach (name/role), how to re
 # question toward a still-missing profile gap without sounding like a form.
 _FIELD_FOCUS = {
     "primary_problem": "the core problem they came to solve",
-    "current_workflow_summary": "how their calls are handled today",
+    "services_and_offerings": "what the business actually sells or does",
     "must_handle_scenarios": "the specific call types the agent must get right",
+    "current_workflow_summary": "how their calls are handled today",
+    "hours_and_availability": "their hours, after-hours handling, and any seasonal peaks",
     "escalation_preferences": "when a call should be escalated, and to whom",
+    "data_to_capture": "what to get off every caller, and where it should land",
+    "key_people_and_roles": "who handles what, and who the agent can route to",
+    "pricing_and_quote_policy": "what the agent may quote versus never promise",
+    "top_caller_questions": "the questions callers ask most, and the right answers",
+    "service_area_and_locations": "where they operate and the area they serve",
     "desired_customizations": "how they want the agent to sound or behave",
 }
 
@@ -577,12 +643,26 @@ def detect_gaps_node(state: ClarificationState) -> ClarificationState:
 _FALLBACK_QUESTIONS = {
     "primary_problem":
         "What's the main thing going wrong with your calls at the moment?",
-    "current_workflow_summary":
-        "How are your calls handled today — who picks up, and what happens after hours?",
+    "services_and_offerings":
+        "What are the main things people call you about — the services or products they ask for by name?",
     "must_handle_scenarios":
         "What kinds of calls do you most need this to handle well?",
+    "current_workflow_summary":
+        "How are your calls handled today — who picks up, and what happens after hours?",
+    "hours_and_availability":
+        "What are your hours, and does anything change on evenings, weekends, or busy seasons?",
     "escalation_preferences":
         "When a call needs a human, what should happen — transfer it, text you, or take a message?",
+    "data_to_capture":
+        "What do you need us to get off every caller before they hang up?",
+    "key_people_and_roles":
+        "Who handles what on your side — is there someone specific we'd route certain calls to?",
+    "pricing_and_quote_policy":
+        "Is there any pricing we're allowed to give out on a call, or should we never quote figures?",
+    "top_caller_questions":
+        "What's the one question callers ask most that we'd need to answer correctly?",
+    "service_area_and_locations":
+        "Where do you operate — one location, several, or a particular area you cover?",
     "desired_customizations":
         "Is there any particular way you'd want it to sound or behave on the phone?",
 }
@@ -668,6 +748,12 @@ def _fallback_recommendations(target_field: Optional[str], library: dict) -> Lis
             "Nobody free to pick up",
             "Losing callers to voicemail",
         ]
+    if target_field == "services_and_offerings":
+        return [
+            "Repairs and servicing",
+            "New installs and sales",
+            "Bookings and consultations",
+        ]
     if target_field == "current_workflow_summary":
         return [
             "Receptionist answers, else voicemail",
@@ -682,11 +768,47 @@ def _fallback_recommendations(target_field: Optional[str], library: dict) -> Lis
             "Bookings and scheduling",
             "Everything after hours",
         ]
+    if target_field == "hours_and_availability":
+        return [
+            "Weekdays nine to five",
+            "Extended and weekend hours",
+            "Busier in peak season",
+        ]
     if target_field == "escalation_preferences":
         return [
             "Transfer to on-call phone",
             "Text me the details",
             "Just take a message",
+        ]
+    if target_field == "data_to_capture":
+        return [
+            "Name and callback number",
+            "Account or order number",
+            "Full name and address",
+        ]
+    if target_field == "key_people_and_roles":
+        return [
+            "One owner handles everything",
+            "Route urgent to on-call",
+            "Front desk takes the rest",
+        ]
+    if target_field == "pricing_and_quote_policy":
+        return [
+            "Never quote prices",
+            "Give the call-out fee only",
+            "Quote from what I provide",
+        ]
+    if target_field == "top_caller_questions":
+        return [
+            "Hours and location",
+            "Pricing and availability",
+            "Do you cover my area",
+        ]
+    if target_field == "service_area_and_locations":
+        return [
+            "One location",
+            "Several branches",
+            "A wider service area",
         ]
     if target_field == "desired_customizations":
         return [
@@ -1149,8 +1271,14 @@ workflow.add_edge("extract_profile", "detect_gaps")
 #: in fast still gets a few tailored questions for breadth), and never more than
 #: MAX (so the conversation always ends). Between the two, we keep going only while
 #: there is a still-unasked gap.
-MIN_QUESTIONS = 3
-MAX_QUESTIONS = 5
+#:
+#: Raised from 3/5 when the profile widened past the original five fields: the
+#: prompt is now expected to keep an agent correct for a real business for a year,
+#: which needs more of the durable detail (services, hours, pricing limits, who
+#: handles what) captured up front. MAX stays bounded so the interview still ends
+#: at a reasonable length even when many fields remain unknown.
+MIN_QUESTIONS = 5
+MAX_QUESTIONS = 9
 
 
 def route_after_gaps(state: ClarificationState):

@@ -200,12 +200,12 @@ function UploadRoute() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-4">
-      <div className="w-full max-w-4xl mx-auto glass-card gradient-border p-8 font-mono relative overflow-hidden text-left space-y-6 animate-fade-in transition-all rounded-2xl shadow-2xl">
+      <div className="doc-ingestion-section w-full max-w-4xl mx-auto glass-card gradient-border p-8 font-mono relative overflow-hidden text-left space-y-6 animate-fade-in transition-all rounded-2xl shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
 
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-foreground text-lg font-bold uppercase tracking-tight font-mono">
+            <h3 className="text-foreground text-xl font-bold tracking-tight font-sans">
               Make it sound like your team
             </h3>
             <span className="text-[9px] font-mono uppercase tracking-widest text-foreground/45 border border-border rounded-full px-2 py-0.5">
@@ -244,206 +244,202 @@ function UploadRoute() {
           ))}
         </ol>
 
-        {/* Drag and Drop Container */}
-        <div
-          onDragEnter={handleDrag}
-          onDragOver={handleDrag}
-          onDragLeave={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => document.getElementById("file-upload-input")?.click()}
-          className={cn(
-            "border-2 border-dashed p-10 flex flex-col items-center justify-center gap-3 cursor-pointer text-center transition-all bg-secondary/10 relative rounded-lg",
-            dragActive
-              ? "border-primary bg-primary/5 scale-[1.01]"
-              : "border-border hover:border-primary/50",
-          )}
-        >
-          <input
-            id="file-upload-input"
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            accept=".pdf,.docx,.txt,.csv"
-            className="hidden"
-          />
-
-          {isIngesting ? (
-            <Loader2 className="h-10 w-10 text-primary animate-spin" />
-          ) : (
-            <Upload className="h-10 w-10 text-foreground/60 hover:text-primary transition-colors" />
-          )}
-
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">
-              Drag and drop your files here, or{" "}
-              <span className="text-primary underline">browse</span>
-            </p>
-            <p className="text-[10px] text-foreground/50 font-sans">
-              Supports PDF, DOCX, TXT, CSV up to 10MB each
-            </p>
-          </div>
-        </div>
-
-        {/* Uploaded Files List & Next-Step Interrelation Preview */}
-        {uploadedFiles.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-            {/* Left Column: Uploaded files list */}
-            <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-foreground/70 font-mono border-b border-border pb-1 border-dashed">
-                Uploaded Documents ({uploadedFiles.length})
-              </div>
-              <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                {uploadedFiles.map((file, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-3 bg-secondary/40 border border-border text-xs rounded"
-                  >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <Paperclip className="h-4 w-4 text-primary shrink-0" />
-                      <span className="truncate font-medium text-foreground">
-                        {file.name}
-                      </span>
-                      <span className="text-[10px] text-foreground/40 shrink-0 font-sans">
-                        ({formatFileSize(file.size)})
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFile(idx);
-                      }}
-                      className="p-1 hover:bg-secondary text-foreground/60 hover:text-destructive transition-colors cursor-pointer border-0 bg-transparent"
-                      aria-label="Remove file"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* What happens next. Previously this panel showed two invented sample
-                queries and claimed they were "ready for testing in Step 2" — nothing
-                generated them and no such step existed. Replaced with an honest
-                icon-led summary of the actual next stage. */}
-            <div className="space-y-3 bg-secondary/20 border border-border p-4 flex flex-col justify-center rounded-lg">
-              <div className="flex items-center gap-1.5">
-                <Database className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-                <span className="text-[10px] uppercase tracking-wider text-foreground/75 font-mono font-bold">
-                  What you get
-                </span>
-              </div>
-              <ul className="space-y-2.5">
-                <li className="flex items-center gap-2.5">
-                  <ScanSearch className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
-                  <span className="text-[11px] text-foreground/75 font-sans">
-                    We read your {uploadedFiles.length === 1 ? "document" : `${uploadedFiles.length} documents`}
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <MessagesSquare className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
-                  <span className="text-[11px] text-foreground/75 font-sans">
-                    A few quick questions — only what we can't infer
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Sparkles className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
-                  <span className="text-[11px] text-foreground/75 font-sans">
-                    A working agent you can call in minutes
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Consent. Stays explicitly opt-in and defaulted off; the toggle now
-            carries a label plus one line of explanation instead of a paragraph. */}
-        <div className="pt-2">
-          <label
-            className={cn(
-              "flex items-start gap-3 p-3.5 border cursor-pointer select-none transition-colors rounded",
-              aiConsent
-                ? "bg-primary/5 border-primary/40"
-                : "bg-secondary/40 border-border hover:border-primary/50",
-            )}
+        {/* Drag-and-drop zone OR in-place progress steps (swaps when processing starts) */}
+        {isIngesting ? (
+          /* ── In-place loading: occupies exactly the same space as the drop zone ── */
+          <div
+            role="status"
+            aria-live="polite"
+            className="border-2 border-dashed border-primary/40 bg-primary/[0.03] rounded-xl p-10 flex flex-col items-center justify-center gap-6 min-h-[180px] animate-fade-in"
           >
-            <input
-              type="checkbox"
-              checked={aiConsent}
-              onChange={(e) => setAiConsent(e.target.checked)}
-              className="h-4 w-4 mt-0.5 accent-primary cursor-pointer rounded-none shrink-0"
-            />
-            <span className="min-w-0">
-              <span className="block text-xs font-mono font-bold uppercase tracking-wider text-foreground">
-                Train my agent on these docs
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                {uploadedFiles.length > 0 ? "Analyzing Documents" : "Scoping Business"}
               </span>
-              <span className="block text-[11px] text-foreground/60 font-sans mt-0.5">
-                This is what makes it sound like your team instead of a generic bot. Private, and deleted after 30 days.
-              </span>
-            </span>
-            <ShieldCheck
-              aria-hidden="true"
-              className={cn(
-                "h-4 w-4 ml-auto shrink-0 transition-colors",
-                aiConsent ? "text-primary" : "text-foreground/25",
-              )}
-            />
-          </label>
-        </div>
+            </div>
 
-        {/* Loading State Overlay */}
-        {isIngesting && (
-          <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-6 rounded-xl animate-fade-in">
-            <div className="w-full max-w-sm space-y-6">
-              <div className="flex items-center gap-3 justify-center mb-2">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                  {uploadedFiles.length > 0 ? "Analyzing Documents" : "Scoping Business"}
-                </span>
+            <ul className="space-y-3 text-left w-full max-w-xs">
+              {(uploadedFiles.length > 0 ? ingestStepsDocs : ingestStepsNoDocs).map((stepText, idx) => {
+                const isDone = idx < ingestStepIndex;
+                const isActive = idx === ingestStepIndex;
+                const isTodo = idx > ingestStepIndex;
+                return (
+                  <li key={idx} className="flex items-center gap-3 transition-opacity duration-300">
+                    <span
+                      className={cn(
+                        "flex h-5 w-5 items-center justify-center rounded-full border shrink-0 text-[10px]",
+                        isDone && "bg-success/15 border-success/40 text-success",
+                        isActive && "bg-primary/15 border-primary/40 text-primary",
+                        isTodo && "border-border text-foreground/25"
+                      )}
+                    >
+                      {isDone ? (
+                        <Check className="h-3 w-3" aria-hidden="true" />
+                      ) : isActive ? (
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                      ) : (
+                        idx + 1
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-xs font-sans",
+                        isActive && "text-foreground font-semibold",
+                        isDone && "text-foreground/60",
+                        isTodo && "text-foreground/30"
+                      )}
+                    >
+                      {stepText}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : (
+          <>
+            {/* Drag and Drop Container */}
+            <div
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById("file-upload-input")?.click()}
+              className={cn(
+                "doc-drop-zone border-2 border-dashed p-10 flex flex-col items-center justify-center gap-3 cursor-pointer text-center bg-secondary/10 relative rounded-xl",
+                dragActive
+                  ? "border-primary bg-primary/5 scale-[1.01] doc-drop-zone-active"
+                  : "border-border hover:border-primary/50",
+              )}
+            >
+              <input
+                id="file-upload-input"
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                accept=".pdf,.docx,.txt,.csv"
+                className="hidden"
+              />
+
+              <Upload className="h-10 w-10 text-foreground/60 hover:text-primary transition-colors" />
+
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Drag and drop your files here, or{" "}
+                  <span className="text-primary underline">browse</span>
+                </p>
+                <p className="text-[10px] text-foreground/50 font-sans">
+                  Supports PDF, DOCX, TXT, CSV up to 10MB each
+                </p>
               </div>
-              
-              <ul className="space-y-4 text-left">
-                {(uploadedFiles.length > 0 ? ingestStepsDocs : ingestStepsNoDocs).map((stepText, idx) => {
-                  const isDone = idx < ingestStepIndex;
-                  const isActive = idx === ingestStepIndex;
-                  const isTodo = idx > ingestStepIndex;
-                  
-                  return (
-                    <li key={idx} className="flex items-center gap-3 transition-opacity duration-300">
-                      <span
-                        className={cn(
-                          "flex h-5 w-5 items-center justify-center rounded-full border shrink-0 text-[10px]",
-                          isDone && "bg-success/15 border-success/40 text-success",
-                          isActive && "bg-primary/15 border-primary/40 text-primary",
-                          isTodo && "border-border text-foreground/25"
-                        )}
+            </div>
+
+            {/* Uploaded Files List & Next-Step Interrelation Preview */}
+            {uploadedFiles.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                {/* Left Column: Uploaded files list */}
+                <div className="space-y-2">
+                  <div className="text-[10px] uppercase tracking-wider text-foreground/70 font-mono border-b border-border pb-1 border-dashed">
+                    Uploaded Documents ({uploadedFiles.length})
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                    {uploadedFiles.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 bg-secondary/40 border border-border text-xs rounded"
                       >
-                        {isDone ? (
-                          <Check className="h-3 w-3" aria-hidden="true" />
-                        ) : isActive ? (
-                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                        ) : (
-                          idx + 1
-                        )}
-                      </span>
-                      <span
-                        className={cn(
-                          "text-xs font-sans",
-                          isActive && "text-foreground font-semibold",
-                          isDone && "text-foreground/60",
-                          isTodo && "text-foreground/30"
-                        )}
-                      >
-                        {stepText}
+                        <div className="flex items-center gap-2.5 truncate">
+                          <Paperclip className="h-4 w-4 text-primary shrink-0" />
+                          <span className="truncate font-medium text-foreground">
+                            {file.name}
+                          </span>
+                          <span className="text-[10px] text-foreground/40 shrink-0 font-sans">
+                            ({formatFileSize(file.size)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFile(idx);
+                          }}
+                          className="p-1 hover:bg-secondary text-foreground/60 hover:text-destructive transition-colors cursor-pointer border-0 bg-transparent"
+                          aria-label="Remove file"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* What happens next */}
+                <div className="space-y-3 bg-secondary/20 border border-border p-4 flex flex-col justify-center rounded-lg">
+                  <div className="flex items-center gap-1.5">
+                    <Database className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                    <span className="text-[10px] uppercase tracking-wider text-foreground/75 font-mono font-bold">
+                      What you get
+                    </span>
+                  </div>
+                  <ul className="space-y-2.5">
+                    <li className="flex items-center gap-2.5">
+                      <ScanSearch className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                      <span className="text-[11px] text-foreground/75 font-sans">
+                        We read your {uploadedFiles.length === 1 ? "document" : `${uploadedFiles.length} documents`}
                       </span>
                     </li>
-                  );
-                })}
-              </ul>
+                    <li className="flex items-center gap-2.5">
+                      <MessagesSquare className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                      <span className="text-[11px] text-foreground/75 font-sans">
+                        A few quick questions — only what we can't infer
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-2.5">
+                      <Sparkles className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                      <span className="text-[11px] text-foreground/75 font-sans">
+                        A working agent you can call in minutes
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Consent toggle */}
+            <div className="pt-2">
+              <label
+                className={cn(
+                  "flex items-start gap-3 p-3.5 border cursor-pointer select-none transition-colors rounded",
+                  aiConsent
+                    ? "bg-primary/5 border-primary/40"
+                    : "bg-secondary/40 border-border hover:border-primary/50",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={aiConsent}
+                  onChange={(e) => setAiConsent(e.target.checked)}
+                  className="h-4 w-4 mt-0.5 accent-primary cursor-pointer rounded-none shrink-0"
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-mono font-bold uppercase tracking-wider text-foreground">
+                    Train my agent on these docs
+                  </span>
+                  <span className="block text-[11px] text-foreground/60 font-sans mt-0.5">
+                    This is what makes it sound like your team instead of a generic bot. Private, and deleted after 30 days.
+                  </span>
+                </span>
+                <ShieldCheck
+                  aria-hidden="true"
+                  className={cn(
+                    "h-4 w-4 ml-auto shrink-0 transition-colors",
+                    aiConsent ? "text-primary" : "text-foreground/25",
+                  )}
+                />
+              </label>
             </div>
-          </div>
+          </>
         )}
 
         {/* Actions Footer. Skip is a text link rather than a bordered button so it
@@ -453,7 +449,7 @@ function UploadRoute() {
             type="button"
             onClick={handleSkipUploadStep}
             disabled={isIngesting}
-            className="bg-transparent border-0 p-0 text-foreground/55 hover:text-foreground underline underline-offset-4 decoration-foreground/25 hover:decoration-foreground/60 transition-colors font-sans text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 border border-border/60 bg-secondary/40 text-foreground/70 hover:text-foreground hover:bg-secondary hover:border-border font-sans text-xs font-semibold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
             Skip for now
           </button>
@@ -461,7 +457,7 @@ function UploadRoute() {
             type="button"
             onClick={handleProceedFromUpload}
             disabled={isIngesting || (uploadedFiles.length > 0 && !aiConsent)}
-            className={cn("bg-primary text-primary-foreground font-mono font-medium text-xs tracking-wider uppercase px-6 py-3 transition-all border-0 rounded",
+            className={cn("bg-primary text-primary-foreground font-mono font-medium text-xs tracking-wider uppercase px-6 py-3 transition-all duration-200 border-0 rounded-xl btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
               isIngesting || (uploadedFiles.length > 0 && !aiConsent)
                 ? "opacity-50 cursor-not-allowed"
                 : "hover:bg-primary/90 cursor-pointer"

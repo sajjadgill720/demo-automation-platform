@@ -149,14 +149,14 @@ function PipelineRoute() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-4">
       {flowStep === "completed" ? (
-        <div className="w-full max-w-4xl mx-auto bg-card border border-border rounded-2xl shadow-xl p-10 font-mono relative overflow-hidden text-center space-y-8 animate-fade-in transition-all">
+        <div className="w-full max-w-4xl mx-auto glass-card gradient-border bg-card rounded-2xl border-2 border-border/60 shadow-2xl p-10 font-mono relative overflow-hidden text-center space-y-8 animate-fade-in transition-all">
           <div className="absolute top-0 left-0 w-full h-[3px] bg-success" />
           <div className="flex flex-col items-center space-y-4">
             <div className="h-16 w-16 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full">
               <Sparkles className="h-8 w-8" />
             </div>
             <div>
-              <h3 className="text-foreground text-xl font-bold uppercase tracking-tight font-mono">
+              <h3 className="text-foreground text-2xl font-bold tracking-tight font-sans">
                 Your agent is live
               </h3>
               <p className="text-xs text-foreground/75 mt-1 font-sans">
@@ -205,15 +205,15 @@ function PipelineRoute() {
           </div>
         </div>
       ) : skippedReason ? (
-        <div className="w-full max-w-3xl mx-auto bg-card border border-primary/30 rounded-2xl shadow-xl p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
+        <div className="w-full max-w-3xl mx-auto glass-card gradient-border bg-card rounded-2xl border-2 border-border/60 shadow-2xl p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
           <div className="absolute top-0 left-0 w-full h-[3px] bg-primary" />
           <div className="flex flex-col items-center text-center space-y-6 py-6">
             <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
               <AlertTriangle className="h-8 w-8 text-primary" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-foreground text-lg font-bold uppercase tracking-tight">
-                Lead Not Qualified
+              <h3 className="text-foreground text-xl font-bold tracking-tight font-sans">
+                Lead not qualified
               </h3>
               <p className="text-xs text-foreground/60 max-w-md font-sans">
                 Our qualification system determined this submission does not meet
@@ -222,7 +222,7 @@ function PipelineRoute() {
             </div>
             <div className="bg-secondary border border-border rounded-xl p-4 text-left max-w-lg w-full">
               <div className="text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-2">
-                QUALIFICATION_REASONING
+                Why this happened
               </div>
               <p className="text-sm text-foreground/80 font-sans leading-relaxed">
                 {skippedReason}
@@ -239,15 +239,15 @@ function PipelineRoute() {
       ) : pollingError ? (
         /* FAILED — a real terminal state, given its own treatment rather than a
            generic spinner that keeps turning. */
-        <div className="w-full max-w-3xl mx-auto bg-card border border-destructive/30 rounded-2xl shadow-xl p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
+        <div className="w-full max-w-3xl mx-auto glass-card gradient-border bg-card rounded-2xl border-2 border-border/60 shadow-2xl p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
           <div className="absolute top-0 left-0 w-full h-[3px] bg-destructive" />
           <div className="flex flex-col items-center text-center space-y-6 py-6">
             <div className="h-16 w-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center">
               <XCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-foreground text-lg font-bold uppercase tracking-tight">
-                Build Didn't Finish
+              <h3 className="text-foreground text-xl font-bold tracking-tight font-sans">
+                Build didn't finish
               </h3>
               <p className="text-xs text-foreground/60 max-w-md font-sans">
                 Your details are saved — retrying picks up where this left off.
@@ -284,7 +284,7 @@ function PipelineRoute() {
         /* WORKING — the one real in-progress state. Indeterminate on purpose: the
            backend reports pending until provisioning completes, so any finer
            breakdown here would be invented. */
-        <div className="w-full max-w-2xl mx-auto bg-card border border-border rounded-2xl p-10 font-mono relative overflow-hidden animate-fade-in transition-all shadow-xl">
+        <div className="w-full max-w-2xl mx-auto glass-card gradient-border bg-card rounded-2xl border-2 border-border/60 p-10 font-mono relative overflow-hidden animate-fade-in transition-all shadow-2xl">
           <div className="absolute top-0 left-0 w-full h-[3px] bg-primary animate-pulse" />
           <div className="flex flex-col items-center text-center space-y-8">
             <div className="relative">
@@ -295,7 +295,7 @@ function PipelineRoute() {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-foreground text-lg font-bold uppercase tracking-tight">
+              <h3 className="text-foreground text-xl font-bold tracking-tight font-sans">
                 Building your agent
               </h3>
               <p className="text-xs text-foreground/70 font-sans max-w-sm">

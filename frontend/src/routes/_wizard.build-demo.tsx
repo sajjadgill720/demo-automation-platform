@@ -147,11 +147,8 @@ function TextField({ label, icon: Icon, error, value, id, ...props }: FieldProps
           }}
           placeholder={focused ? props.placeholder : ""}
           className={cn(
-            "w-full bg-secondary/35 border-2 px-4 pt-6 pb-2.5 text-foreground placeholder:text-foreground/55 focus:outline-none font-sans text-[15px] font-medium transition-all duration-200 input-glow rounded-xl",
+            "field-box w-full border-2 px-4 pt-6 pb-2.5 text-foreground placeholder:text-foreground/55 focus:outline-none font-sans text-[15px] font-medium transition-all duration-200 input-glow rounded-xl",
             Icon && "pl-11",
-            error
-              ? "border-destructive/60 focus:border-destructive"
-              : "border-border focus:border-primary",
           )}
         />
         <label
@@ -210,10 +207,7 @@ function TextArea({ label, error, value, id, maxChars = 500, ...props }: AreaPro
           }}
           placeholder={focused ? props.placeholder : ""}
           className={cn(
-            "w-full bg-secondary/35 border-2 px-4 pt-6 pb-2.5 text-foreground placeholder:text-foreground/55 focus:outline-none font-sans text-[15px] font-medium leading-relaxed transition-all duration-200 input-glow resize-none rounded-xl",
-            error
-              ? "border-destructive/60 focus:border-destructive"
-              : "border-border focus:border-primary",
+            "field-box w-full border-2 px-4 pt-6 pb-2.5 text-foreground placeholder:text-foreground/55 focus:outline-none font-sans text-[15px] font-medium leading-relaxed transition-all duration-200 input-glow resize-none rounded-xl",
           )}
         />
         <label
@@ -297,10 +291,8 @@ function PhoneField({ country, digits, error, disabled, onCountry, onDigits, onK
         Phone number *
       </label>
       <div
-        className={cn(
-          "flex items-stretch rounded-xl border-2 bg-secondary/35 input-glow transition-all",
-          error ? "border-destructive/60 focus-within:border-destructive" : "border-border focus-within:border-primary",
-        )}
+        data-invalid={error ? "true" : undefined}
+        className="field-box flex items-stretch rounded-xl border-2 input-glow transition-all"
       >
         <div ref={dropdownRef} className="relative flex items-center border-r-2 border-border bg-secondary/40 rounded-l-[10px]">
           <button
@@ -594,7 +586,7 @@ function BuildDemoPage() {
   return (
     <div
       className={cn(
-        "skydda-sentinel-theme flex-1 bg-background text-foreground font-sans antialiased overflow-x-hidden relative flex flex-col py-10 px-4 sm:px-6",
+        "skydda-sentinel-theme dq-form-surface flex-1 bg-background text-foreground font-sans antialiased overflow-x-hidden relative flex flex-col py-10 px-4 sm:px-6",
         theme,
       )}
     >
@@ -837,10 +829,10 @@ function BuildDemoPage() {
                           setErrors((prev) => ({ ...prev, industry: undefined }));
                         }}
                         className={cn(
-                          "group flex items-center gap-2.5 rounded-xl border-2 px-3.5 py-3 text-left transition-all cursor-pointer",
+                          "group flex items-center gap-2.5 rounded-xl border-2 px-3.5 py-3 text-left transition-all duration-200 cursor-pointer btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
                           selected
                             ? "border-primary bg-primary/10 text-primary shadow-sm shadow-primary/10"
-                            : "border-border bg-secondary/30 text-foreground/80 hover:border-primary/40 hover:bg-secondary/50",
+                            : "border-border bg-secondary/60 text-foreground/80 hover:border-primary/40 hover:bg-secondary/80",
                         )}
                       >
                         <Icon className={cn("h-5 w-5 shrink-0 transition-transform", selected && "scale-110")} />
@@ -913,7 +905,7 @@ function BuildDemoPage() {
                       setTouched((t) => ({ ...t, problem_text: true }));
                       setErrors((prev) => ({ ...prev, problem_text: undefined }));
                     }}
-                    className="text-xs font-sans px-3 py-1.5 bg-secondary/60 hover:bg-primary/15 hover:text-primary text-foreground/75 border border-border hover:border-primary/50 rounded-full transition-all cursor-pointer active:scale-95 font-semibold"
+                    className="text-xs font-sans px-3 py-1.5 bg-secondary/60 hover:bg-primary/15 hover:text-primary text-foreground/75 border border-border hover:border-primary/50 rounded-full transition-all duration-200 cursor-pointer btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0 active:scale-[0.97] font-semibold"
                   >
                     {preset}
                   </button>
@@ -941,10 +933,10 @@ function BuildDemoPage() {
                       aria-pressed={selected}
                       onClick={() => setFormData({ ...formData, voiceGender: v.key })}
                       className={cn(
-                        "flex items-center gap-3 border-2 px-4 py-3.5 rounded-xl transition-all cursor-pointer text-left",
+                        "flex items-center gap-3 border-2 px-4 py-3.5 rounded-xl transition-all duration-200 cursor-pointer text-left btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
                         selected
                           ? "border-primary bg-primary/10 shadow-sm shadow-primary/10"
-                          : "border-border bg-secondary/30 hover:border-primary/40",
+                          : "border-border bg-secondary/60 hover:border-primary/40",
                       )}
                     >
                       <span
@@ -972,10 +964,10 @@ function BuildDemoPage() {
                 disabled={formSubmitting}
                 aria-busy={formSubmitting}
                 className={cn(
-                  "w-full text-[15px] font-bold uppercase tracking-wider py-4 flex items-center justify-center gap-2 font-sans border-0 rounded-xl transition-all",
+                  "w-full text-[15px] font-bold uppercase tracking-wider py-4 flex items-center justify-center gap-2 font-sans border-0 rounded-xl transition-all duration-200",
                   formSubmitting
                     ? "bg-primary/70 text-primary-foreground cursor-wait"
-                    : "bg-primary text-primary-foreground glow-button magnetic-hover cursor-pointer",
+                    : "bg-primary text-primary-foreground glow-button magnetic-hover cursor-pointer btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]",
                 )}
               >
                 {formSubmitting ? (

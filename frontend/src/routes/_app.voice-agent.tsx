@@ -185,7 +185,7 @@ function VoiceAgent() {
                         },
                       })
                     }
-                    className="console-cta inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
+                    className="console-cta inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97] transition-all duration-200"
                   >
                     <ExternalLink className="h-4 w-4" /> Open live voice test
                   </button>
@@ -213,7 +213,7 @@ function VoiceAgent() {
                   {!confirmingDelete ? (
                     <button
                       onClick={() => setConfirmingDelete(true)}
-                      className="inline-flex items-center gap-1.5 border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
                     >
                       <Trash2 className="h-3.5 w-3.5" /> Delete agent
                     </button>
@@ -227,7 +227,7 @@ function VoiceAgent() {
                         <button
                           onClick={handleDeleteAgent}
                           disabled={deleting}
-                          className="inline-flex items-center gap-1.5 bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 cursor-pointer btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0 transition-all duration-200"
                         >
                           {deleting ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -239,7 +239,7 @@ function VoiceAgent() {
                         <button
                           onClick={() => setConfirmingDelete(false)}
                           disabled={deleting}
-                          className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                          className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-all duration-200 hover:bg-muted btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
                         >
                           Cancel
                         </button>
@@ -409,7 +409,7 @@ function Waveform() {
       <button
         onClick={isMicTesting ? handleStopMic : handleStartMic}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all cursor-pointer",
+          "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all duration-200 cursor-pointer btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
           isMicTesting
             ? "border-success bg-success/10 text-success hover:bg-success/20"
             : "border-border bg-card text-muted-foreground hover:text-foreground",

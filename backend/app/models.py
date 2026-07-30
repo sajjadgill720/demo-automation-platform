@@ -88,7 +88,7 @@ class Lead(SQLModel, table=True):
     # clarification chat can open with it and so profile extraction never re-asks
     # about a pain point the lead already described.
     problem_statement: Optional[str] = Field(default=None, nullable=True)
-    # Which Vapi voice the client picked: "male" (Elliot) or "female" (Emma).
+    # Which Vapi voice the client picked: "male" (Elliot) or "female" (Naina).
     voice_gender: Optional[str] = Field(default="female", max_length=16, nullable=True)
     rendered_prompt: str
     assistant_id: Optional[str] = Field(default=None, max_length=255, nullable=True)
