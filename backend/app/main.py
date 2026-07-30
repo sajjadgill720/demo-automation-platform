@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import json
 import uuid
 import logging
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pypdf import PdfReader
 
 # SlowAPI imports
@@ -59,11 +60,65 @@ from app.clarification import (
 )
 
 
+# ── Periodic cleanup: delete Vapi assistants older than 6 hours ──
+
+AGENT_TTL_HOURS = 6
+CLEANUP_INTERVAL_SECONDS = 15 * 60  # sweep every 15 minutes
+
+
+async def _cleanup_expired_agents():
+    """Runs in the background on a fixed interval. Deletes Vapi assistants
+    whose leads were created more than AGENT_TTL_HOURS ago and still have an
+    assistant_id, regardless of agent_status. This replaces the old event-based
+    deletion that happened on end-session."""
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+        try:
+            cutoff = datetime.utcnow() - timedelta(hours=AGENT_TTL_HOURS)
+            with Session(engine) as session:
+                statement = select(Lead).where(
+                    Lead.assistant_id.isnot(None),  # type: ignore[union-attr]
+                    Lead.created_at < cutoff,
+                )
+                expired_leads = session.exec(statement).all()
+
+                if not expired_leads:
+                    continue
+
+                logger.info(f"Agent cleanup: found {len(expired_leads)} expired agent(s) to delete")
+
+                for lead in expired_leads:
+                    try:
+                        delete_vapi_assistant(lead.assistant_id)
+                        logger.info(
+                            f"Agent cleanup: deleted Vapi assistant {lead.assistant_id}",
+                            extra={"extra_data": {"lead_id": str(lead.id)}},
+                        )
+                    except Exception:
+                        logger.error(
+                            f"Agent cleanup: failed to delete Vapi assistant {lead.assistant_id}",
+                            exc_info=True,
+                            extra={"extra_data": {"lead_id": str(lead.id)}},
+                        )
+
+                    lead.assistant_id = None
+                    lead.agent_status = AgentStatus.completed
+                    lead.updated_at = datetime.utcnow()
+                    session.add(lead)
+
+                session.commit()
+        except Exception:
+            logger.error("Agent cleanup: unhandled error in sweep", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables and compile schemas automatically on start
     init_db()
+    # Launch the periodic agent-expiry sweeper
+    cleanup_task = asyncio.create_task(_cleanup_expired_agents())
     yield
+    cleanup_task.cancel()
     close_checkpointer_pool()
 
 app = FastAPI(
@@ -558,35 +613,24 @@ def delete_lead_agent(lead_id: uuid.UUID, session: Session = Depends(get_session
 
 @app.post("/api/demo-request/{lead_id}/end-session")
 def end_demo_session(lead_id: uuid.UUID, session: Session = Depends(get_session)):
-    """Deletes the Vapi assistant for the lead and marks status as completed."""
+    """Marks the demo session as completed without deleting the Vapi assistant.
+
+    The assistant stays alive so the user can call back during the demo window.
+    A background cleanup task (_cleanup_expired_agents) automatically deletes
+    assistants that are older than AGENT_TTL_HOURS (6 hours).
+    """
     logger.info("Received request to end demo session", extra={"extra_data": {"lead_id": str(lead_id)}})
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")
-        
-    if lead.assistant_id:
-        try:
-            delete_vapi_assistant(lead.assistant_id)
-        except Exception as e:
-            # Wrap in try/except so persistent failures/network glitches do not crash the request
-            # We log the error but proceed with database status update to avoid orphaned state in DB
-            logger.error(
-                f"Failed to delete Vapi assistant {lead.assistant_id} during end-session",
-                exc_info=True,
-                extra={"extra_data": {"lead_id": str(lead_id)}}
-            )
-            
+
     lead.agent_status = AgentStatus.completed
     lead.updated_at = datetime.utcnow()
     session.add(lead)
     session.commit()
     session.refresh(lead)
-    
-    # TODO: scheduled cleanup job to delete Vapi assistants older than
-    # N hours with agent_status still "active" and no end-session call.
-    # This is a known gap to prevent orphaned assistants.
-    
-    logger.info("Demo session ended successfully", extra={"extra_data": {"lead_id": str(lead_id)}})
+
+    logger.info("Demo session ended successfully (agent retained for TTL cleanup)", extra={"extra_data": {"lead_id": str(lead_id)}})
     return {"message": "Demo session ended successfully", "agent_status": lead.agent_status}
 
 
