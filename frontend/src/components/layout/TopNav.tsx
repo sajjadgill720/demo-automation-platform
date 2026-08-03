@@ -1,4 +1,4 @@
-import { Search, Sun, Moon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useTheme } from "@/hooks/use-theme";
 import { HelpMenu } from "@/components/layout/HelpMenu";
@@ -10,17 +10,6 @@ export function TopNav({ title, actions }: { title: string; actions?: React.Reac
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border/70 bg-background/70 px-6 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <h1 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h1>
-      <div className="relative ml-4 hidden max-w-sm flex-1 md:flex items-center">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
-        <input
-          placeholder="Search demos, companies, agents…"
-          className="w-full rounded-lg border border-border/80 bg-card/70 py-2 pl-9 pr-16 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 transition-shadow"
-        />
-        {/* Keyboard shortcut discovery hint */}
-        <span className="kbd-chip absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-          ⌘K
-        </span>
-      </div>
       <div className="ml-auto flex items-center gap-1.5">
         {actions}
 

@@ -17,6 +17,9 @@ import {
   ChevronDown,
   MessageSquare,
   DollarSign,
+  Clock,
+  UserCheck,
+  BarChart3,
 } from "lucide-react";
 import { CompanyLogo } from "@/components/common/CompanyCard";
 import { cn } from "@/lib/utils";
@@ -66,6 +69,14 @@ const fadeUp: any = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
+
+/* Value props shown alongside the live-call orb in the hero. */
+const HERO_POINTS = [
+  { icon: Volume2, text: "Sounds human — callers never ask to be put through to someone else." },
+  { icon: Clock, text: "Answers at 2am, on weekends, and through the rush. Every call, every time." },
+  { icon: UserCheck, text: "Every caller captured, qualified, and ready for you to follow up." },
+  { icon: BarChart3, text: "See every call and every missed opportunity in one place." },
+] as const;
 
 function DemoPreview() {
   const search = Route.useSearch();
@@ -524,55 +535,87 @@ function DemoPreview() {
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="relative z-10 mx-auto max-w-6xl px-6 pt-4 pb-20 space-y-12"
+          className="relative z-10 mx-auto w-full max-w-[1600px] px-6 lg:px-10 pt-4 pb-20 space-y-12"
         >
-          {/* C1: Personalization Signaling banner */}
-          <div className="flex items-center gap-2.5 px-4 py-2 border border-primary/20 w-fit bg-primary/[0.04] mx-auto text-[10px] font-semibold text-primary uppercase tracking-widest font-mono">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            Prepared for {personalization.name} · {personalization.company}
-          </div>
+          <div className="relative pt-2">
+            <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 lg:items-center">
+              {/* Left — the pitch */}
+              <motion.div variants={fadeUp} className="space-y-7 text-center lg:text-left">
+                {/* Attractive live badge — replaces the old personalization banner */}
+                <div className="flex justify-center lg:justify-start">
+                  <div className="relative inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/[0.06] pl-1.5 pr-3.5 py-1.5 overflow-hidden">
+                    {/* shimmer sweep */}
+                    <motion.span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-[20deg] bg-gradient-to-r from-transparent via-primary/25 to-transparent"
+                      animate={{ x: ["0%", "420%"] }}
+                      transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", repeatDelay: 1.4 }}
+                    />
+                    <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="relative z-10 flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-widest text-primary">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+                      </span>
+                      Live personalized demo
+                    </span>
+                  </div>
+                </div>
 
-          <div className="rounded-3xl border border-border bg-card/85 backdrop-blur-sm p-10 md:p-14 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-primary to-blue-400" />
+                {/* Company lockup */}
+                <div className="flex items-center gap-3 justify-center lg:justify-start">
+                  <CompanyLogo company={companyRepresentation} size={44} />
+                  <span className="text-muted-foreground text-lg font-light">×</span>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary text-foreground">
+                    <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                  </div>
+                </div>
 
-            <div className="flex flex-col items-center gap-8 text-center">
-              {/* Company Logo representation */}
-              <motion.div variants={fadeUp} className="flex items-center gap-4">
-                <CompanyLogo company={companyRepresentation} size={56} />
-                <span className="text-muted-foreground text-xl font-light">×</span>
-                <div className="flex h-14 w-14 items-center justify-center border border-border bg-secondary text-foreground">
-                  <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+                {/* Headline */}
+                <div className="space-y-4">
+                  <h1 className="text-3xl sm:text-4xl xl:text-5xl font-normal tracking-tight text-foreground leading-[1.1]">
+                    {personalization.company}'s new receptionist{" "}
+                    <span className="text-primary">never misses a call</span>
+                  </h1>
+                  <p className="text-base text-muted-foreground leading-relaxed max-w-md mx-auto lg:mx-0 font-sans">
+                    Trained on how you work. Call it right now — this is exactly what your
+                    customers would hear.
+                  </p>
+                </div>
+
+                {/* Value list */}
+                <ul className="space-y-3.5 max-w-md mx-auto lg:mx-0 text-left">
+                  {HERO_POINTS.map((p) => (
+                    <li key={p.text} className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+                        <p.icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-sm text-foreground/75 font-sans leading-relaxed">
+                        {p.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Trust row */}
+                <div className="flex items-center gap-5 flex-wrap justify-center lg:justify-start pt-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> Live agent
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5" /> Real voice
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5" /> No setup
+                  </span>
                 </div>
               </motion.div>
 
-              {/* Minimal headline */}
-              <motion.div variants={fadeUp} className="max-w-2xl space-y-4">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-foreground leading-[1.1]">
-                  {personalization.company}'s new receptionist never misses a call
-                </h1>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto font-sans">
-                  Trained on how you work. Call it right now — this is exactly what your
-                  customers would hear.
-                </p>
-              </motion.div>
-
-              {/* CV: Convoa Command Grid — Bento hero with central live-call orb */}
-              <motion.div
-                variants={fadeUp}
-                className="w-full no-print pt-2"
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 text-left">
-                  {/* Top-left — Human-like voice */}
-                  <FeatureCell
-                    text="Sounds human. Your customers won't ask to be put through to someone else."
-                    illustration={<VoiceRosterIllustration />}
-                  />
-
-                  {/* Center hub — eclipse orb, spans two rows on desktop, whole surface is clickable */}
-                  <button
+              {/* Right — the live-call orb (the primary action, now the hero visual) */}
+              <motion.div variants={fadeUp} className="w-full no-print">
+                <button
                     onClick={
                       callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall
                     }
@@ -583,7 +626,7 @@ function DemoPreview() {
                         : "Start a live voice call now"
                     }
                     className={cn(
-                      "lg:row-span-2 group relative flex flex-col items-center justify-start gap-5 rounded-3xl p-6 md:p-8 text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                      "w-full group relative flex flex-col items-center justify-start gap-5 rounded-3xl p-6 md:p-8 text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                       // Light mode: contain the orb as its own dark "spotlight" panel so the
                       // glow never smudges the light page. Dark mode: let it float in the void.
                       theme !== "dark" &&
@@ -738,28 +781,43 @@ function DemoPreview() {
                       </div>
                     </div>
                   </button>
-
-                  {/* Top-right — Heat maps */}
-                  <FeatureCell
-                    text="See every call and every missed opportunity in one place."
-                    illustration={<HeatmapIllustration />}
-                  />
-
-                  {/* Bottom-left — 24/7 revenue */}
-                  <FeatureCell
-                    text="Answers at 2am, on weekends, and through the rush. Every call, every time."
-                    illustration={<RevenueIllustration />}
-                  />
-
-                  {/* Bottom-right — Real-time data */}
-                  <FeatureCell
-                    text="Every caller captured, qualified and ready for you to follow up."
-                    illustration={<TimelineIllustration />}
-                  />
-                </div>
               </motion.div>
             </div>
           </div>
+
+          {/* Dashboard preview — the four product panels, reframed as labeled
+              previews of what the client sees inside the live console. */}
+          <motion.div variants={fadeUp} className="space-y-6 no-print">
+            <div className="text-center lg:text-left space-y-2">
+              <span className="text-[10px] font-mono text-primary uppercase tracking-widest font-semibold">
+                Inside the console
+              </span>
+              <h2 className="text-2xl font-normal tracking-tight">
+                Everything Convoa captures, in one view
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+              {[
+                { label: "Agent activity", desc: "Live roster of calls handled", el: <VoiceRosterIllustration /> },
+                { label: "Service heatmap", desc: "Where demand concentrates", el: <HeatmapIllustration /> },
+                { label: "Revenue trend", desc: "Booked jobs over time", el: <RevenueIllustration /> },
+                { label: "Call timings", desc: "Peak hours at a glance", el: <TimelineIllustration /> },
+              ].map((t) => (
+                <div
+                  key={t.label}
+                  className="group flex flex-col gap-4 rounded-3xl border border-border bg-card/60 backdrop-blur-sm p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_8px_32px_-12px_rgba(45,212,191,0.25)]"
+                >
+                  <div className="relative h-40 overflow-hidden rounded-2xl border border-border/60 bg-secondary/30 transition-colors group-hover:border-primary/25">
+                    {t.el}
+                  </div>
+                  <div className="px-1">
+                    <p className="text-sm font-medium text-foreground">{t.label}</p>
+                    <p className="text-xs text-muted-foreground font-sans">{t.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
           {/* Act now — the two primary actions, directly below the demo so the
               client reaches them without scrolling past secondary content. On lg
@@ -977,7 +1035,7 @@ function DemoPreview() {
             initial="hidden"
             whileInView="show"
             viewport={{ once: true }}
-            className="rounded-3xl border border-border p-8 md:p-10 space-y-8 bg-card/60 backdrop-blur-sm"
+            className="space-y-8"
           >
             <div className="space-y-2">
               <span className="text-[10px] font-mono text-primary uppercase tracking-widest font-semibold">
@@ -1086,7 +1144,7 @@ function DemoPreview() {
 
         {/* Footer */}
         <footer className="relative z-10 border-t border-border bg-background">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-[11px] text-muted-foreground font-mono">
+          <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between px-6 lg:px-10 py-8 text-[11px] text-muted-foreground font-mono">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
               <span className="uppercase tracking-widest text-[9px]">
@@ -1223,23 +1281,6 @@ function LoadingPulseRing() {
           ease: "linear",
         }}
       />
-    </div>
-  );
-}
-
-function FeatureCell({
-  text,
-  illustration,
-}: {
-  text: string;
-  illustration: React.ReactNode;
-}) {
-  return (
-    <div className="group flex flex-col justify-between gap-5 rounded-3xl border border-border bg-card/60 backdrop-blur-sm p-6 md:p-7 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_8px_32px_-12px_rgba(45,212,191,0.25)]">
-      <div className="relative h-40 overflow-hidden rounded-2xl border border-border/60 bg-secondary/30 transition-colors group-hover:border-primary/25">
-        {illustration}
-      </div>
-      <p className="text-sm leading-relaxed text-foreground/75 font-sans">{text}</p>
     </div>
   );
 }

@@ -79,12 +79,11 @@ function Dashboard() {
         actions={
           <Link
             to="/build-demo"
-            title="Create a new AI demo (⌘ N)"
+            title="Create a new AI demo"
             className="console-cta inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 btn-themed-shadow transition-all duration-200 hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
             <Sparkles className="h-3.5 w-3.5" />
             New demo
-            <span className="kbd-chip ml-1 hidden sm:inline-flex">⌘N</span>
           </Link>
         }
       />

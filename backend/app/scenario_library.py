@@ -28,7 +28,12 @@ EDITING RULES (important — read before changing entries)
   real calendar.
 """
 
+import json
+import logging
+import os
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("app.scenario_library")
 
 # ── Canonical industry entries ────────────────────────────────────────────────
 # `aliases` are matched case-insensitively as substrings against the free-text
@@ -426,3 +431,183 @@ def format_scenarios_as_rules(entry: Dict[str, Any], limit: Optional[int] = None
     if limit is not None:
         scenarios = scenarios[:limit]
     return [f"If {trigger}, {action}." for trigger, action in scenarios]
+
+
+# ── Generated (LLM-enriched) industry entries ─────────────────────────────────
+#
+# WHY: an unknown industry falls back to GENERIC_ENTRY. That keeps the agent
+# safe, but the compiled prompt then talks about "a general business reception
+# line" instead of, say, "a veterinary clinic", which makes the demo feel
+# untailored for any industry we have not hand-written.
+#
+# WHAT THIS DOES: for an unknown industry we make a ONE-TIME LLM call to fill in
+# the *informational* fields only — display_name, business_stakes,
+# common_questions — and cache the result so the same industry never calls the
+# model again. The CONVERSATION BEHAVIOUR (caller_scenarios, default_escalation)
+# is deliberately left as the vetted generic default: a model never gets to
+# invent how the agent handles a call, including emergencies. That boundary is
+# the whole point of the hand-written library above.
+#
+# WHERE IT IS STORED: generated entries are written to generated_scenarios.json
+# — a DATA file next to this module, not this source file. The source stays
+# 100% human-written and reviewable; the generated cache is separate, clearly
+# marked with "source": "generated", and NEVER overrides a hand-vetted key.
+
+_GENERATED_PATH = os.path.join(os.path.dirname(__file__), "generated_scenarios.json")
+
+# Captured before merging the generated cache, so we always know which keys are
+# hand-vetted and must never be shadowed or overwritten by generated content.
+_VETTED_KEYS = frozenset(SCENARIO_LIBRARY.keys())
+
+
+def _load_generated_into_library() -> None:
+    """Merges the on-disk generated cache into SCENARIO_LIBRARY at import time.
+
+    Vetted keys always win: a generated entry is skipped if a hand-written entry
+    with the same key exists. Any read/parse problem is non-fatal — the library
+    simply runs with its vetted entries only.
+    """
+    try:
+        with open(_GENERATED_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Could not load generated scenarios (%s): %s", _GENERATED_PATH, e)
+        return
+
+    if not isinstance(data, dict):
+        return
+    for key, entry in data.items():
+        if key in _VETTED_KEYS or not isinstance(entry, dict):
+            continue
+        SCENARIO_LIBRARY[key] = entry
+
+
+def _build_generated_entry(industry_key: str, info: Dict[str, Any]) -> Dict[str, Any]:
+    """Assembles a library entry from LLM-generated INFO, keeping the vetted
+    generic CONVERSATION BEHAVIOUR (caller_scenarios + default_escalation)."""
+    aliases: List[str] = [industry_key]
+    for a in info.get("aliases") or []:
+        a = str(a).strip().lower()
+        if a and a not in aliases:
+            aliases.append(a)
+
+    questions = [str(q).strip() for q in (info.get("common_questions") or []) if str(q).strip()][:6]
+
+    return {
+        # Same rank as an umbrella category, so a more specific hand-vetted trade
+        # alias still wins a tie rather than being hijacked by generated aliases.
+        "specificity": 1,
+        "source": "generated",
+        "display_name": (str(info.get("display_name") or industry_key).strip() or industry_key),
+        "aliases": aliases,
+        "business_stakes": (str(info.get("business_stakes") or "").strip()
+                            or GENERIC_ENTRY["business_stakes"]),
+        # Conversation behaviour is intentionally the vetted generic default —
+        # never generated. This is the line the model is not allowed to cross.
+        "caller_scenarios": list(GENERIC_ENTRY["caller_scenarios"]),
+        "default_escalation": GENERIC_ENTRY["default_escalation"],
+        "common_questions": questions or list(GENERIC_ENTRY["common_questions"]),
+    }
+
+
+def _generate_industry_info(industry: str) -> Dict[str, Any]:
+    """One LLM call that returns INDUSTRY CONTEXT ONLY — never call handling.
+
+    Imported lazily so this module stays import-safe (and network-free) for the
+    tests and callers that only use the deterministic lookup_industry().
+    """
+    from pydantic import BaseModel
+    from app.llm_client import call_structured_llm
+
+    class GeneratedIndustryInfo(BaseModel):
+        display_name: str
+        business_stakes: str
+        common_questions: List[str]
+        aliases: List[str] = []
+
+    prompt = (
+        "You are enriching a phone-reception scenario library with INDUSTRY "
+        "CONTEXT ONLY. A business signed up and typed this industry:\n"
+        f'"{industry}"\n\n'
+        "Return STRICT JSON with exactly these fields and nothing about how to "
+        "handle calls:\n"
+        '- "display_name": a short natural label for this kind of business '
+        '(e.g. "veterinary clinic"), lowercase unless a proper noun.\n'
+        '- "business_stakes": 1-2 descriptive sentences on why answering the '
+        "phone matters for THIS industry and what a missed call costs them.\n"
+        '- "common_questions": 3-5 realistic questions a caller to this business '
+        "actually asks. Questions only, no answers.\n"
+        '- "aliases": 2-5 lowercase keywords someone might type for this industry.\n\n'
+        "Rules:\n"
+        "- Do NOT include instructions, actions, escalation steps, or how the "
+        "agent should respond. Information only.\n"
+        "- No emergency handling, no medical/legal/financial advice, no invented "
+        "phone numbers, prices, or promises.\n"
+        "- If the industry is unclear or gibberish, describe a general business "
+        "reception line.\n"
+    )
+
+    info = call_structured_llm(prompt, GeneratedIndustryInfo, max_tokens=600)
+    return info.model_dump()
+
+
+def _persist_generated(key: str, entry: Dict[str, Any]) -> None:
+    """Adds a generated entry to the in-memory library and the on-disk cache.
+
+    Vetted keys are never touched. The disk write is atomic (temp + replace) and
+    best-effort: on a read-only or full filesystem it logs and keeps the entry in
+    memory for this process, so a demo still benefits even if it can't persist.
+    """
+    if key in _VETTED_KEYS:
+        return
+
+    SCENARIO_LIBRARY[key] = entry  # available immediately, even if the write fails
+
+    try:
+        existing: Dict[str, Any] = {}
+        try:
+            with open(_GENERATED_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    existing = loaded
+        except FileNotFoundError:
+            existing = {}
+
+        existing[key] = entry
+        tmp = _GENERATED_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(existing, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, _GENERATED_PATH)
+    except OSError as e:
+        logger.warning("Could not persist generated scenario '%s' (in-memory only): %s", key, e)
+
+
+def resolve_industry_entry(industry: Optional[str]) -> Dict[str, Any]:
+    """Like lookup_industry(), but for an UNKNOWN industry it makes a one-time
+    LLM call to enrich the entry with industry INFO, caches it, and returns it.
+
+    The conversation behaviour stays the vetted generic default. On any failure
+    (no API key, network error, blank industry) it returns exactly what
+    lookup_industry() would, so every caller can treat it as a drop-in.
+    """
+    entry = lookup_industry(industry)
+    if entry.get("matched"):
+        return entry
+    if not industry or not str(industry).strip():
+        return entry
+
+    key = str(industry).strip().lower()
+    try:
+        info = _generate_industry_info(str(industry).strip())
+    except Exception as e:
+        logger.warning("Industry enrichment failed for %r; using generic entry: %s", industry, e)
+        return entry
+
+    generated = _build_generated_entry(key, info)
+    _persist_generated(key, generated)
+    return {**generated, "key": key, "matched": True}
+
+
+_load_generated_into_library()

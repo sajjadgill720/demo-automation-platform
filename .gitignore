@@ -33,3 +33,6 @@ dist-ssr
 
 #sensistive data
 .env
+.claude
+.gemini
+

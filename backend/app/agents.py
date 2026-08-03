@@ -83,7 +83,7 @@ def _call_vapi_create_assistant(
     prompt: str,
     file_id: Optional[str] = None,
     first_message: Optional[str] = None,
-    voice_id: str = "Naina",
+    voice_config: dict = None,
 ) -> str:
     """Creates a Vapi assistant using the API.
 
@@ -91,6 +91,9 @@ def _call_vapi_create_assistant(
     If file_id is provided, includes knowledgeBase directly in creation payload.
     Returns the assistant_id.
     """
+    if voice_config is None:
+        voice_config = {"voiceId": "Naina", "speed": 0.9}
+
     logger = logging.getLogger(__name__)
     vapi_key = os.getenv("VAPI_API_KEY", "")
     if not vapi_key or vapi_key.startswith("dummy") or vapi_key.startswith("mock"):
@@ -118,7 +121,8 @@ def _call_vapi_create_assistant(
         },
         "voice": {
             "provider": "vapi",
-            "voiceId": voice_id
+            "voiceId": voice_config["voiceId"],
+            "speed": voice_config["speed"]
         }
     }
 
@@ -175,7 +179,7 @@ def _call_vapi_create_assistant(
 
 from typing import Optional, Union, Any
 from app.utils import sanitize_input, sanitize_profile_text
-from app.scenario_library import lookup_industry, format_scenarios_as_rules
+from app.scenario_library import lookup_industry, resolve_industry_entry, format_scenarios_as_rules
 
 
 # ── Modular Vapi prompt composition ───────────────────────────────────────────
@@ -337,7 +341,9 @@ def compile_lead_prompt(
     sanitized_industry = sanitize_input(industry)
 
     prof = _normalize_profile(profile)
-    library = lookup_industry(industry)
+    # Enrich unknown industries with cached, LLM-generated INFO (display name,
+    # stakes, common questions); conversation behaviour stays the vetted default.
+    library = resolve_industry_entry(industry)
     sections = _load_template_sections()
 
     # ── business_context ──────────────────────────────────────────────────────
@@ -501,13 +507,16 @@ def compile_lead_prompt(
 
 #: Vapi built-in voices offered to the client. Male maps to Elliot per product
 #: decision; female uses Naina.
-VOICE_IDS = {"male": "Elliot", "female": "Naina"}
-DEFAULT_VOICE = "Naina"
+VOICE_CONFIGS = {
+    "male": {"voiceId": "Elliot", "speed": 0.8},
+    "female": {"voiceId": "Naina", "speed": 0.9}
+}
+DEFAULT_CONFIG = {"voiceId": "Naina", "speed": 0.9}
 
 
-def resolve_voice_id(voice_gender: Optional[str]) -> str:
-    """Maps a stored voice preference to a Vapi voiceId, defaulting to female."""
-    return VOICE_IDS.get((voice_gender or "").strip().lower(), DEFAULT_VOICE)
+def resolve_voice_config(voice_gender: Optional[str]) -> dict:
+    """Maps a stored voice preference to a Vapi voice config (id and speed), defaulting to female."""
+    return VOICE_CONFIGS.get((voice_gender or "").strip().lower(), DEFAULT_CONFIG)
 
 
 def compile_first_message(company_name: str) -> str:
@@ -518,7 +527,7 @@ def compile_first_message(company_name: str) -> str:
     never disagree about how the business answers its phone.
     """
     company = sanitize_input(company_name) or "this business"
-    return f"Thanks for calling {company}, this is the AI assistant — how can I help you today?"
+    return f"Thanks for calling {company}, how can I help you today?"
 
 
 def _set_stage(session, lead, status, logger) -> None:
@@ -673,7 +682,7 @@ def provision_vapi_assistant_task(lead_id: str):
                 {"role": m.role.value, "content": m.content} for m in clar_msgs
             ]
 
-            library = lookup_industry(lead.industry)
+            library = resolve_industry_entry(lead.industry)
             company_context_block = generate_company_context_block(
                 lead.company_name,
                 lead.industry,
@@ -729,7 +738,7 @@ def provision_vapi_assistant_task(lead_id: str):
                 rendered_prompt,
                 file_id=file_id,
                 first_message=compile_first_message(lead.company_name),
-                voice_id=resolve_voice_id(getattr(lead, "voice_gender", None)),
+                voice_config=resolve_voice_config(getattr(lead, "voice_gender", None)),
             )
             
             lead.assistant_id = assistant_id

@@ -70,6 +70,41 @@ export interface LeadResponse {
 
 /* ── API functions ── */
 
+export interface ApiHealth {
+  ok: boolean;
+  status?: string;
+  service?: string;
+  latencyMs: number;
+  error?: string;
+}
+
+/**
+ * GET / — backend liveness probe.
+ *
+ * Hits the FastAPI root health route ({"status":"healthy", ...}) and measures
+ * round-trip latency, so the dashboard can honestly report whether the API this
+ * frontend talks to is reachable. Never throws — failures are returned as
+ * `{ ok: false, error }`.
+ */
+export async function apiHealth(): Promise<ApiHealth> {
+  const started = performance.now();
+  try {
+    const res = await fetch(`${BASE_URL}/`, { method: "GET" });
+    const latencyMs = Math.round(performance.now() - started);
+    if (!res.ok) {
+      return { ok: false, latencyMs, error: `Server returned ${res.status}` };
+    }
+    const body = (await res.json().catch(() => ({}))) as { status?: string; service?: string };
+    return { ok: true, latencyMs, status: body.status, service: body.service };
+  } catch {
+    return {
+      ok: false,
+      latencyMs: Math.round(performance.now() - started),
+      error: "Backend unreachable",
+    };
+  }
+}
+
 /**
  * POST /api/demo-request
  *
