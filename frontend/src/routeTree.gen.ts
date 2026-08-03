@@ -9,77 +9,42 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PortalRouteImport } from './routes/portal'
-import { Route as WizardRouteImport } from './routes/_wizard'
-import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as WizardUploadRouteImport } from './routes/_wizard.upload'
-import { Route as WizardPipelineRouteImport } from './routes/_wizard.pipeline'
-import { Route as WizardDemoPreviewRouteImport } from './routes/_wizard.demo-preview'
-import { Route as WizardClarificationRouteImport } from './routes/_wizard.clarification'
-import { Route as WizardBuildDemoRouteImport } from './routes/_wizard.build-demo'
-import { Route as AppVoiceAgentRouteImport } from './routes/_app.voice-agent'
-import { Route as AppSettingsRouteImport } from './routes/_app.settings'
-import { Route as AppFeedbackRouteImport } from './routes/_app.feedback'
-import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as WizardRouteImport } from './routes/_wizard'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as AppActiveDemosRouteImport } from './routes/_app.active-demos'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppFeedbackRouteImport } from './routes/_app.feedback'
+import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppVoiceAgentRouteImport } from './routes/_app.voice-agent'
+import { Route as WizardBuildDemoRouteImport } from './routes/_wizard.build-demo'
+import { Route as WizardClarificationRouteImport } from './routes/_wizard.clarification'
+import { Route as WizardDemoPreviewRouteImport } from './routes/_wizard.demo-preview'
+import { Route as WizardPipelineRouteImport } from './routes/_wizard.pipeline'
+import { Route as WizardUploadRouteImport } from './routes/_wizard.upload'
 
-const PortalRoute = PortalRouteImport.update({
-  id: '/portal',
-  path: '/portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WizardRoute = WizardRouteImport.update({
-  id: '/_wizard',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const WizardRoute = WizardRouteImport.update({
+  id: '/_wizard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WizardUploadRoute = WizardUploadRouteImport.update({
-  id: '/upload',
-  path: '/upload',
-  getParentRoute: () => WizardRoute,
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const WizardPipelineRoute = WizardPipelineRouteImport.update({
-  id: '/pipeline',
-  path: '/pipeline',
-  getParentRoute: () => WizardRoute,
-} as any)
-const WizardDemoPreviewRoute = WizardDemoPreviewRouteImport.update({
-  id: '/demo-preview',
-  path: '/demo-preview',
-  getParentRoute: () => WizardRoute,
-} as any)
-const WizardClarificationRoute = WizardClarificationRouteImport.update({
-  id: '/clarification',
-  path: '/clarification',
-  getParentRoute: () => WizardRoute,
-} as any)
-const WizardBuildDemoRoute = WizardBuildDemoRouteImport.update({
-  id: '/build-demo',
-  path: '/build-demo',
-  getParentRoute: () => WizardRoute,
-} as any)
-const AppVoiceAgentRoute = AppVoiceAgentRouteImport.update({
-  id: '/voice-agent',
-  path: '/voice-agent',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFeedbackRoute = AppFeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
+const AppActiveDemosRoute = AppActiveDemosRouteImport.update({
+  id: '/active-demos',
+  path: '/active-demos',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -87,10 +52,45 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
-const AppActiveDemosRoute = AppActiveDemosRouteImport.update({
-  id: '/active-demos',
-  path: '/active-demos',
+const AppFeedbackRoute = AppFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppVoiceAgentRoute = AppVoiceAgentRouteImport.update({
+  id: '/voice-agent',
+  path: '/voice-agent',
+  getParentRoute: () => AppRoute,
+} as any)
+const WizardBuildDemoRoute = WizardBuildDemoRouteImport.update({
+  id: '/build-demo',
+  path: '/build-demo',
+  getParentRoute: () => WizardRoute,
+} as any)
+const WizardClarificationRoute = WizardClarificationRouteImport.update({
+  id: '/clarification',
+  path: '/clarification',
+  getParentRoute: () => WizardRoute,
+} as any)
+const WizardDemoPreviewRoute = WizardDemoPreviewRouteImport.update({
+  id: '/demo-preview',
+  path: '/demo-preview',
+  getParentRoute: () => WizardRoute,
+} as any)
+const WizardPipelineRoute = WizardPipelineRouteImport.update({
+  id: '/pipeline',
+  path: '/pipeline',
+  getParentRoute: () => WizardRoute,
+} as any)
+const WizardUploadRoute = WizardUploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => WizardRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -194,18 +194,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/portal': {
-      id: '/portal'
-      path: '/portal'
-      fullPath: '/portal'
-      preLoaderRoute: typeof PortalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_wizard': {
-      id: '/_wizard'
-      path: ''
+    '/': {
+      id: '/'
+      path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof WizardRouteImport
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -215,67 +208,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
+    '/_wizard': {
+      id: '/_wizard'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof WizardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_wizard/upload': {
-      id: '/_wizard/upload'
-      path: '/upload'
-      fullPath: '/upload'
-      preLoaderRoute: typeof WizardUploadRouteImport
-      parentRoute: typeof WizardRoute
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_wizard/pipeline': {
-      id: '/_wizard/pipeline'
-      path: '/pipeline'
-      fullPath: '/pipeline'
-      preLoaderRoute: typeof WizardPipelineRouteImport
-      parentRoute: typeof WizardRoute
-    }
-    '/_wizard/demo-preview': {
-      id: '/_wizard/demo-preview'
-      path: '/demo-preview'
-      fullPath: '/demo-preview'
-      preLoaderRoute: typeof WizardDemoPreviewRouteImport
-      parentRoute: typeof WizardRoute
-    }
-    '/_wizard/clarification': {
-      id: '/_wizard/clarification'
-      path: '/clarification'
-      fullPath: '/clarification'
-      preLoaderRoute: typeof WizardClarificationRouteImport
-      parentRoute: typeof WizardRoute
-    }
-    '/_wizard/build-demo': {
-      id: '/_wizard/build-demo'
-      path: '/build-demo'
-      fullPath: '/build-demo'
-      preLoaderRoute: typeof WizardBuildDemoRouteImport
-      parentRoute: typeof WizardRoute
-    }
-    '/_app/voice-agent': {
-      id: '/_app/voice-agent'
-      path: '/voice-agent'
-      fullPath: '/voice-agent'
-      preLoaderRoute: typeof AppVoiceAgentRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/feedback': {
-      id: '/_app/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof AppFeedbackRouteImport
+    '/_app/active-demos': {
+      id: '/_app/active-demos'
+      path: '/active-demos'
+      fullPath: '/active-demos'
+      preLoaderRoute: typeof AppActiveDemosRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -285,12 +236,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/active-demos': {
-      id: '/_app/active-demos'
-      path: '/active-demos'
-      fullPath: '/active-demos'
-      preLoaderRoute: typeof AppActiveDemosRouteImport
+    '/_app/feedback': {
+      id: '/_app/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof AppFeedbackRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/voice-agent': {
+      id: '/_app/voice-agent'
+      path: '/voice-agent'
+      fullPath: '/voice-agent'
+      preLoaderRoute: typeof AppVoiceAgentRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_wizard/build-demo': {
+      id: '/_wizard/build-demo'
+      path: '/build-demo'
+      fullPath: '/build-demo'
+      preLoaderRoute: typeof WizardBuildDemoRouteImport
+      parentRoute: typeof WizardRoute
+    }
+    '/_wizard/clarification': {
+      id: '/_wizard/clarification'
+      path: '/clarification'
+      fullPath: '/clarification'
+      preLoaderRoute: typeof WizardClarificationRouteImport
+      parentRoute: typeof WizardRoute
+    }
+    '/_wizard/demo-preview': {
+      id: '/_wizard/demo-preview'
+      path: '/demo-preview'
+      fullPath: '/demo-preview'
+      preLoaderRoute: typeof WizardDemoPreviewRouteImport
+      parentRoute: typeof WizardRoute
+    }
+    '/_wizard/pipeline': {
+      id: '/_wizard/pipeline'
+      path: '/pipeline'
+      fullPath: '/pipeline'
+      preLoaderRoute: typeof WizardPipelineRouteImport
+      parentRoute: typeof WizardRoute
+    }
+    '/_wizard/upload': {
+      id: '/_wizard/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof WizardUploadRouteImport
+      parentRoute: typeof WizardRoute
     }
   }
 }
