@@ -1471,4 +1471,109 @@ select:focus-visible {
 
 .stat-hover-shimmer:hover::after {
   animation: data-shimmer 0.6s ease-out forwards;
-}
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FUTURISTIC CONSOLE ENHANCEMENTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Page-level glow backdrop (radial amber in light, radial sky-blue in dark) */
+.console-page-glow {
+  position: relative;
+  background-image: radial-gradient(ellipse 60% 45% at 80% 10%, oklch(0.92 0.21 82 / 0.04) 0%, transparent 80%);
+}
+
+.dark .console-page-glow {
+  background-image: radial-gradient(ellipse 60% 45% at 80% 10%, oklch(0.65 0.2 215 / 0.05) 0%, transparent 80%),
+                    radial-gradient(ellipse 50% 40% at 20% 80%, oklch(0.72 0.19 208 / 0.02) 0%, transparent 70%);
+}
+
+/* Glassmorphism panel with custom border glow highlights */
+.console-card-glass {
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+  background-color: color-mix(in oklch, var(--card) 65%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 
+    0 4px 30px oklch(0 0 0 / 0.02),
+    inset 0 1px 1px oklch(1 0 0 / 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .console-card-glass {
+  background-color: color-mix(in oklch, var(--card) 55%, transparent);
+  box-shadow: 
+    0 10px 40px -10px oklch(0 0 0 / 0.5),
+    inset 0 1px 0px oklch(1 0 0 / 0.07);
+}
+
+.console-card-glass:hover {
+  border-color: color-mix(in oklch, var(--primary) 30%, var(--border));
+  box-shadow: 
+    0 20px 40px -15px color-mix(in oklch, var(--primary) 20%, transparent),
+    inset 0 1px 1px oklch(1 0 0 / 0.08);
+}
+
+.dark .console-card-glass:hover {
+  box-shadow: 
+    0 24px 50px -12px oklch(0 0 0 / 0.7),
+    0 0 24px -4px color-mix(in oklch, var(--primary) 15%, transparent),
+    inset 0 1px 1px oklch(1 0 0 / 0.12);
+}
+
+/* Futuristic headers inside cards with a left gradient stripe */
+.console-card-header-futuristic {
+  position: relative;
+  overflow: hidden;
+}
+
+.console-card-header-futuristic::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--primary), var(--accent));
+  border-radius: 0 4px 4px 0;
+}
+
+/* Glassmorphism stat card variants */
+.console-stat-glow-ring {
+  box-shadow: 0 0 12px currentColor;
+}
+
+/* High-tech headers: animated gradient line underneath navigation */
+.console-header-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary) 20%, var(--accent) 80%, transparent);
+  opacity: 0.7;
+}
+
+/* Sidebar DQ Brand Glow */
+.sidebar-brand-glow {
+  position: relative;
+}
+
+.sidebar-brand-glow::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 16px;
+  background: radial-gradient(circle, color-mix(in oklch, var(--primary) 25%, transparent) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(4px);
+}
+
+/* Frosted modern table headers */
+.console-table-futuristic thead tr {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--muted) 40%, transparent), color-mix(in oklch, var(--muted) 20%, transparent)) !important;
+  backdrop-filter: blur(8px);
+}
+

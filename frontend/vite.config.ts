@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Overrides the package's 8080 default. Has no effect inside Lovable's
+  // sandbox (LOVABLE_SANDBOX=1 / DEV_SERVER__PROJECT_PATH set), which force
+  // port 8080 regardless of this setting.
+  vite: {
+    server: { port: 3000 },
+  },
 });

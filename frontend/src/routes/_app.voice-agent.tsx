@@ -157,7 +157,7 @@ function VoiceAgent() {
   return (
     <>
       <TopNav title="Voice Agents" />
-      <div className="grid gap-6 p-6 xl:grid-cols-3">
+      <div className="console-page-glow flex-1 grid gap-6 p-6 xl:grid-cols-3">
         {/* Agent list */}
         <div className="space-y-3 xl:col-span-1">
           <div className="relative">
@@ -186,15 +186,15 @@ function VoiceAgent() {
               {error}
             </div>
           ) : loading && leads.length === 0 ? (
-            <div className="console-card p-6 text-center text-sm text-muted-foreground">
+            <div className="console-card-glass p-6 text-center text-sm text-muted-foreground">
               Loading…
             </div>
           ) : agents.length === 0 ? (
-            <div className="console-card p-6 text-center text-sm text-muted-foreground">
+            <div className="console-card-glass p-6 text-center text-sm text-muted-foreground">
               No provisioned agents yet. Generate a demo to create one.
             </div>
           ) : (
-            <ul className="console-card divide-y divide-border/60 overflow-hidden">
+            <ul className="console-card-glass divide-y divide-border/60 overflow-hidden">
               {agents.map((a) => (
                 <li key={a.id}>
                   <button
@@ -207,7 +207,7 @@ function VoiceAgent() {
                       selected?.id === a.id && "bg-primary/10",
                     )}
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary console-stat-glow-ring">
                       <Bot className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -228,9 +228,9 @@ function VoiceAgent() {
         <div className="space-y-6 xl:col-span-2">
           {selected ? (
             <>
-              <div className="console-card p-5">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
+              <div className="console-card-glass p-5">
+                <div className="console-card-header-futuristic flex flex-col gap-4 md:flex-row md:items-start md:justify-between pb-3 border-b border-border/40">
+                  <div className="min-w-0 pl-2">
                     <div className="flex items-center gap-2">
                       <h2 className="text-base font-semibold">{selected.company_name}</h2>
                       <StatusBadge tone={statusToTone(selected.agent_status)}>
@@ -243,7 +243,7 @@ function VoiceAgent() {
                   </div>
                 </div>
 
-                <dl className="mt-5 grid gap-4 border-t pt-4 sm:grid-cols-2">
+                <dl className="mt-5 grid gap-4 border-t border-border/40 pt-4 sm:grid-cols-2">
                   <Field label="Assistant ID" value={selected.assistant_id ?? "—"} mono />
                   <Field label="Contact" value={selected.contact_email} />
                   <Field label="Provisioned" value={formatDate(selected.created_at)} />
@@ -261,7 +261,7 @@ function VoiceAgent() {
                 </dl>
 
                 {/* Delete agent — tears down the Vapi assistant, keeps the lead. */}
-                <div className="mt-4 border-t pt-4">
+                <div className="mt-4 border-t border-border/40 pt-4">
                   {!confirmingDelete ? (
                     <button
                       onClick={() => setConfirmingDelete(true)}
@@ -302,15 +302,15 @@ function VoiceAgent() {
               </div>
 
               {/* Real call history for this agent (Vapi's own reports). */}
-              <div className="console-card p-5">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+              <div className="console-card-glass p-5">
+                <div className="console-card-header-futuristic mb-4 flex items-center justify-between gap-2 pb-3 border-b border-border/40">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold pl-2">
                     <Phone className="h-4 w-4 text-muted-foreground" /> Call history
                   </h3>
                   <button
                     onClick={() => selectedAgentId && loadCalls(selectedAgentId)}
                     disabled={!selectedAgentId || callsLoading}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 cursor-pointer pr-1"
                   >
                     <RefreshCw className={callsLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
                     Refresh
@@ -353,21 +353,21 @@ function VoiceAgent() {
                 )}
               </div>
 
-              <div className="console-card p-5">
-                <div className="mb-1 flex items-center gap-2">
-                  <h3 className="text-sm font-semibold">Microphone check</h3>
+              <div className="console-card-glass p-5">
+                <div className="console-card-header-futuristic mb-3 flex items-center gap-2 pb-3 border-b border-border/40">
+                  <h3 className="text-sm font-semibold pl-2">Microphone check</h3>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Verify your mic before running a live voice test. This runs entirely in your
                   browser — it doesn't call the agent.
                 </p>
-                <div className="mt-4 flex justify-center rounded-lg border bg-background/60 py-6">
+                <div className="mt-4 flex justify-center rounded-lg border border-border/60 bg-background/40 py-6">
                   <Waveform />
                 </div>
               </div>
             </>
           ) : (
-            <div className="console-card p-10 text-center text-sm text-muted-foreground">
+            <div className="console-card-glass p-10 text-center text-sm text-muted-foreground">
               Select an agent to see its details and test it.
             </div>
           )}

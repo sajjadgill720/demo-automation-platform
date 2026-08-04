@@ -546,6 +546,15 @@ def create_demo_request(
 
     problem = payload.problem_text.strip() if payload.problem_text else None
 
+    # Qualify at intake so obvious junk / off-target submissions are filtered here,
+    # before the lead enters the clarification chat and provisioning. An unqualified
+    # lead is created as `skipped`; the frontend routes it straight to the "not
+    # qualified" screen instead of /upload. The qualifier FAILS OPEN (see
+    # qualifier.py) — a missing key or LLM error yields qualified=True — so a real
+    # lead is never blocked by a qualification outage. Provisioning trusts this
+    # stored result and does not re-run qualification.
+    qualification = qualify_lead_internal(payload.company_name, payload.industry)
+
     lead = Lead(
         company_name=payload.company_name,
         contact_name=payload.contact_name,
@@ -555,14 +564,24 @@ def create_demo_request(
         problem_statement=problem or None,
         voice_gender=(payload.voice_gender or "female").strip().lower(),
         rendered_prompt=rendered_prompt,
-        agent_status=AgentStatus.pending
+        agent_status=AgentStatus.pending if qualification.qualified else AgentStatus.skipped,
+        qualified=qualification.qualified,
+        qualification_confidence=qualification.confidence,
+        qualification_reasoning=qualification.reasoning,
     )
-    
+
     session.add(lead)
     session.commit()
     session.refresh(lead)
-    
-    logger.info("Saved lead to database", extra={"extra_data": {"lead_id": str(lead.id)}})
+
+    logger.info(
+        "Saved lead to database",
+        extra={"extra_data": {
+            "lead_id": str(lead.id),
+            "qualified": qualification.qualified,
+            "agent_status": lead.agent_status.value,
+        }},
+    )
     return lead
 
 

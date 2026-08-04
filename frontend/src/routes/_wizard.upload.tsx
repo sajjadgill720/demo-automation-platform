@@ -449,7 +449,7 @@ function UploadRoute() {
             type="button"
             onClick={handleSkipUploadStep}
             disabled={isIngesting}
-            className="inline-flex items-center gap-2 border border-border/60 bg-secondary/40 text-foreground/70 hover:text-foreground hover:bg-secondary hover:border-border font-sans text-xs font-semibold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
+            className="inline-flex items-center gap-2 border-0 bg-yellow-400 text-black hover:bg-yellow-500 dark:bg-sky-500 dark:text-white dark:hover:bg-sky-600 font-sans text-xs font-semibold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
             Skip for now
           </button>

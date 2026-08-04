@@ -264,6 +264,9 @@ function DemoPreview() {
   const callStartRef = useRef<number | null>(null);
   const assistantIdRef = useRef<string | null>(null);
   const leadIdRef = useRef<string | null>(dynamicLeadId);
+  // Mirror of callStatus so the once-registered Vapi handlers can read the LIVE
+  // status (a handler closes over the value at registration time otherwise).
+  const callStatusRef = useRef(callStatus);
 
   // Keep the refs in sync so the once-registered call-end handler always saves
   // against the currently-resolved agent and lead (the assistant id can arrive
@@ -272,6 +275,10 @@ function DemoPreview() {
     assistantIdRef.current = resolvedAssistantId;
     leadIdRef.current = dynamicLeadId;
   }, [resolvedAssistantId, dynamicLeadId]);
+
+  useEffect(() => {
+    callStatusRef.current = callStatus;
+  }, [callStatus]);
 
   // The two primary actions (feedback + booking) live in this block, directly
   // below the demo. When a call ends — the moment the client is most primed to
@@ -321,6 +328,8 @@ function DemoPreview() {
       console.warn("VITE_VAPI_PUBLIC_KEY is not defined in environment variables.");
     }
 
+    let createdVapi: any = null;
+
     import("@vapi-ai/web").then((VapiModule) => {
       try {
         let VapiClass = VapiModule.default;
@@ -331,15 +340,39 @@ function DemoPreview() {
           VapiClass = VapiModule as any;
         }
         const vapiInstance = new (VapiClass as any)(VAPI_PUBLIC_KEY);
+        createdVapi = vapiInstance;
 
-        vapiInstance.on("call-start", (payload: any) => {
-          setCallStatus("on-call");
-          callStartRef.current = Date.now();
-          // Some SDK versions surface the call id on the event; otherwise it comes
-          // from the start() promise (see handleStartBrowserCall).
-          const idFromEvent = payload?.call?.id || payload?.id;
-          if (typeof idFromEvent === "string") vapiCallIdRef.current = idFromEvent;
-          toast.success("Connected to generated demo agent.");
+        // Flip out of the "connecting" spinner into the live-call UI. Idempotent,
+        // and driven by SEVERAL signals because in the current SDK (2.6.x) the
+        // bare `call-start` event does not always land before the agent's first
+        // words — `call-start-success` and `speech-start` are used as fallbacks
+        // so the loader never sticks while the agent is already talking.
+        const markConnected = () => {
+          if (!callStartRef.current) callStartRef.current = Date.now();
+          if (callStatusRef.current !== "on-call") {
+            setCallStatus("on-call");
+            toast.success("Connected to generated demo agent.");
+          }
+        };
+
+        vapiInstance.on("call-start", () => markConnected());
+        vapiInstance.on("call-start-success", (evt: any) => {
+          // This event DOES carry the call id in 2.6.x; capture it for the report.
+          if (evt?.callId && typeof evt.callId === "string") vapiCallIdRef.current = evt.callId;
+          markConnected();
+        });
+        // The agent (or the caller) producing speech proves the call is live —
+        // clear the loader even if the connection events were missed.
+        vapiInstance.on("speech-start", () => {
+          if (callStatusRef.current === "connecting") markConnected();
+        });
+
+        vapiInstance.on("call-start-failed", (evt: any) => {
+          console.error("Vapi call-start-failed:", evt);
+          setCallStatus("idle");
+          toast.error(
+            evt?.error ? `Couldn't start the call: ${evt.error}` : "Couldn't start the call.",
+          );
         });
 
         vapiInstance.on("call-end", () => {
@@ -366,8 +399,13 @@ function DemoPreview() {
 
         vapiInstance.on("error", (err: any) => {
           console.error("Vapi error:", err);
-          setCallStatus("idle");
-          toast.error("Connection failed.");
+          // Only tear the UI down if we never got connected. An error emitted
+          // mid-call is left to `call-end` to handle, so a benign warning does
+          // not yank an active call back to the idle screen.
+          if (callStatusRef.current === "connecting" || callStatusRef.current === "idle") {
+            setCallStatus("idle");
+            toast.error("Connection failed. Check your microphone permission and try again.");
+          }
         });
 
         setVapi(vapiInstance);
@@ -377,11 +415,19 @@ function DemoPreview() {
     });
 
     return () => {
-      if (vapi) {
-        vapi.stop();
+      // Stop the instance THIS effect created. The previous code closed over the
+      // `vapi` state (still null when the empty-deps effect ran), so the call and
+      // microphone were never released on unmount.
+      if (createdVapi) {
+        try {
+          createdVapi.stop();
+        } catch {
+          /* already stopped / never started */
+        }
       }
-      // Best-effort unmount cleanup for the Vapi assistant.
-      // Removed endDemoSession here because React StrictMode triggers it instantly during dev, deleting the backend agent before the user can even test it!
+      // endDemoSession is intentionally NOT called here: React StrictMode would
+      // trigger it instantly during dev, deleting the backend agent before the
+      // user can even test it.
     };
   }, []);
 

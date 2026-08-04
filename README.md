@@ -31,7 +31,7 @@ such rather than described as finished. See [Known limitations](#known-limitatio
 
 ## Project overview
 
-DataQuartz is the backend + frontend for generating **Convoa** voice-agent demos on
+Demoflow is the backend + frontend for generating **Convoa** voice-agent demos on
 demand. Convoa is an AI front-desk receptionist; this platform is the machinery
 that produces a *personalized* demo of it for each sales lead.
 
@@ -77,9 +77,12 @@ wired** are called out inline.
 ```
 1. Lead submits intake form
    frontend /build-demo  →  POST /api/demo-request
-   → creates a Lead (status = pending)
+   → runs qualification (qualify_lead_internal on company + industry)
+   → creates a Lead (status = pending, or skipped if unqualified)
    → renders a SEED prompt (company + industry only, no profile yet)
-   → NOTE: does NOT enqueue provisioning here, and does NOT run qualification
+   → an unqualified lead is skipped here: the frontend routes it to the
+     "not qualified" screen instead of /upload
+   → NOTE: does NOT enqueue provisioning here
                      │
                      ▼
 2. Optional document upload + AI-processing consent
@@ -100,6 +103,11 @@ wired** are called out inline.
                      ▼
 4. Personalized Vapi agent provisioning  (FastAPI BackgroundTask)
    provision_vapi_assistant_task(lead_id):
+     0. qualification gate      → trusts the intake-time qualification result;
+                                  only re-runs qualify_lead_internal if a lead
+                                  reached here without one. An unqualified lead →
+                                  agent_status = skipped and the task returns
+                                  before any Vapi work. Fails OPEN.
      a. summarizing_documents  → document_summarizer (map-reduce, if consented
                                   document passed the injection gate)
      b. building_profile       → compile_lead_prompt() assembles the Vapi prompt
@@ -118,11 +126,16 @@ wired** are called out inline.
    → POST /api/demo-request/{lead_id}/end-session (tears down the assistant)
 ```
 
-**Qualification is defined but not in this flow.** A separate lead-qualification
-LangGraph exists (`qualifier.py`, exposed at `POST /api/qualify`) but nothing in
-the demo pipeline calls it, so no lead is actually qualified/disqualified during
-the flow above and `AgentStatus.skipped` is never set. See
-[Known limitations](#known-limitations--open-items).
+**Qualification runs at intake.** The lead-qualification LangGraph (`qualifier.py`,
+also exposed standalone at `POST /api/qualify`) runs inside `POST /api/demo-request`
+on `company_name` + `industry`. It writes `qualified` /
+`qualification_confidence` / `qualification_reasoning`, and an unqualified lead is
+created as `AgentStatus.skipped` — the frontend then routes it to the "not
+qualified" screen instead of clarification. Provisioning (Stage 0 of
+`provision_vapi_assistant_task`) trusts this stored result and only re-runs the
+qualifier if a lead somehow reaches it without one. It
+[fails open](#known-limitations--open-items), so a qualification outage lets a
+genuine lead through rather than blocking it.
 
 **A second, legacy path exists** alongside the Lead pipeline: the
 "discovery"/`VoiceAgent` endpoints (`/api/discovery`, `/api/agents/provision/...`)
@@ -281,9 +294,9 @@ tables at runtime via `PostgresSaver.setup()`.
 | assistant_id | str(255)? | Vapi assistant id once provisioned |
 | agent_status | enum `AgentStatus` | pending, summarizing_documents, building_profile, provisioning, active, completed, failed, skipped |
 | failure_reason | str? | Set on provisioning failure |
-| qualified | bool? | **Never populated by the pipeline** |
-| qualification_confidence | float? | **Never populated by the pipeline** |
-| qualification_reasoning | str? | **Never populated by the pipeline** |
+| qualified | bool? | Set at Stage 0 of provisioning by `qualify_lead_internal` |
+| qualification_confidence | float? | Set at Stage 0 of provisioning (0.0–1.0) |
+| qualification_reasoning | str? | Set at Stage 0 of provisioning; shown on the pipeline "not qualified" screen |
 | ai_processing_consent | bool | Default false |
 | consent_recorded_at | datetime? | |
 | created_at / updated_at | datetime | |
@@ -409,10 +422,14 @@ Base URL defaults to `http://localhost:8000`. All bodies are JSON unless noted.
 - **GET `/api/leads?limit=&status=`** → `LeadResponse[]` (newest first; optional
   `agent_status` filter; limit clamped 1–200).
 
-### Qualification (standalone — not used by the pipeline)
+### Qualification
+- The qualifier graph runs as **Stage 0 of `provision_vapi_assistant_task`**, and
+  its result is persisted to the lead (`qualified` / `qualification_confidence` /
+  `qualification_reasoning`); an unqualified lead is set to `skipped` and skips
+  provisioning.
 - **POST `/api/qualify`** → `QualificationResult {qualified, confidence, reasoning}`.
-  Body: `{company_name, industry}`. Runs the qualifier graph. Result is **not
-  persisted** and nothing else calls this.
+  Body: `{company_name, industry}`. Runs the same qualifier graph on demand; this
+  standalone endpoint does **not** persist its result (the pipeline path does).
 
 ### Clarification
 - **POST `/api/clarification/{lead_id}/documents`** (multipart, `file=`) →
@@ -561,11 +578,13 @@ demo wizard starts at `/build-demo`.
 
 Honest list — this is the part that saves the next person the most time.
 
-1. **Qualifier is not wired into the pipeline.** `qualifier.py` and `/api/qualify`
-   exist and work, but the demo flow never calls `qualify_lead_internal`.
-   Consequently `AgentStatus.skipped` is never set and `leads.qualified` /
-   `qualification_confidence` / `qualification_reasoning` are never populated by
-   the flow. (The import in `clarification.py` is currently unused.)
+1. **Qualification uses company + industry only.** `qualify_lead_internal` runs at
+   intake (`POST /api/demo-request`) and again defensively at provisioning if a
+   lead arrives without a result, setting `AgentStatus.skipped` for unqualified
+   leads. It judges on `company_name` + `industry` only — the clarification
+   profile is captured later and is not fed back into qualification, so a lead
+   that looks fine at intake is never re-evaluated against what it revealed in the
+   chat.
 2. **Second LLM provider is a stub.** `llm_client.py`'s `"other_provider"` branch
    raises `NotImplementedError`. Only Groq is implemented.
 3. **No orphaned-assistant cleanup.** `end_demo_session` carries an explicit TODO:

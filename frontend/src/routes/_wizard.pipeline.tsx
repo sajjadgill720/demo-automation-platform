@@ -65,6 +65,12 @@ function PipelineRoute() {
   const navigate = useNavigate();
 
   const [isFormBuilding, setIsFormBuilding] = useState(true);
+  // True until the FIRST status fetch resolves. Until then we show a neutral
+  // "checking" spinner rather than the "Building your agent" box — otherwise a
+  // lead that was skipped at intake would flash the build pipeline for a moment
+  // before the not-qualified screen appears. The build box belongs to the real
+  // post-clarification provisioning flow, not to an unqualified lead.
+  const [initializing, setInitializing] = useState(true);
   // The real backend stage, straight from agent_status. Never inferred or timed.
   const [stage, setStage] = useState<LeadResponse["agent_status"]>("pending");
   
@@ -99,10 +105,13 @@ function PipelineRoute() {
     const MAX_POLL_DURATION_MS = 300000;
     const startTime = Date.now();
 
-    const pollId = setInterval(async () => {
+    let pollId: ReturnType<typeof setInterval>;
+
+    const checkStatus = async () => {
       if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
         clearInterval(pollId);
         setIsFormBuilding(false);
+        setInitializing(false);
         setPollingError("This is taking longer than expected. Please try again.");
         return;
       }
@@ -127,10 +136,18 @@ function PipelineRoute() {
           setIsFormBuilding(false);
           setPollingError(lead.failure_reason || "Vapi agent provisioning failed.");
         }
+        // First resolved status decides which screen to show, so the build box
+        // is only ever rendered once we know the lead is genuinely building.
+        setInitializing(false);
       } catch (err) {
         // Swallow transient network blips during polling
       }
-    }, POLL_INTERVAL_MS);
+    };
+
+    // Poll immediately so a skipped lead lands on the not-qualified screen at
+    // once, instead of flashing the build box until the first interval tick.
+    checkStatus();
+    pollId = setInterval(checkStatus, POLL_INTERVAL_MS);
 
     return () => clearInterval(pollId);
   }, [isFormBuilding, leadId]);
@@ -279,6 +296,13 @@ function PipelineRoute() {
               </button>
             </div>
           </div>
+        </div>
+      ) : initializing ? (
+        /* CHECKING — brief neutral state until the first status fetch resolves,
+           so a lead that was skipped at intake never flashes the build box
+           before the not-qualified screen. */
+        <div className="w-full max-w-2xl mx-auto flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
         </div>
       ) : (
         /* WORKING — the one real in-progress state. Indeterminate on purpose: the

@@ -174,7 +174,7 @@ function ActiveDemos() {
   return (
     <>
       <TopNav title="Demos" />
-      <div className="space-y-4 p-6">
+      <div className="console-page-glow flex-1 space-y-4 p-6">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1 max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -189,7 +189,7 @@ function ActiveDemos() {
           {/* Status filter — a dropdown with live per-status counts. Both the
               trigger and the menu carry the dense elevation shadow. */}
           <Select value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
-            <SelectTrigger className="w-[190px] demo-dropdown-trigger">
+            <SelectTrigger className="w-[190px] demo-dropdown-trigger btn-themed-shadow transition-all duration-200 hover:-translate-y-[1px] active:translate-y-0 cursor-pointer">
               <span className="text-sm font-bold text-primary tracking-wide">
                 {statusLabel(filter)}
               </span>
@@ -239,8 +239,8 @@ function ActiveDemos() {
             {error}
           </div>
         ) : (
-          <div className="console-card overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="console-card-glass overflow-x-auto">
+            <table className="w-full text-sm console-table-futuristic">
               <thead>
                 <tr className="border-b border-border/70 bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                   <SortTh label="Company" col="company_name" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />

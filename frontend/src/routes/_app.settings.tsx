@@ -84,170 +84,172 @@ function Settings() {
   return (
     <>
       <TopNav title="Settings" />
-      <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
-        {/* Appearance */}
-        <section className="console-card overflow-hidden">
-          <div className="border-b border-border/70 bg-muted/30 px-4 py-3">
-            <h2 className="text-sm font-semibold">Appearance</h2>
-            <p className="text-xs text-muted-foreground">How the dashboard looks on this device.</p>
-          </div>
-          <div className="flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium">Theme</span>
+      <div className="console-page-glow flex-1">
+        <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
+          {/* Appearance */}
+          <section className="console-card-glass overflow-hidden">
+            <div className="console-card-header-futuristic border-b border-border/70 bg-muted/10 px-5 py-4">
+              <h2 className="text-sm font-semibold pl-2">Appearance</h2>
+              <p className="text-xs text-muted-foreground pl-2">How the dashboard looks on this device.</p>
             </div>
-            <div className="inline-flex overflow-hidden rounded-lg border border-border/80">
-              <ThemeOption
-                current={preference}
-                value="light"
-                onSelect={setPreference}
-                icon={Sun}
-                label="Light"
-                position="left"
-              />
-              <ThemeOption
-                current={preference}
-                value="dark"
-                onSelect={setPreference}
-                icon={Moon}
-                label="Dark"
-                position="middle"
-              />
-              <ThemeOption
-                current={preference}
-                value="system"
-                onSelect={setPreference}
-                icon={Monitor}
-                label="System"
-                position="right"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Backend connection (live) */}
-        <section className="console-card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border/70 bg-muted/30 px-4 py-3">
-            <div>
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-                <Activity className="h-4 w-4 text-muted-foreground" /> Backend connection
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Live status of the API this dashboard talks to.
-              </p>
-            </div>
-            <button
-              onClick={checkHealth}
-              disabled={checking}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
-            >
-              <RefreshCw className={checking ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-              Recheck
-            </button>
-          </div>
-          <div className="flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-2.5">
-              <span
-                className={cn(
-                  "relative flex h-2.5 w-2.5 shrink-0 rounded-full",
-                  checking ? "bg-muted-foreground/50" : health?.ok ? "bg-success" : "bg-destructive",
-                )}
-              >
-                {!checking && health?.ok && (
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
-                )}
-              </span>
-              <div className="text-sm">
-                <div className="font-medium">
-                  {checking
-                    ? "Checking…"
-                    : health?.ok
-                      ? "Connected"
-                      : "Unreachable"}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {checking
-                    ? "Pinging the API…"
-                    : health?.ok
-                      ? `Healthy · responded in ${health.latencyMs} ms`
-                      : health?.error || "No response from the API."}
-                </div>
+            <div className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium">Theme</span>
+              </div>
+              <div className="inline-flex overflow-hidden rounded-lg border border-border/80">
+                <ThemeOption
+                  current={preference}
+                  value="light"
+                  onSelect={setPreference}
+                  icon={Sun}
+                  label="Light"
+                  position="left"
+                />
+                <ThemeOption
+                  current={preference}
+                  value="dark"
+                  onSelect={setPreference}
+                  icon={Moon}
+                  label="Dark"
+                  position="middle"
+                />
+                <ThemeOption
+                  current={preference}
+                  value="system"
+                  onSelect={setPreference}
+                  icon={Monitor}
+                  label="System"
+                  position="right"
+                />
               </div>
             </div>
-            {!checking &&
-              (health?.ok ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
-                  <Check className="h-3.5 w-3.5" /> Online
+          </section>
+
+          {/* Backend connection (live) */}
+          <section className="console-card-glass overflow-hidden">
+            <div className="console-card-header-futuristic flex items-center justify-between border-b border-border/70 bg-muted/10 px-5 py-4">
+              <div className="pl-2">
+                <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Activity className="h-4 w-4 text-muted-foreground" /> Backend connection
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Live status of the API this dashboard talks to.
+                </p>
+              </div>
+              <button
+                onClick={checkHealth}
+                disabled={checking}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
+              >
+                <RefreshCw className={checking ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+                Recheck
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={cn(
+                    "relative flex h-2.5 w-2.5 shrink-0 rounded-full",
+                    checking ? "bg-muted-foreground/50" : health?.ok ? "bg-success" : "bg-destructive",
+                  )}
+                >
+                  {!checking && health?.ok && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
+                  )}
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
-                  <X className="h-3.5 w-3.5" /> Offline
-                </span>
-              ))}
-          </div>
-        </section>
+                <div className="text-sm">
+                  <div className="font-medium">
+                    {checking
+                      ? "Checking…"
+                      : health?.ok
+                        ? "Connected"
+                        : "Unreachable"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {checking
+                      ? "Pinging the API…"
+                      : health?.ok
+                        ? `Healthy · responded in ${health.latencyMs} ms`
+                        : health?.error || "No response from the API."}
+                  </div>
+                </div>
+              </div>
+              {!checking &&
+                (health?.ok ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+                    <Check className="h-3.5 w-3.5" /> Online
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
+                    <X className="h-3.5 w-3.5" /> Offline
+                  </span>
+                ))}
+            </div>
+          </section>
 
-        {/* Voice infrastructure (read-only) */}
-        <section className="console-card overflow-hidden">
-          <div className="border-b border-border/70 bg-muted/30 px-4 py-3">
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-              <ServerCog className="h-4 w-4 text-muted-foreground" /> Voice infrastructure
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Configured server-side via environment variables — not editable from the dashboard.
-            </p>
-          </div>
-          <dl className="divide-y divide-border/60 text-sm">
-            <ConfigRow
-              label="Vapi API key (server)"
-              icon={KeyRound}
-              hint="Set as VAPI_API_KEY in the backend environment."
-              status="managed"
-            />
-            <ConfigRow
-              label="Vapi public key (browser calls)"
-              icon={KeyRound}
-              hint="VITE_VAPI_PUBLIC_KEY — required for the live voice test."
-              status={publicKeySet ? "set" : "missing"}
-            />
-            <ConfigRow
-              label="Agent provisioning"
-              icon={ServerCog}
-              hint="One Vapi agent is created automatically per generated demo."
-              status="managed"
-            />
-          </dl>
-        </section>
+          {/* Voice infrastructure (read-only) */}
+          <section className="console-card-glass overflow-hidden">
+            <div className="console-card-header-futuristic border-b border-border/70 bg-muted/10 px-5 py-4">
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold pl-2">
+                <ServerCog className="h-4 w-4 text-muted-foreground" /> Voice infrastructure
+              </h2>
+              <p className="text-xs text-muted-foreground pl-2">
+                Configured server-side via environment variables — not editable from the dashboard.
+              </p>
+            </div>
+            <dl className="divide-y divide-border/60 text-sm">
+              <ConfigRow
+                label="Vapi API key (server)"
+                icon={KeyRound}
+                hint="Set as VAPI_API_KEY in the backend environment."
+                status="managed"
+              />
+              <ConfigRow
+                label="Vapi public key (browser calls)"
+                icon={KeyRound}
+                hint="VITE_VAPI_PUBLIC_KEY — required for the live voice test."
+                status={publicKeySet ? "set" : "missing"}
+              />
+              <ConfigRow
+                label="Agent provisioning"
+                icon={ServerCog}
+                hint="One Vapi agent is created automatically per generated demo."
+                status="managed"
+              />
+            </dl>
+          </section>
 
-        {/* Session */}
-        <section className="console-card overflow-hidden">
-          <div className="border-b border-border/70 bg-muted/30 px-4 py-3">
-            <h2 className="text-sm font-semibold">Session</h2>
-            <p className="text-xs text-muted-foreground">
-              You're signed in to the internal portal on this browser.
-            </p>
-          </div>
-          <div className="flex items-center justify-between px-4 py-4">
-            <span className="text-sm text-muted-foreground">
-              Sign out to clear this device's access.
-            </span>
-            <button
-              onClick={handleSignOut}
-              disabled={loggingOut}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50 cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
-            >
-              {loggingOut ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LogOut className="h-4 w-4" />
-              )}
-              {loggingOut ? "Signing out…" : "Sign out"}
-            </button>
-          </div>
-        </section>
+          {/* Session */}
+          <section className="console-card-glass overflow-hidden">
+            <div className="console-card-header-futuristic border-b border-border/70 bg-muted/10 px-5 py-4">
+              <h2 className="text-sm font-semibold pl-2">Session</h2>
+              <p className="text-xs text-muted-foreground pl-2">
+                You're signed in to the internal portal on this browser.
+              </p>
+            </div>
+            <div className="flex items-center justify-between px-5 py-4">
+              <span className="text-sm text-muted-foreground">
+                Sign out to clear this device's access.
+              </span>
+              <button
+                onClick={handleSignOut}
+                disabled={loggingOut}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50 cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
+              >
+                {loggingOut ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                {loggingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </div>
+          </section>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Team, billing and integrations aren't available yet.
-        </p>
+          <p className="text-center text-xs text-muted-foreground">
+            Team, billing and integrations aren't available yet.
+          </p>
+        </div>
       </div>
     </>
   );

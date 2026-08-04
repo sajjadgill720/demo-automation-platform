@@ -1,0 +1,134 @@
+{
+  "finance": {
+    "specificity": 1,
+    "source": "generated",
+    "display_name": "financial services firm",
+    "aliases": [
+      "finance",
+      "banking",
+      "financial advisor",
+      "accounting",
+      "loans",
+      "wealth management"
+    ],
+    "business_stakes": "Finance clients often call about time-sensitive matters like wire transfers, account access, loan applications, or market-moving decisions, and a missed call can mean lost business, compliance concerns, or a client turning to a competitor. Slow or absent phone handling also erodes trust in a relationship built on responsiveness and discretion.",
+    "caller_scenarios": [
+      [
+        "a caller is asking about the company's services or pricing",
+        "answer from the provided business information only, and where it does not cover the question, take their details and confirm someone will follow up"
+      ],
+      [
+        "a caller asks for a specific person or department",
+        "take their name, number, and the reason for the call, and confirm the message will be passed on"
+      ],
+      [
+        "an existing customer is calling with a problem or complaint",
+        "acknowledge the problem, capture what happened and any order or account reference, and confirm it is being escalated — do not promise a refund, credit, or resolution"
+      ],
+      [
+        "a caller wants to book an appointment or a callback",
+        "collect their name, contact number, and preferred times, and confirm the next step"
+      ],
+      [
+        "a caller asks something the provided business information does not cover",
+        "say plainly that you want to get them an accurate answer, take their details, and confirm a callback rather than guessing"
+      ]
+    ],
+    "default_escalation": "Take the caller's name, callback number, and the reason for the call, then confirm that the team will get back to them. Do not commit to a specific time unless the business information provides one.",
+    "common_questions": [
+      "Can I speak with someone about opening a new account?",
+      "What are your current rates for a mortgage or loan?",
+      "I lost my debit card, what should I do next?",
+      "Can you help me reset my online banking login?",
+      "What documents do I need to apply for a small business loan?"
+    ]
+  },
+  "cloud services": {
+    "specificity": 1,
+    "source": "generated",
+    "display_name": "cloud services provider",
+    "aliases": [
+      "cloud services",
+      "cloud computing",
+      "iaas",
+      "paas",
+      "saas provider",
+      "managed cloud"
+    ],
+    "business_stakes": "Cloud services clients often need rapid help with outages, provisioning, or account access, and a missed call can mean lost revenue, churn to a competitor, or a stalled deployment. First impressions matter because prospects comparing providers will move on quickly if they cannot reach a human.",
+    "caller_scenarios": [
+      [
+        "a caller is asking about the company's services or pricing",
+        "answer from the provided business information only, and where it does not cover the question, take their details and confirm someone will follow up"
+      ],
+      [
+        "a caller asks for a specific person or department",
+        "take their name, number, and the reason for the call, and confirm the message will be passed on"
+      ],
+      [
+        "an existing customer is calling with a problem or complaint",
+        "acknowledge the problem, capture what happened and any order or account reference, and confirm it is being escalated — do not promise a refund, credit, or resolution"
+      ],
+      [
+        "a caller wants to book an appointment or a callback",
+        "collect their name, contact number, and preferred times, and confirm the next step"
+      ],
+      [
+        "a caller asks something the provided business information does not cover",
+        "say plainly that you want to get them an accurate answer, take their details, and confirm a callback rather than guessing"
+      ]
+    ],
+    "default_escalation": "Take the caller's name, callback number, and the reason for the call, then confirm that the team will get back to them. Do not commit to a specific time unless the business information provides one.",
+    "common_questions": [
+      "Can you help me migrate my existing infrastructure to your platform?",
+      "What is the pricing for your managed cloud services?",
+      "Do you offer 24/7 support and what is the response time for critical issues?",
+      "Is my data stored in a specific region for compliance reasons?",
+      "Can I get a demo or trial of your platform before committing?"
+    ]
+  },
+  "home appliances": {
+    "specificity": 1,
+    "source": "generated",
+    "display_name": "home appliances store",
+    "aliases": [
+      "home appliances",
+      "appliance store",
+      "appliance repair",
+      "home appliance shop",
+      "appliance service",
+      "major appliances"
+    ],
+    "business_stakes": "Home appliances customers often call with time-sensitive needs like broken refrigerators, water heaters, or ovens, so a missed call can mean losing an urgent repair or replacement job to a competitor. Many shoppers also call to confirm stock, pricing, and delivery windows before driving to the store, so unanswered calls translate directly into lost sales.",
+    "caller_scenarios": [
+      [
+        "a caller is asking about the company's services or pricing",
+        "answer from the provided business information only, and where it does not cover the question, take their details and confirm someone will follow up"
+      ],
+      [
+        "a caller asks for a specific person or department",
+        "take their name, number, and the reason for the call, and confirm the message will be passed on"
+      ],
+      [
+        "an existing customer is calling with a problem or complaint",
+        "acknowledge the problem, capture what happened and any order or account reference, and confirm it is being escalated — do not promise a refund, credit, or resolution"
+      ],
+      [
+        "a caller wants to book an appointment or a callback",
+        "collect their name, contact number, and preferred times, and confirm the next step"
+      ],
+      [
+        "a caller asks something the provided business information does not cover",
+        "say plainly that you want to get them an accurate answer, take their details, and confirm a callback rather than guessing"
+      ]
+    ],
+    "default_escalation": "Take the caller's name, callback number, and the reason for the call, then confirm that the team will get back to them. Do not commit to a specific time unless the business information provides one.",
+    "common_questions": [
+      "Do you have this model refrigerator in stock right now?",
+      "How much does it cost to repair a washing machine that won't drain?",
+      "What's the turnaround time for a service call on my oven?",
+      "Do you offer delivery and installation for large appliances?",
+      "Can I schedule a technician to come out tomorrow morning?"
+    ]
+  }
+}

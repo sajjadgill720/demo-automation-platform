@@ -8,7 +8,7 @@ export function TopNav({ title, actions }: { title: string; actions?: React.Reac
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border/70 bg-background/70 px-6 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border/70 bg-background/70 px-6 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 relative">
       <h1 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h1>
       <div className="ml-auto flex items-center gap-1.5">
         {actions}
@@ -33,6 +33,7 @@ export function TopNav({ title, actions }: { title: string; actions?: React.Reac
           View demo as client
         </Link>
       </div>
+      <div className="console-header-line" />
     </header>
   );
 }

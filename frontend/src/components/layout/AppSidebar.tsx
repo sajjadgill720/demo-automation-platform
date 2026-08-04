@@ -16,7 +16,7 @@ export function AppSidebar() {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 pt-6 pb-7">
+      <div className="flex items-center gap-3 px-5 pt-6 pb-7 sidebar-brand-glow">
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground font-bold text-xs uppercase tracking-tight shadow-lg shadow-primary/25">
           DQ
           <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-white/20" />
@@ -26,6 +26,8 @@ export function AppSidebar() {
           <p className="text-[11px] leading-tight text-sidebar-foreground/55">AI Demo Automation</p>
         </div>
       </div>
+
+      <div className="mx-5 mb-5 h-[1px] bg-gradient-to-r from-border/10 via-border/50 to-border/10" />
 
       <nav className="flex-1 space-y-1 px-3">
         <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40">
@@ -59,6 +61,14 @@ export function AppSidebar() {
           );
         })}
       </nav>
+
+      {/* Version Label */}
+      <div className="px-6 py-4 border-t border-sidebar-border/40">
+        <div className="flex items-center justify-between text-[10px] font-mono text-sidebar-foreground/35 uppercase tracking-wider">
+          <span>Console v1.4.0</span>
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        </div>
+      </div>
     </aside>
   );
 }

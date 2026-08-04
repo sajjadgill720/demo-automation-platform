@@ -122,6 +122,12 @@ def _call_vapi_create_assistant(
         "voice": {
             "provider": "vapi",
             "voiceId": voice_config["voiceId"],
+            # Vapi native TTS "version 2" model: noticeably more human and
+            # consistent than v1 (and cheaper). It is opt-in per assistant via
+            # this field — without it Vapi falls back to the older v1 model. v2
+            # is human-sounding by default, superseding v1's "humanness" tuning
+            # (which is not a v2 API parameter).
+            "version": 2,
             "speed": voice_config["speed"]
         }
     }
@@ -560,6 +566,41 @@ def provision_vapi_assistant_task(lead_id: str):
             return
             
         try:
+            # ── Stage 0: qualification gate ──────────────────────────────────
+            # Qualification normally already ran at intake (POST /api/demo-request),
+            # so we TRUST that stored result and avoid a second LLM call. We only
+            # qualify here when it hasn't been done yet — a defensive fallback for a
+            # lead that reaches provisioning without an intake-time result (created
+            # before this existed, or provisioned via another path).
+            #
+            # The qualifier FAILS OPEN by design (see qualifier.py): a missing
+            # GROQ_API_KEY or a bad LLM response yields qualified=True, so an outage
+            # never blocks a genuine lead. Either way, an unqualified lead is set to
+            # skipped and never provisions an agent.
+            if lead.qualified is None:
+                from app.qualifier import qualify_lead_internal
+
+                qualification = qualify_lead_internal(lead.company_name, lead.industry)
+                lead.qualified = qualification.qualified
+                lead.qualification_confidence = qualification.confidence
+                lead.qualification_reasoning = qualification.reasoning
+                session.add(lead)
+                session.commit()
+
+            if lead.qualified is False:
+                lead.agent_status = AgentStatus.skipped
+                lead.updated_at = datetime.utcnow()
+                session.add(lead)
+                session.commit()
+                logger.info(
+                    "Lead is not qualified — Vapi provisioning skipped",
+                    extra={"extra_data": {
+                        "lead_id": lead_id,
+                        "reasoning": lead.qualification_reasoning,
+                    }},
+                )
+                return
+
             # Recompile prompt using the finalized company profile
             from app.models import CompanyProfileDB, Document
             from sqlmodel import select
