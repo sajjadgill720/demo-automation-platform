@@ -465,7 +465,7 @@ function ClarificationRoute() {
                 "px-6 font-sans font-bold uppercase text-sm cursor-pointer border-2 flex items-center justify-center gap-2 rounded-lg transition-all shrink-0",
                 isQuerying || !currentQuestionText.trim() || clarificationStatus?.status === "completed"
                   ? "bg-secondary text-foreground/40 border-border cursor-not-allowed"
-                  : "bg-primary text-primary-foreground border-primary hover:bg-primary/90 active:scale-98 shadow-sm",
+                  : "bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 hover:border-yellow-500 dark:bg-sky-500 dark:text-white dark:border-sky-500 dark:hover:bg-sky-600 dark:hover:border-sky-600 btn-themed-shadow active:scale-98",
               )}
             >
               {isQuerying ? "Sending..." : "Send"}
@@ -481,9 +481,9 @@ function ClarificationRoute() {
             type="button"
             onClick={handleSkipRemainingQuestions}
             disabled={isQuerying || clarificationStatus?.status === "completed"}
-            className="bg-transparent border border-border text-foreground hover:bg-secondary transition-colors font-mono font-medium text-xs tracking-wider uppercase px-5 py-3 cursor-pointer rounded disabled:opacity-50"
+            className="inline-flex items-center gap-2 border-0 bg-yellow-400 text-black hover:bg-yellow-500 dark:bg-sky-500 dark:text-white dark:hover:bg-sky-600 font-sans text-xs font-semibold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
-            Skip remaining questions
+            Skip for now
           </button>
 
           {clarificationStatus?.status === "completed" && (

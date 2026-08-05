@@ -15,6 +15,21 @@ from app.models import DiscoveryResponse, Lead, AgentStatus
 
 VAPI_API_KEY = os.getenv("VAPI_API_KEY", "")
 
+
+def _document_content_type(filename: str) -> str:
+    """Maps a document filename to the MIME type Vapi's /file part must declare.
+
+    Only PDF and TXT are accepted at upload time (see main.py), so those are the
+    real cases; anything else falls back to a generic binary type.
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext == "pdf":
+        return "application/pdf"
+    if ext == "txt":
+        return "text/plain"
+    return "application/octet-stream"
+
+
 def compile_agent_prompt(discovery: DiscoveryResponse) -> str:
     """Compiles a highly tailored system prompt for a Vapi Voice Receptionist"""
     company = discovery.company_name
@@ -81,14 +96,15 @@ class VapiAPIError(Exception):
 def _call_vapi_create_assistant(
     name: str,
     prompt: str,
-    file_id: Optional[str] = None,
+    file_ids: Optional[list] = None,
     first_message: Optional[str] = None,
     voice_config: dict = None,
 ) -> str:
     """Creates a Vapi assistant using the API.
 
     Includes mock fallback if key is missing/mock, and retry logic on transient errors.
-    If file_id is provided, includes knowledgeBase directly in creation payload.
+    If file_ids is provided (one or more Vapi file ids), includes knowledgeBase
+    directly in the creation payload with all of them attached.
     Returns the assistant_id.
     """
     if voice_config is None:
@@ -141,12 +157,12 @@ def _call_vapi_create_assistant(
         payload["firstMessage"] = first_message
         payload["firstMessageMode"] = "assistant-speaks-first"
 
-    if file_id:
+    if file_ids:
         payload["model"]["knowledgeBase"] = {
             "provider": "canonical",
-            "fileIds": [file_id]
+            "fileIds": file_ids
         }
-        logger.info(f"Including knowledgeBase in Vapi assistant creation payload for file_id: {file_id}")
+        logger.info(f"Including knowledgeBase in Vapi assistant creation payload for file_ids: {file_ids}")
 
     headers = {
         "Authorization": f"Bearer {vapi_key}",
@@ -163,7 +179,7 @@ def _call_vapi_create_assistant(
             with urllib.request.urlopen(req, timeout=10) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 created_id = res_data["id"]
-                logger.info(f"Vapi assistant created successfully. assistant_id: {created_id}, file_id attached: {file_id}")
+                logger.info(f"Vapi assistant created successfully. assistant_id: {created_id}, file_ids attached: {file_ids}")
                 return created_id
         except urllib.error.HTTPError as e:
             status_code = e.code
@@ -607,6 +623,7 @@ def provision_vapi_assistant_task(lead_id: str):
             from app.utils import sanitize_document_text
             from app.document_summarizer import summarize_documents
             from app.vapi_knowledge_base import upload_to_knowledge_base, attach_knowledge_base
+            from app.storage import download_document
             import json
             
             statement = select(CompanyProfileDB).where(CompanyProfileDB.lead_id == db_lead_id)
@@ -649,7 +666,7 @@ def provision_vapi_assistant_task(lead_id: str):
 
             business_brief = ""
             sanitized_text = ""
-            file_id = None
+            file_ids = []
             has_text = bool(docs) and any(
                 d.extracted_text and d.extracted_text.strip() for d in docs
             )
@@ -754,22 +771,69 @@ def provision_vapi_assistant_task(lead_id: str):
             )
             lead.rendered_prompt = rendered_prompt
 
-            # ── Knowledge base upload (reuses the same sanitized text) ────────
+            # ── Knowledge base upload (RAW original files, not extracted text) ─
+            # Gated by the same conditions as the brief: consent given and the
+            # combined extracted text was not injection-flagged (sanitized_text
+            # truthy). But instead of sending flattened text, each document's
+            # ORIGINAL uploaded file is fetched byte-for-byte from Supabase and
+            # uploaded to Vapi so Vapi indexes the real PDF/TXT. Every uploaded
+            # document is attached, not just the first.
             if sanitized_text:
-                doc_obj = docs[0]
-                fname = getattr(doc_obj, "file_name", None)
-                if not fname and doc_obj.file_url:
-                    base = os.path.basename(doc_obj.file_url)
-                    fname = base.split("_", 1)[1] if "_" in base and len(base.split("_", 1)[0]) == 36 else base
-                primary_filename = fname or "document.txt"
-                file_id = upload_to_knowledge_base(
-                    sanitized_text, str(lead_id), filename=primary_filename
-                )
-                if file_id:
-                    logger.info(
-                        f"Document uploaded to Vapi Files library. file_id: {file_id}, filename: {primary_filename}",
-                        extra={"extra_data": {"lead_id": lead_id, "file_id": file_id, "filename": primary_filename}},
+                for doc_obj in docs:
+                    fname = getattr(doc_obj, "file_name", None)
+                    if not fname and doc_obj.file_url:
+                        base = os.path.basename(doc_obj.file_url)
+                        fname = base.split("_", 1)[1] if "_" in base and len(base.split("_", 1)[0]) == 36 else base
+                    primary_filename = fname or "document.txt"
+                    content_type = _document_content_type(primary_filename)
+
+                    raw_bytes = download_document(doc_obj.file_url) if doc_obj.file_url else None
+
+                    if raw_bytes:
+                        # Preferred path: the original file was persisted to Supabase
+                        # Storage, so send it to Vapi byte-for-byte with its true type.
+                        upload_bytes = raw_bytes
+                        upload_filename = primary_filename
+                        upload_content_type = content_type
+                        source = "raw file"
+                    else:
+                        # Fallback path: Supabase Storage is unavailable (e.g. the
+                        # service key is a dummy/mock, so the original file was never
+                        # actually stored and can't be downloaded). Rather than drop
+                        # the document from the assistant's knowledge base entirely,
+                        # upload the extracted text as a .txt so the KB is still
+                        # populated. The per-document text is re-sanitized here so the
+                        # prompt-injection guard stays in force on this path too.
+                        doc_text = (doc_obj.extracted_text or "").strip()
+                        clean_text, was_flagged, _match_count, _patterns = (
+                            sanitize_document_text(doc_text) if doc_text else ("", False, 0, [])
+                        )
+                        if not clean_text or was_flagged:
+                            logger.warning(
+                                f"Could not fetch raw bytes for document '{primary_filename}' and no usable "
+                                f"extracted text to fall back to — skipping its KB upload",
+                                extra={"extra_data": {"lead_id": lead_id, "filename": primary_filename, "file_url": doc_obj.file_url, "text_flagged": was_flagged}},
+                            )
+                            continue
+                        upload_bytes = clean_text.encode("utf-8")
+                        # We're sending text, not the original file, so name it .txt
+                        # and label it text/plain to match what's actually uploaded.
+                        upload_filename = primary_filename.rsplit(".", 1)[0] + ".txt"
+                        upload_content_type = "text/plain"
+                        source = "extracted-text fallback (Supabase Storage unavailable)"
+
+                    file_id = upload_to_knowledge_base(
+                        upload_bytes,
+                        filename=upload_filename,
+                        content_type=upload_content_type,
+                        lead_id=str(lead_id),
                     )
+                    if file_id:
+                        file_ids.append(file_id)
+                        logger.info(
+                            f"Document sent to Vapi Files library via {source}. file_id: {file_id}, filename: {upload_filename}, content_type: {upload_content_type}, bytes: {len(upload_bytes)}",
+                            extra={"extra_data": {"lead_id": lead_id, "file_id": file_id, "filename": upload_filename, "content_type": upload_content_type, "source": source}},
+                        )
 
             # ── Stage 3: provision the voice agent ────────────────────────────
             _set_stage(session, lead, AgentStatus.provisioning, logger)
@@ -777,27 +841,27 @@ def provision_vapi_assistant_task(lead_id: str):
             assistant_id = _call_vapi_create_assistant(
                 assistant_name,
                 rendered_prompt,
-                file_id=file_id,
+                file_ids=file_ids,
                 first_message=compile_first_message(lead.company_name),
                 voice_config=resolve_voice_config(getattr(lead, "voice_gender", None)),
             )
-            
+
             lead.assistant_id = assistant_id
             lead.agent_status = AgentStatus.active
             session.add(lead)
             session.commit()
-            logger.info(f"Vapi assistant provisioned successfully. assistant_id: {assistant_id}, file_id: {file_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+            logger.info(f"Vapi assistant provisioned successfully. assistant_id: {assistant_id}, file_ids: {file_ids}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_ids": file_ids}})
 
-            # Fallback/verification attach call if file_id exists
-            if file_id:
+            # Fallback/verification attach call if any files were uploaded
+            if file_ids:
                 try:
-                    attached = attach_knowledge_base(assistant_id, file_id, prompt=rendered_prompt)
+                    attached = attach_knowledge_base(assistant_id, file_ids, prompt=rendered_prompt)
                     if attached:
-                        logger.info(f"Knowledge Base attached to Vapi assistant successfully. assistant_id: {assistant_id}, file_id: {file_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+                        logger.info(f"Knowledge Base attached to Vapi assistant successfully. assistant_id: {assistant_id}, file_ids: {file_ids}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_ids": file_ids}})
                     else:
-                        logger.warning(f"KB attach update call returned False for assistant_id: {assistant_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+                        logger.warning(f"KB attach update call returned False for assistant_id: {assistant_id}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_ids": file_ids}})
                 except Exception as attach_err:
-                    logger.warning(f"Non-blocking error during fallback KB attach: {attach_err}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_id": file_id}})
+                    logger.warning(f"Non-blocking error during fallback KB attach: {attach_err}", extra={"extra_data": {"lead_id": lead_id, "assistant_id": assistant_id, "file_ids": file_ids}})
         except VapiAPIError as e:
             lead.agent_status = AgentStatus.failed
             lead.failure_reason = str(e)

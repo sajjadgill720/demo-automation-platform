@@ -587,29 +587,6 @@ function DemoPreview() {
             <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 lg:items-center">
               {/* Left — the pitch */}
               <motion.div variants={fadeUp} className="space-y-7 text-center lg:text-left">
-                {/* Attractive live badge — replaces the old personalization banner */}
-                <div className="flex justify-center lg:justify-start">
-                  <div className="relative inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/[0.06] pl-1.5 pr-3.5 py-1.5 overflow-hidden">
-                    {/* shimmer sweep */}
-                    <motion.span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-[20deg] bg-gradient-to-r from-transparent via-primary/25 to-transparent"
-                      animate={{ x: ["0%", "420%"] }}
-                      transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", repeatDelay: 1.4 }}
-                    />
-                    <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary">
-                      <Sparkles className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="relative z-10 flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-widest text-primary">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-                      </span>
-                      Live personalized demo
-                    </span>
-                  </div>
-                </div>
-
                 {/* Company lockup */}
                 <div className="flex items-center gap-3 justify-center lg:justify-start">
                   <CompanyLogo company={companyRepresentation} size={44} />

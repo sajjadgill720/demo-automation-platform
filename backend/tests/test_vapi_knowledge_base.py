@@ -44,6 +44,10 @@ def create_sample_lead(session: Session, company_name: str, consent: bool) -> Le
         rendered_prompt="Base System Prompt",
         ai_processing_consent=consent,
         agent_status=AgentStatus.pending,
+        # Pre-mark as qualified so the Stage-0 qualifier gate (a live LLM call
+        # that would otherwise judge these fake company names) doesn't skip
+        # provisioning — these tests exercise the KB upload path, not qualification.
+        qualified=True,
     )
     session.add(lead)
     session.commit()
@@ -137,23 +141,24 @@ def test_consent_true_clean_doc_succeeds():
         session.commit()
 
     with patch("app.vapi_knowledge_base.upload_to_knowledge_base", return_value="vapi_kb_mock_12345") as mock_upload, \
-         patch("app.vapi_knowledge_base.attach_knowledge_base", return_value=True) as mock_attach:
+         patch("app.vapi_knowledge_base.attach_knowledge_base", return_value=True) as mock_attach, \
+         patch("app.storage.download_document", return_value=b"%PDF-1.4 raw bytes") as mock_download:
         provision_vapi_assistant_task(str(lead_id))
 
         mock_upload.assert_called_once()
         mock_attach.assert_called_once()
-        called_ast_id, called_kb_id = mock_attach.call_args[0]
+        called_ast_id, called_kb_ids = mock_attach.call_args[0]
 
         with Session(engine) as session:
             updated_lead = session.get(Lead, lead_id)
             correct_ast = called_ast_id == updated_lead.assistant_id
-            correct_kb = called_kb_id == "vapi_kb_mock_12345"
+            correct_kb = called_kb_ids == ["vapi_kb_mock_12345"]
             is_active = updated_lead.agent_status == AgentStatus.active
 
             log_result(
                 "Upload and attach succeed for valid doc with consent",
                 mock_upload.call_count == 1 and mock_attach.call_count == 1 and correct_ast and correct_kb and is_active,
-                f"— KB ID returned: {called_kb_id}, assistant_id: {called_ast_id}",
+                f"— KB IDs returned: {called_kb_ids}, assistant_id: {called_ast_id}",
             )
 
 
@@ -177,7 +182,8 @@ def test_kb_failure_does_not_block_agent_creation():
 
     # Simulate upload failure (returns None)
     with patch("app.vapi_knowledge_base.upload_to_knowledge_base", return_value=None) as mock_upload, \
-         patch("app.vapi_knowledge_base.attach_knowledge_base") as mock_attach:
+         patch("app.vapi_knowledge_base.attach_knowledge_base") as mock_attach, \
+         patch("app.storage.download_document", return_value=b"%PDF-1.4 raw bytes") as mock_download:
         provision_vapi_assistant_task(str(lead_id))
 
         mock_upload.assert_called_once()
@@ -216,6 +222,7 @@ def test_distinctive_filename_passed():
 
     with patch("app.vapi_knowledge_base.upload_to_knowledge_base", return_value="vapi_file_acme_123") as mock_upload, \
          patch("app.vapi_knowledge_base.attach_knowledge_base", return_value=True) as mock_attach, \
+         patch("app.storage.download_document", return_value=b"%PDF-1.4 raw bytes") as mock_download, \
          patch("app.agents._call_vapi_create_assistant", return_value="vapi_ast_acme_999") as mock_create_ast:
 
         provision_vapi_assistant_task(str(lead_id))
@@ -223,13 +230,16 @@ def test_distinctive_filename_passed():
         mock_upload.assert_called_once()
         _, kwargs = mock_upload.call_args
         uploaded_filename = kwargs.get("filename")
+        uploaded_content_type = kwargs.get("content_type")
         mock_create_ast.assert_called_once()
-        passed_file_id = mock_create_ast.call_args[1].get("file_id")
+        passed_file_ids = mock_create_ast.call_args[1].get("file_ids")
 
         log_result(
-            "Distinctive filename passed to KB upload and file_id passed to assistant creation",
-            uploaded_filename == "acme_hvac_procedures.pdf" and passed_file_id == "vapi_file_acme_123",
-            f"— Uploaded filename: {uploaded_filename}, file_id in create: {passed_file_id}",
+            "Distinctive filename + content type passed to KB upload and file_ids passed to assistant creation",
+            uploaded_filename == "acme_hvac_procedures.pdf"
+            and uploaded_content_type == "application/pdf"
+            and passed_file_ids == ["vapi_file_acme_123"],
+            f"— Uploaded filename: {uploaded_filename}, content_type: {uploaded_content_type}, file_ids in create: {passed_file_ids}",
         )
 
 

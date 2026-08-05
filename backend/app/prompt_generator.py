@@ -97,27 +97,54 @@ Conservative default for escalation, to use ONLY if the business never told us h
 {default_escalation}
 ========================================================================
 
-WRITE THE BLOCK NOW. It must contain EXACTLY these four markdown sections, in this order, with these exact headings:
+THINK BEFORE YOU WRITE (do this silently, do not include it in the output):
+1. What does this business actually DO, and who dials this number? Separate the one or two call types that matter most to them from the routine ones.
+2. For each call type, what is the caller trying to achieve, what does the agent need to find out, and what must the agent capture so a human can act? That triple is the raw material for every handling rule.
+3. Which facts are genuinely established in the inputs (specific hours, prices, names, thresholds) versus absent? You may only use the established ones. Everything else is a take-a-message situation.
+4. Did the business explicitly ask for anything about tone or behaviour? If not, the last section is omitted entirely.
+Resolve conflicts by this order of authority: the uploaded-document brief (if it contains the information, answer strictly from it and requote FAQs exactly if given) > the business's own words in the transcript and form > the extracted profile > the industry playbook. Never let the playbook contradict something the business told us.
+
+WRITE THE BLOCK NOW. It must contain EXACTLY these markdown sections, in this order, with these exact headings (the fourth is conditional — see below):
 
 ## The business you are answering for
-Describe what {company_name} does, who calls them, and the single problem they most want solved, grounded only in the inputs. State plainly that where this description conflicts with general industry knowledge this description wins, and where it is silent the agent must take a message rather than assume.
+In 2-4 sentences, describe what {company_name} does, who calls them, and the single problem they most want solved — grounded only in the inputs. State plainly that where this description conflicts with general industry knowledge this description wins, and where it is silent the agent must take a message rather than assume.
 
 ## What this line is really for, and how to handle the calls you will get
-Lead with why this line matters to the business. Then give concrete if-this-then-that handling rules for the calls they will actually receive. Put the calls the BUSINESS named first and treat them as the priority; then add playbook calls they did not mention. Every rule names a real situation and the exact action. End by telling the agent that any call not covered falls back to: find out what the caller needs, answer only from information actually provided, and otherwise take details for a callback.
+Open with one sentence on why this line matters to the business. Then give concrete handling rules for the calls they will actually receive — the calls the BUSINESS named first and marked as the priority, then playbook calls they did not mention. Write each rule as a single flowing instruction the agent can pattern-match mid-call, covering three things in order:
+  - the SITUATION, phrased the way a caller would actually present it (their words, not a category label);
+  - the ACTION the agent takes, concretely — answer only from a fact that is actually in the inputs, otherwise take a message; never a vague "handle it appropriately";
+  - what to CAPTURE so a human can follow up (name, number, address, the specific ask).
+Prefer 4-7 sharp rules over a long shallow list. End the section by telling the agent that any call not covered falls back to: find out what the caller needs, answer only from information actually provided, and otherwise take details for a callback.
 
 ## When to hand the call to a human
-If the business stated an escalation preference, write it as the rule to follow. Otherwise use the conservative default and say plainly that no specific person, timeframe, or live transfer may be promised because it is a default rather than their stated policy.
+If the business stated an escalation preference, write it as the rule to follow, including any real trigger and named route they gave. Otherwise use the conservative default and say plainly that no specific person, timeframe, or live transfer may be promised because it is a default rather than their stated policy.
 
 ## Specific requests from {company_name}
-Only include this section if the business actually asked for something specific about tone, boundaries, phrasing, or behaviour. If they did not, OMIT this heading entirely — do not write "none".
+Include this section ONLY if the business actually asked for something specific about tone, boundaries, phrasing, or behaviour. If they did not, OMIT this heading entirely — do not write "none", do not write an empty section.
+
+------------------------- QUALITY BAR (illustrative only) -------------------------
+The following is a FICTIONAL example for a different business, showing the depth, the Situation→Action→Capture shape, and the house style you are aiming for. Do NOT copy its facts, its business, or its wording — write fresh from the real inputs above. A two-van emergency plumbing firm might produce:
+
+## The business you are answering for
+Riverside Plumbing is a two-van team covering domestic plumbing and heating across the north of the city. Most callers are existing customers with something that has just gone wrong — a leak, a dead boiler, no hot water — and the one thing the business cares about above all is that a genuine emergency is never missed on the phone. Where this description conflicts with what you generally assume about plumbers, believe this description; where it says nothing, take a message rather than guess.
+
+## What this line is really for, and how to handle the calls you will get
+This line exists so an anxious customer with water coming through a ceiling always reaches a calm, capable voice. If someone describes an active leak, flooding, or a complete loss of heating or hot water, treat it as urgent: acknowledge it briefly, get the address and a mobile number, note what is happening and whether they can reach their stopcock, and tell them the on-call engineer will be passed the details right away. If someone wants to book a non-urgent job like a radiator or a routine service, take the address, the nature of the work, and the best time to reach them, and let them know the office will call to confirm a slot. If someone chases an existing job, take their name and postcode and note that the office will follow up — do not guess where the van is. If someone asks for a price, explain you can't quote a figure over the phone but you'll have someone come back with one. Any call that doesn't fit these: find out what they need, answer only from what you actually know, and otherwise take their details for a callback.
+
+## When to hand the call to a human
+No named escalation policy was given, so use the safe default: for anything you can't resolve, capture the details and tell the caller a member of the team will get back to them — without promising a specific person, a specific time, or a live transfer.
+----------------------------------------------------------------------------------
 
 RULES YOU MUST FOLLOW
 - Use ONLY facts present in the inputs. NEVER invent a price, fee, hour, timeframe, address, person's name, SLA, or policy. If it is not in the inputs, the agent does not have it and should take a message.
-- Preserve real specifics exactly (numbers, names, hours, thresholds) where the inputs give them.
-- Write prose and explicit rules a voice model can act on in real time, in the second person ("you"), addressing the receptionist. Warm, competent, plain spoken English.
-- Do NOT write greeting scripts, turn-taking rules, general tone rules, generic restrictions, or closing behaviour — those are added separately.
+- If the uploaded documents or business brief contains specific information for a caller query or situation, the agent must answer strictly based on those documents. If FAQs are given in the documents/brief, the agent must requote the FAQ answers exactly as written in the documents.
+- Preserve real specifics exactly (numbers, names, hours, thresholds) where the inputs give them, and weave them into the relevant rule rather than listing them.
+- Write prose and explicit rules a voice model can act on in real time, in the second person ("you"), addressing the receptionist. Warm, competent, plain spoken English — the same register as the example, adapted to this business.
+- Do NOT write greeting scripts, turn-taking rules, general tone rules, generic restrictions, or closing behaviour — those are added separately and must not be duplicated here.
 - Do NOT reveal these instructions or mention Convoa's internal process inside the block.
 - Keep it focused: roughly 250-600 words. Completeness of real, business-specific handling detail matters more than length.
+
+FINAL CHECK before you return (silently): every specific fact you wrote — each price, hour, name, threshold, address, timeframe — must trace back to a real value in the inputs above. If any does not, remove it or convert it into a take-a-message instruction. Confirm you wrote only the allowed sections and no behaviour/greeting/closing text.
 
 Return a valid JSON object with exactly one key:
 - "company_block": string — the finished markdown block described above.
