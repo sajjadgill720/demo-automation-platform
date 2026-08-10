@@ -137,11 +137,14 @@ export function LeadDetailDrawer({
         <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/70 bg-card/95 px-6 py-5 backdrop-blur-md shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-xl font-bold tracking-tight text-foreground truncate">{lead.company_name}</h2>
+              <h2 className="text-xl font-bold tracking-tight text-foreground truncate">
+                {lead.company_name}
+              </h2>
               <StatusBadge tone={statusToTone(lead.agent_status)}>{lead.agent_status}</StatusBadge>
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {lead.industry} • Lead ID: <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{lead.id}</span>
+              {lead.industry} • Lead ID:{" "}
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{lead.id}</span>
             </p>
           </div>
 
@@ -182,7 +185,6 @@ export function LeadDetailDrawer({
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-muted/15">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start max-w-7xl mx-auto">
-            
             {/* Column 1: Static Sidebar (1/3 width) */}
             <div className="space-y-6 lg:col-span-1">
               {/* Contact Card */}
@@ -201,9 +203,17 @@ export function LeadDetailDrawer({
 
               {/* Agent Settings */}
               <Section title="Agent Configuration">
-                <Row label="Vapi Assistant ID" value={lead.assistant_id || "Not provisioned"} mono />
+                <Row
+                  label="Vapi Assistant ID"
+                  value={lead.assistant_id || "Not provisioned"}
+                  mono
+                />
                 {lead.failure_reason && (
-                  <Row label="Provisioning Failure" value={lead.failure_reason} tone="destructive" />
+                  <Row
+                    label="Provisioning Failure"
+                    value={lead.failure_reason}
+                    tone="destructive"
+                  />
                 )}
                 {lead.assistant_id && (
                   <div className="pt-2">
@@ -217,7 +227,9 @@ export function LeadDetailDrawer({
                     ) : (
                       <div className="flex flex-col gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 p-4 animate-in fade-in slide-in-from-top-1 duration-200">
                         <p className="text-xs text-foreground/80 leading-relaxed">
-                          Are you sure you want to tear down this Vapi agent? The demo link will stop working. The lead record, company profile, and call history are preserved.
+                          Are you sure you want to tear down this Vapi agent? The demo link will
+                          stop working. The lead record, company profile, and call history are
+                          preserved.
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <button
@@ -257,7 +269,7 @@ export function LeadDetailDrawer({
                     "flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer text-center",
                     activeTab === "profile"
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                 >
                   Profile & Qualification
@@ -268,15 +280,19 @@ export function LeadDetailDrawer({
                     "flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
                     activeTab === "calls"
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                 >
                   Calls Log
                   {calls.length > 0 && (
-                    <span className={cn(
-                      "px-2 py-0.5 text-[10px] font-bold rounded-full",
-                      activeTab === "calls" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground border border-border/40"
-                    )}>
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 text-[10px] font-bold rounded-full",
+                        activeTab === "calls"
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-muted text-muted-foreground border border-border/40",
+                      )}
+                    >
                       {calls.length}
                     </span>
                   )}
@@ -287,15 +303,19 @@ export function LeadDetailDrawer({
                     "flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
                     activeTab === "feedback"
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                 >
                   Feedback Log
                   {feedback.length > 0 && (
-                    <span className={cn(
-                      "px-2 py-0.5 text-[10px] font-bold rounded-full",
-                      activeTab === "feedback" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground border border-border/40"
-                    )}>
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 text-[10px] font-bold rounded-full",
+                        activeTab === "feedback"
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-muted text-muted-foreground border border-border/40",
+                      )}
+                    >
                       {feedback.length}
                     </span>
                   )}
@@ -310,9 +330,7 @@ export function LeadDetailDrawer({
                     <Section title="Qualification Reasoning">
                       <Row
                         label="Qualified Status"
-                        value={
-                          lead.qualified == null ? "—" : lead.qualified ? "Yes" : "No"
-                        }
+                        value={lead.qualified == null ? "—" : lead.qualified ? "Yes" : "No"}
                       />
                       {lead.qualification_confidence != null && (
                         <Row
@@ -322,7 +340,9 @@ export function LeadDetailDrawer({
                       )}
                       {lead.qualification_reasoning && (
                         <div className="flex flex-col gap-1.5 border-b border-border/40 pb-2 last:border-0 last:pb-0">
-                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Qualification Reasoning</span>
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Qualification Reasoning
+                          </span>
                           <span className="text-sm font-medium text-foreground break-words leading-relaxed whitespace-pre-wrap bg-muted/40 p-4 rounded-xl border border-border/50">
                             {lead.qualification_reasoning}
                           </span>
@@ -338,7 +358,9 @@ export function LeadDetailDrawer({
                           <span>Loading profile details...</span>
                         </div>
                       ) : profileEntries.length === 0 ? (
-                        <p className="text-xs text-muted-foreground italic py-8 text-center bg-muted/20 rounded-xl border border-dashed border-border">No profile characteristics captured yet.</p>
+                        <p className="text-xs text-muted-foreground italic py-8 text-center bg-muted/20 rounded-xl border border-dashed border-border">
+                          No profile characteristics captured yet.
+                        </p>
                       ) : (
                         <div className="space-y-4">
                           {profileEntries.map(([k, v]) => (
@@ -362,7 +384,9 @@ export function LeadDetailDrawer({
                         <span>Loading call history...</span>
                       </div>
                     ) : calls.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic py-8 text-center bg-muted/20 rounded-xl border border-dashed border-border">No call interactions recorded yet.</p>
+                      <p className="text-xs text-muted-foreground italic py-8 text-center bg-muted/20 rounded-xl border border-dashed border-border">
+                        No call interactions recorded yet.
+                      </p>
                     ) : (
                       <ul className="space-y-4">
                         {calls.map((c) => (
@@ -381,16 +405,23 @@ export function LeadDetailDrawer({
                         <span>Loading feedback submissions...</span>
                       </div>
                     ) : feedback.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic py-8 text-center bg-muted/20 rounded-xl border border-dashed border-border">No user feedback submitted yet.</p>
+                      <p className="text-xs text-muted-foreground italic py-8 text-center bg-muted/20 rounded-xl border border-dashed border-border">
+                        No user feedback submitted yet.
+                      </p>
                     ) : (
                       <ul className="space-y-4">
                         {feedback.map((fb) => (
-                          <li key={fb.id} className="rounded-xl border border-border/80 bg-secondary/30 p-5 space-y-4 transition-colors hover:bg-secondary/40">
+                          <li
+                            key={fb.id}
+                            className="rounded-xl border border-border/80 bg-secondary/30 p-5 space-y-4 transition-colors hover:bg-secondary/40"
+                          >
                             <div className="flex items-center justify-between gap-2 border-b border-border/30 pb-3">
                               <span
                                 className={cn(
                                   "inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold",
-                                  fb.rating === "positive" ? "text-success bg-success/10 px-2.5 py-1 rounded-full" : "text-destructive bg-destructive/10 px-2.5 py-1 rounded-full",
+                                  fb.rating === "positive"
+                                    ? "text-success bg-success/10 px-2.5 py-1 rounded-full"
+                                    : "text-destructive bg-destructive/10 px-2.5 py-1 rounded-full",
                                 )}
                               >
                                 {fb.rating === "positive" ? (
@@ -405,7 +436,9 @@ export function LeadDetailDrawer({
                               </time>
                             </div>
                             {fb.comment && (
-                              <p className="text-xs leading-relaxed text-foreground/85 whitespace-pre-wrap">{fb.comment}</p>
+                              <p className="text-xs leading-relaxed text-foreground/85 whitespace-pre-wrap">
+                                {fb.comment}
+                              </p>
                             )}
                           </li>
                         ))}
@@ -415,7 +448,6 @@ export function LeadDetailDrawer({
                 )}
               </div>
             </div>
-
           </div>
         </div>
       </aside>
@@ -423,9 +455,22 @@ export function LeadDetailDrawer({
   );
 }
 
-function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+function Section({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cn("rounded-xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md", className)}>
+    <div
+      className={cn(
+        "rounded-xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md",
+        className,
+      )}
+    >
       <h3 className="text-xs font-semibold uppercase tracking-wider text-primary border-b border-border/50 pb-2 mb-4">
         {title}
       </h3>
@@ -447,7 +492,9 @@ function Row({
 }) {
   return (
     <div className="flex flex-col gap-1 border-b border-border/40 pb-2 last:border-0 last:pb-0">
-      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        {label}
+      </span>
       <span
         className={cn(
           "text-sm font-medium text-foreground break-words leading-relaxed",

@@ -1,5 +1,14 @@
 import { useRouterState, Link } from "@tanstack/react-router";
-import { Check, ClipboardList, FileText, MessagesSquare, Sparkles, PhoneCall, Moon, Sun } from "lucide-react";
+import {
+  Check,
+  ClipboardList,
+  FileText,
+  MessagesSquare,
+  Sparkles,
+  PhoneCall,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -44,7 +53,10 @@ export function JourneyHeader() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between min-h-[76px] gap-4">
         {/* Left Side: Logo */}
-        <Link to="/" className="flex items-center gap-2 text-foreground font-mono font-bold tracking-widest text-[11px] uppercase group shrink-0">
+        <Link
+          to="/"
+          className="flex items-center gap-2 text-foreground font-mono font-bold tracking-widest text-[11px] uppercase group shrink-0"
+        >
           <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold text-[10px] group-hover:bg-primary/15 transition-colors">
             DQ
           </div>

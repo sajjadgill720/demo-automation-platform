@@ -350,5 +350,92 @@
       "Do you also handle hosting, domains, and ongoing maintenance?",
       "Can I see examples of sites you have built for businesses like mine?"
     ]
+  },
+  "testing services": {
+    "specificity": 1,
+    "source": "generated",
+    "display_name": "testing services",
+    "aliases": [
+      "testing services",
+      "lab testing",
+      "diagnostic testing",
+      "test center",
+      "sample testing",
+      "certification testing"
+    ],
+    "business_stakes": "Testing services depend on phone calls to schedule appointments, confirm sample drop-offs, and relay time-sensitive results. A missed call can mean a lost client, a delayed test, or a frustrated customer who moves to a competitor.",
+    "caller_scenarios": [
+      [
+        "a caller is asking about the company's services or pricing",
+        "answer from the provided business information only, and where it does not cover the question, take their details and confirm someone will follow up"
+      ],
+      [
+        "a caller asks for a specific person or department",
+        "take their name, number, and the reason for the call, and confirm the message will be passed on"
+      ],
+      [
+        "an existing customer is calling with a problem or complaint",
+        "acknowledge the problem, capture what happened and any order or account reference, and confirm it is being escalated — do not promise a refund, credit, or resolution"
+      ],
+      [
+        "a caller wants to book an appointment or a callback",
+        "collect their name, contact number, and preferred times, and confirm the next step"
+      ],
+      [
+        "a caller asks something the provided business information does not cover",
+        "say plainly that you want to get them an accurate answer, take their details, and confirm a callback rather than guessing"
+      ]
+    ],
+    "default_escalation": "Take the caller's name, callback number, and the reason for the call, then confirm that the team will get back to them. Do not commit to a specific time unless the business information provides one.",
+    "common_questions": [
+      "What types of tests do you offer?",
+      "How much does the test cost?",
+      "Do I need an appointment or can I walk in?",
+      "How long does it take to get results?",
+      "Do you accept walk-ins or only scheduled visits?"
+    ]
+  },
+  "electronics": {
+    "specificity": 1,
+    "source": "generated",
+    "display_name": "electronics store",
+    "aliases": [
+      "electronics",
+      "consumer electronics",
+      "tech store",
+      "gadget shop",
+      "electronics repair"
+    ],
+    "business_stakes": "Electronics retailers compete on availability and technical fit, so a missed call often means the customer buys the same item from a competitor within hours. Many callers are comparing specs, checking stock, or arranging repairs, and they will move on quickly if no one picks up.",
+    "caller_scenarios": [
+      [
+        "a caller is asking about the company's services or pricing",
+        "answer from the provided business information only, and where it does not cover the question, take their details and confirm someone will follow up"
+      ],
+      [
+        "a caller asks for a specific person or department",
+        "take their name, number, and the reason for the call, and confirm the message will be passed on"
+      ],
+      [
+        "an existing customer is calling with a problem or complaint",
+        "acknowledge the problem, capture what happened and any order or account reference, and confirm it is being escalated — do not promise a refund, credit, or resolution"
+      ],
+      [
+        "a caller wants to book an appointment or a callback",
+        "collect their name, contact number, and preferred times, and confirm the next step"
+      ],
+      [
+        "a caller asks something the provided business information does not cover",
+        "say plainly that you want to get them an accurate answer, take their details, and confirm a callback rather than guessing"
+      ]
+    ],
+    "default_escalation": "Take the caller's name, callback number, and the reason for the call, then confirm that the team will get back to them. Do not commit to a specific time unless the business information provides one.",
+    "common_questions": [
+      "Do you have this model in stock right now?",
+      "What's the difference between these two versions?",
+      "Can you order it if it's not in the store?",
+      "How long does the repair take and what's the cost?",
+      "Do you price match other retailers?"
+    ]
   }
 }

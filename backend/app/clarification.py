@@ -131,6 +131,10 @@ class ClarificationState(TypedDict):
     company_name: str
     industry: str
     documents_text: str
+    # Prose brief distilled from the full document text. Produced once after
+    # initial gap detection by summarize_documents_node and used for question
+    # generation context and the final Vapi prompt.
+    business_brief: Optional[str]
     extracted_profile: Optional[dict]
     missing_fields: List[str]
     conversation_history: List[dict]
@@ -229,6 +233,9 @@ Industry: "{industry}"
 
 WHAT WE ALREADY KNOW ABOUT THIS BUSINESS
 {profile_json}
+
+BUSINESS BRIEF (distilled from their uploaded documents — never ask about anything already covered here)
+{business_brief}
 
 WHAT OUR {industry_display} PLAYBOOK ALREADY COVERS (never ask about any of this)
 {library_rules}
@@ -587,7 +594,7 @@ def extract_profile_node(state: ClarificationState) -> ClarificationState:
         company_name=company,
         industry=industry,
         stated_problem=form_problem or "None provided",
-        documents_text=docs_text[:6000] if docs_text else "None",
+        documents_text=docs_text if docs_text else "None",
         conversation_text=compile_conversation(history)
     )
 
@@ -633,6 +640,133 @@ def detect_gaps_node(state: ClarificationState) -> ClarificationState:
         **state,
         "missing_fields": missing
     }
+
+
+@timed_node("summarize_documents")
+def summarize_documents_node(state: ClarificationState) -> ClarificationState:
+    """Runs once after initial gap detection. Distils full doc text into a brief
+    for use in question generation context and the final Vapi prompt.
+
+    Positioned after extract_profile + detect_gaps so gap detection works from
+    the complete, un-summarized document text — nothing is lost to compression
+    before we know what's missing.
+    """
+    lead_id_str = state.get("lead_id")
+    docs_text = state.get("documents_text", "")
+
+    if not docs_text:
+        logger.info(f"[{lead_id_str}] summarize_documents: no document text, skipping")
+        return {**state, "business_brief": ""}
+
+    from app.document_summarizer import summarize_documents
+
+    logger.info(f"[{lead_id_str}] summarize_documents: summarizing {len(docs_text)} chars")
+    brief = summarize_documents(
+        docs_text,
+        state.get("company_name", ""),
+        state.get("industry", ""),
+        lead_id=lead_id_str,
+    )
+    logger.info(f"[{lead_id_str}] summarize_documents: produced {len(brief)} char brief")
+    
+    # Save the generated brief to the DB immediately
+    try:
+        with Session(engine) as session:
+            statement = select(CompanyProfileDB).where(CompanyProfileDB.lead_id == uuid.UUID(lead_id_str))
+            profile_db = session.exec(statement).first()
+            if profile_db:
+                profile_db.business_brief = brief
+                profile_db.updated_at = datetime.utcnow()
+                session.add(profile_db)
+                session.commit()
+                logger.info(f"[{lead_id_str}] Persisted business brief directly from summarize_documents_node")
+    except Exception as e:
+        logger.error(f"[{lead_id_str}] Failed to persist business brief in summarize_documents_node: {e}")
+
+    return {**state, "business_brief": brief}
+
+
+# ── Incremental profile merge (replaces per-answer full re-extraction) ──
+
+MERGE_ANSWER_PROMPT = """You are Convoa's profile updater.
+Company: "{company_name}"
+Industry: "{industry}"
+
+CURRENT PROFILE (what we already know):
+{current_profile}
+
+BUSINESS BRIEF (distilled from their uploaded documents — for context only):
+{business_brief}
+
+LATEST EXCHANGE:
+Question asked: {question}
+Business answered: {answer}
+
+Your task: examine the answer and update ONLY the profile fields that the answer
+provides new or better information for. Return the COMPLETE updated profile with
+all fields — keeping existing values unchanged for fields the answer does not address.
+
+Rules:
+- Only update a field if the answer provides clear, relevant information for it.
+- Never downgrade a known value to "UNKNOWN".
+- If must_handle_scenarios gains new items, APPEND them to the existing list.
+- Extract only what is stated or clearly implied — never invent.
+- Return all 12 fields, even unchanged ones.
+
+Return a valid JSON object matching the CompanyProfile schema.
+"""
+
+
+@timed_node("merge_answer")
+def merge_answer_node(state: ClarificationState) -> ClarificationState:
+    """Incrementally updates the profile from the latest Q&A pair only.
+
+    Far cheaper than the old full re-extraction: sends ~the profile JSON + one
+    Q&A pair + the compact brief, instead of 6000 chars of raw document text +
+    the entire (growing) conversation history.
+    """
+    lead_id_str = state.get("lead_id")
+    profile = state.get("extracted_profile") or {}
+    history = state.get("conversation_history", [])
+
+    # Get the latest user answer from history
+    latest_answer = ""
+    for msg in reversed(history):
+        if msg.get("role") == "user":
+            latest_answer = msg.get("content", "")
+            break
+
+    if not latest_answer:
+        logger.info(f"[{lead_id_str}] merge_answer: no user answer found, skipping")
+        return state
+
+    prompt = MERGE_ANSWER_PROMPT.format(
+        company_name=state.get("company_name", ""),
+        industry=state.get("industry", ""),
+        current_profile=json.dumps(profile, indent=2),
+        business_brief=(state.get("business_brief") or "").strip() or "No documents provided.",
+        question=state.get("pending_question", ""),
+        answer=latest_answer,
+    )
+
+    _llm_t0 = time.perf_counter()
+    try:
+        res = call_structured_llm(prompt, CompanyProfile, retry_on_failure=True)
+        updated = res.model_dump()
+        logger.info(
+            f"LLM_TIMING call=merge_answer lead_id={lead_id_str} "
+            f"duration_ms={(time.perf_counter() - _llm_t0) * 1000:.1f}"
+        )
+        # Safety: never let a merge downgrade a known field to UNKNOWN
+        for key, val in profile.items():
+            if val not in (None, "", "UNKNOWN", []):
+                new_val = updated.get(key)
+                if new_val in (None, "", "UNKNOWN", []):
+                    updated[key] = val
+        return {**state, "extracted_profile": updated}
+    except Exception as e:
+        logger.error(f"[{lead_id_str}] merge_answer failed: {e}", exc_info=True)
+        return state  # Keep existing profile on failure
 
 
 #: Fallback questions used only when the LLM call fails, keyed to the profile
@@ -955,6 +1089,7 @@ def generate_question_node(state: ClarificationState) -> ClarificationState:
         industry=industry,
         industry_display=library.get("display_name", industry),
         profile_json=json.dumps(known, indent=2) if known else "Nothing yet — this is the first question.",
+        business_brief=(state.get("business_brief") or "").strip() or "No documents were provided.",
         library_rules="\n".join(f"- {r}" for r in library_rules) or "- (no playbook entries)",
         library_questions="\n".join(f"- {q}" for q in (library.get("common_questions") or [])) or "- (none)",
         already_asked=already_asked,
@@ -1226,6 +1361,7 @@ def ingest_answer_node(state: ClarificationState) -> ClarificationState:
 def finalize_node(state: ClarificationState) -> ClarificationState:
     lead_id_str = state.get("lead_id")
     profile = state.get("extracted_profile") or {}
+    business_brief = state.get("business_brief") or ""
     
     logger.info(f"[{lead_id_str}] finalize node started. Profile: {profile}")
     
@@ -1235,6 +1371,8 @@ def finalize_node(state: ClarificationState) -> ClarificationState:
         if profile_db:
             profile_db.status = ProfileStatus.completed
             profile_db.profile = json.dumps(profile)
+            if business_brief:
+                profile_db.business_brief = business_brief
             profile_db.updated_at = datetime.utcnow()
             session.add(profile_db)
             
@@ -1254,16 +1392,19 @@ def finalize_node(state: ClarificationState) -> ClarificationState:
 workflow = StateGraph(ClarificationState)
 
 workflow.add_node("parse_documents", parse_documents_node)
-workflow.add_node("extract_profile", extract_profile_node)
+workflow.add_node("extract_profile", extract_profile_node)          # Initial only, FULL text
 workflow.add_node("detect_gaps", detect_gaps_node)
+workflow.add_node("summarize_documents", summarize_documents_node)  # NEW — runs once after initial gaps
 workflow.add_node("generate_question", generate_question_node)
 workflow.add_node("ask_final_question", ask_final_question_node)
 workflow.add_node("await_answer", await_answer_node)
 workflow.add_node("ingest_answer", ingest_answer_node)
+workflow.add_node("merge_answer", merge_answer_node)                # NEW — incremental profile update
 workflow.add_node("finalize", finalize_node)
 
 workflow.set_entry_point("parse_documents")
 
+# ── Initial pipeline (runs once) ──
 workflow.add_edge("parse_documents", "extract_profile")
 workflow.add_edge("extract_profile", "detect_gaps")
 
@@ -1282,10 +1423,21 @@ MAX_QUESTIONS = 9
 
 
 def route_after_gaps(state: ClarificationState):
+    """Routes after gap detection.
+
+    On the FIRST pass (no questions asked yet, documents exist): route through
+    summarize_documents so the business brief is available for question generation.
+    On subsequent passes: route directly to question/final/finalize.
+    """
     missing = state.get("missing_fields", [])
     asked_fields = state.get("asked_fields") or []
     questions_asked = state.get("questions_asked") or 0
     final_asked = state.get("final_question_asked", False)
+
+    # First pass: summarize documents before generating the first question.
+    # The brief needs to exist before generate_question can include it.
+    if questions_asked == 0 and state.get("documents_text", ""):
+        return "summarize_documents"
 
     # Only structured gaps we have NOT already asked about count as "remaining" —
     # a field the extractor keeps failing to fill is asked once, not forever.
@@ -1297,7 +1449,27 @@ def route_after_gaps(state: ClarificationState):
         return "ask_final_question"
     return "finalize"
 
+
+# After initial summarization, route into the normal question decision.
+# We use a separate router here because after summarize we still need to
+# check MIN/MAX bounds before generating a question.
+def route_after_summarize(state: ClarificationState):
+    """After the one-time summarization, enter the question loop normally."""
+    missing = state.get("missing_fields", [])
+    asked_fields = state.get("asked_fields") or []
+    questions_asked = state.get("questions_asked") or 0
+    final_asked = state.get("final_question_asked", False)
+    remaining_fields = [f for f in missing if f not in asked_fields]
+
+    if questions_asked < MAX_QUESTIONS and (remaining_fields or questions_asked < MIN_QUESTIONS):
+        return "generate_question"
+    if not final_asked:
+        return "ask_final_question"
+    return "finalize"
+
+
 workflow.add_conditional_edges("detect_gaps", route_after_gaps)
+workflow.add_conditional_edges("summarize_documents", route_after_summarize)
 workflow.add_edge("generate_question", "await_answer")
 workflow.add_edge("ask_final_question", "await_answer")
 
@@ -1307,10 +1479,11 @@ def route_after_ingest(state: ClarificationState):
     pause on the same question again instead of advancing."""
     if state.get("last_response_was_meta"):
         return "await_answer"
-    return "extract_profile"
+    return "merge_answer"
 
 
 workflow.add_conditional_edges("ingest_answer", route_after_ingest)
+workflow.add_edge("merge_answer", "detect_gaps")                    # → gaps → question loop
 workflow.add_edge("await_answer", "ingest_answer")
 workflow.add_edge("finalize", END)
 
@@ -1349,6 +1522,7 @@ def start_clarification(lead_id: str) -> ClarificationStatus:
         "company_name": company_name,
         "industry": industry,
         "documents_text": "",
+        "business_brief": "",
         "extracted_profile": None,
         "missing_fields": [],
         "conversation_history": history,
@@ -1397,11 +1571,13 @@ def skip_remaining_questions(lead_id: str) -> ClarificationStatus:
     lead_id_uuid = uuid.UUID(lead_id)
     config = {"configurable": {"thread_id": lead_id}}
     extracted_profile = None
+    business_brief = None
 
     try:
         state_snap = get_compiled_graph().get_state(config)
         if state_snap and state_snap.values:
             extracted_profile = state_snap.values.get("extracted_profile")
+            business_brief = state_snap.values.get("business_brief")
     except Exception as e:
         logger.warning(f"[{lead_id}] Could not retrieve graph state during skip: {e}")
 
@@ -1415,6 +1591,7 @@ def skip_remaining_questions(lead_id: str) -> ClarificationStatus:
                 lead_id=lead_id_uuid,
                 status=ProfileStatus.completed,
                 profile=profile_json_str,
+                business_brief=business_brief,
                 missing_fields=json.dumps([])
             )
             session.add(profile_db)
@@ -1422,6 +1599,8 @@ def skip_remaining_questions(lead_id: str) -> ClarificationStatus:
             profile_db.status = ProfileStatus.completed
             if profile_json_str:
                 profile_db.profile = profile_json_str
+            if business_brief:
+                profile_db.business_brief = business_brief
             profile_db.missing_fields = json.dumps([])
             profile_db.updated_at = datetime.utcnow()
             session.add(profile_db)

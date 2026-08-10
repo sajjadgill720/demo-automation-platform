@@ -90,7 +90,9 @@ function Settings() {
           <section className="console-card-glass overflow-hidden">
             <div className="console-card-header-futuristic border-b border-border/70 bg-muted/10 px-5 py-4">
               <h2 className="text-sm font-semibold pl-2">Appearance</h2>
-              <p className="text-xs text-muted-foreground pl-2">How the dashboard looks on this device.</p>
+              <p className="text-xs text-muted-foreground pl-2">
+                How the dashboard looks on this device.
+              </p>
             </div>
             <div className="flex items-center justify-between px-5 py-4">
               <div className="flex items-center gap-2 text-sm">
@@ -150,7 +152,11 @@ function Settings() {
                 <span
                   className={cn(
                     "relative flex h-2.5 w-2.5 shrink-0 rounded-full",
-                    checking ? "bg-muted-foreground/50" : health?.ok ? "bg-success" : "bg-destructive",
+                    checking
+                      ? "bg-muted-foreground/50"
+                      : health?.ok
+                        ? "bg-success"
+                        : "bg-destructive",
                   )}
                 >
                   {!checking && health?.ok && (
@@ -159,11 +165,7 @@ function Settings() {
                 </span>
                 <div className="text-sm">
                   <div className="font-medium">
-                    {checking
-                      ? "Checking…"
-                      : health?.ok
-                        ? "Connected"
-                        : "Unreachable"}
+                    {checking ? "Checking…" : health?.ok ? "Connected" : "Unreachable"}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {checking
@@ -317,7 +319,9 @@ function ConfigRow({
           <div className="text-xs text-muted-foreground">{hint}</div>
         </div>
       </div>
-      <span className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-medium", badge.cls)}>
+      <span
+        className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-medium", badge.cls)}
+      >
         <badge.Icon className="h-3.5 w-3.5" />
         {badge.text}
       </span>

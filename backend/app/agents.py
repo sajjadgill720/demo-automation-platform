@@ -65,8 +65,8 @@ async def provision_vapi_assistant(company_name: str, prompt: str) -> dict:
         return {
             "id": assistant_id,
             "name": f"Convoa AI - {company_name}",
-            "model": "gpt-4o",
-            "voice": "playht/susan",
+            "model": "gpt-4.1",
+            "voice": "vapi/Naina",
             "prompt": prompt,
             "status": status,
             "provider": provider
@@ -78,8 +78,8 @@ async def provision_vapi_assistant(company_name: str, prompt: str) -> dict:
         return {
             "id": mock_id,
             "name": f"Convoa AI - {company_name} (Fallback)",
-            "model": "gpt-4o",
-            "voice": "playht/susan",
+            "model": "gpt-4.1",
+            "voice": "vapi/Naina",
             "prompt": prompt,
             "status": "failed_real_provisioning_fallback_mock",
             "provider": "mocked"
@@ -108,7 +108,7 @@ def _call_vapi_create_assistant(
     Returns the assistant_id.
     """
     if voice_config is None:
-        voice_config = {"voiceId": "Naina", "speed": 0.9}
+        voice_config = {"voiceId": "Naina", "speed": 1.0}
 
     logger = logging.getLogger(__name__)
     vapi_key = os.getenv("VAPI_API_KEY", "")
@@ -127,7 +127,7 @@ def _call_vapi_create_assistant(
         },
         "model": {
             "provider": "openai",
-            "model": "gpt-4o",
+            "model": "gpt-4.1",
             "messages": [
                 {
                     "role": "system",
@@ -225,6 +225,7 @@ SECTION_ORDER = [
     "escalation_rules",
     "follow_up_and_clarification_rules",
     "customization_notes",
+    "knowledge_base_directive",
     "restrictions",
     "closing_behavior",
 ]
@@ -303,6 +304,7 @@ def compile_lead_prompt(
     profile: Optional[Union[dict, Any]] = None,
     business_brief: str = "",
     company_context_block: Optional[str] = None,
+    has_documents: bool = False,
 ) -> str:
     """Assembles the Vapi system prompt from vetted template sections.
 
@@ -446,7 +448,19 @@ def compile_lead_prompt(
     # when the Q&A loop was skipped and every structured field came back UNKNOWN.
     brief_text = (business_brief or "").strip()
     brief_block = ""
-    if brief_text:
+    if has_documents:
+        # KB-first path: documents are uploaded to the Vapi Knowledge Base.
+        # The prompt does NOT embed the full brief inline — the agent retrieves
+        # document facts at call time via the KB search. We include a short
+        # referral notice so the business_context section still reads naturally.
+        brief_block = (
+            "Detailed operating documentation for this business has been loaded "
+            "into your Knowledge Base. When answering caller questions about "
+            "services, procedures, prices, hours, or policies, consult the "
+            "Knowledge Base for the authoritative answer rather than guessing."
+        )
+    elif brief_text:
+        # No-documents path: embed the brief inline as before.
         brief_block = (
             "Here is what their own operating documentation says about how they work. "
             "Treat it as authoritative:\n\n"
@@ -498,6 +512,10 @@ def compile_lead_prompt(
         "customization_notes": bool(customization_content),
         "restrictions": True,
         "closing_behavior": True,
+        # knowledge_base_directive is ONLY emitted when documents are present
+        # and uploaded to the Vapi KB. This keeps the KB-first instruction out
+        # of prompts for businesses that have no documents.
+        "knowledge_base_directive": has_documents,
     }
 
     hybrid_block = (company_context_block or "").strip()
@@ -530,10 +548,10 @@ def compile_lead_prompt(
 #: Vapi built-in voices offered to the client. Male maps to Elliot per product
 #: decision; female uses Naina.
 VOICE_CONFIGS = {
-    "male": {"voiceId": "Elliot", "speed": 0.8},
-    "female": {"voiceId": "Naina", "speed": 0.9}
+    "male": {"voiceId": "Elliot", "speed": 1.0},
+    "female": {"voiceId": "Naina", "speed": 1.0}
 }
-DEFAULT_CONFIG = {"voiceId": "Naina", "speed": 0.9}
+DEFAULT_CONFIG = {"voiceId": "Naina", "speed": 1.0}
 
 
 def resolve_voice_config(voice_gender: Optional[str]) -> dict:
@@ -661,10 +679,18 @@ def provision_vapi_assistant_task(lead_id: str):
             # Both existing gates are preserved exactly: nothing is summarized
             # without ai_processing_consent, and nothing that sanitize_document_text
             # flagged for injection is ever passed on.
+            # Reuses pre-summarized brief from DB if available.
             doc_statement = select(Document).where(Document.lead_id == db_lead_id)
             docs = session.exec(doc_statement).all()
 
             business_brief = ""
+            if profile_db and profile_db.business_brief:
+                business_brief = profile_db.business_brief
+                logger.info(
+                    "Reusing pre-summarized business brief from database",
+                    extra={"extra_data": {"lead_id": lead_id, "brief_chars": len(business_brief)}},
+                )
+
             sanitized_text = ""
             file_ids = []
             has_text = bool(docs) and any(
@@ -702,7 +728,8 @@ def provision_vapi_assistant_task(lead_id: str):
                         }},
                     )
                     sanitized_text = ""
-                else:
+                    business_brief = ""
+                elif not business_brief:
                     _set_stage(session, lead, AgentStatus.summarizing_documents, logger)
                     business_brief = summarize_documents(
                         sanitized_text,
@@ -718,6 +745,16 @@ def provision_vapi_assistant_task(lead_id: str):
                             "brief_chars": len(business_brief),
                         }},
                     )
+                    # Persist the generated brief to DB for future reference
+                    if profile_db:
+                        profile_db.business_brief = business_brief
+                        profile_db.updated_at = datetime.utcnow()
+                        session.add(profile_db)
+                        session.commit()
+                        logger.info(
+                            "Persisted new business brief to database",
+                            extra={"extra_data": {"lead_id": lead_id, "brief_chars": len(business_brief)}},
+                        )
 
             # ── Stage 2: assemble the prompt (hybrid: template + LLM block) ───
             # The LLM writes only the company-specific block from everything we
@@ -741,6 +778,12 @@ def provision_vapi_assistant_task(lead_id: str):
             ]
 
             library = resolve_industry_entry(lead.industry)
+            # has_documents is True when uploaded documents passed sanitisation
+            # and will be sent to the Vapi Knowledge Base. This flag tells the
+            # generator to write KB-referral rules, and tells compile_lead_prompt
+            # to emit the KB directive section instead of embedding the brief.
+            has_documents = bool(sanitized_text)
+
             company_context_block = generate_company_context_block(
                 lead.company_name,
                 lead.industry,
@@ -750,6 +793,7 @@ def provision_vapi_assistant_task(lead_id: str):
                 library=library,
                 voice_gender=getattr(lead, "voice_gender", None),
                 lead_id=str(lead_id),
+                has_documents=has_documents,
             )
             if company_context_block:
                 logger.info(
@@ -768,6 +812,7 @@ def provision_vapi_assistant_task(lead_id: str):
                 profile_data,
                 business_brief=business_brief,
                 company_context_block=company_context_block,
+                has_documents=has_documents,
             )
             lead.rendered_prompt = rendered_prompt
 

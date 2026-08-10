@@ -1,18 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
-import { Search, Copy, ExternalLink, RefreshCw, Download, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import {
+  Search,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+} from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
 import { StatusBadge, statusToTone } from "@/components/common/StatusBadge";
 import { LeadDetailDrawer } from "@/components/common/LeadDetailDrawer";
 import { listLeads, type LeadResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/active-demos")({
   head: () => ({ meta: [{ title: "Demos — DataQuartz" }] }),
@@ -140,14 +144,7 @@ function ActiveDemos() {
     const header = ["Company", "Contact email", "Industry", "Status", "Qualified", "Created"];
     const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
     const body = rows.map((l) =>
-      [
-        l.company_name,
-        l.contact_email,
-        l.industry,
-        l.agent_status,
-        qualifiedLabel(l),
-        l.created_at,
-      ]
+      [l.company_name, l.contact_email, l.industry, l.agent_status, qualifiedLabel(l), l.created_at]
         .map(esc)
         .join(","),
     );
@@ -195,21 +192,21 @@ function ActiveDemos() {
               </span>
             </SelectTrigger>
             <SelectContent className="dropdown-dense-shadow">
-              {STATUS_CHIPS.filter(
-                (c) => c.value === "all" || (counts[c.value] ?? 0) > 0,
-              ).map((c) => {
-                const n = c.value === "all" ? counts.all : counts[c.value] ?? 0;
-                return (
-                  <SelectItem key={c.value} value={c.value}>
-                    <span className="flex w-full items-center justify-between gap-3">
-                      <span>{c.label}</span>
-                      <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums text-muted-foreground">
-                        {n}
+              {STATUS_CHIPS.filter((c) => c.value === "all" || (counts[c.value] ?? 0) > 0).map(
+                (c) => {
+                  const n = c.value === "all" ? counts.all : (counts[c.value] ?? 0);
+                  return (
+                    <SelectItem key={c.value} value={c.value}>
+                      <span className="flex w-full items-center justify-between gap-3">
+                        <span>{c.label}</span>
+                        <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums text-muted-foreground">
+                          {n}
+                        </span>
                       </span>
-                    </span>
-                  </SelectItem>
-                );
-              })}
+                    </SelectItem>
+                  );
+                },
+              )}
             </SelectContent>
           </Select>
 
@@ -243,11 +240,41 @@ function ActiveDemos() {
             <table className="w-full text-sm console-table-futuristic">
               <thead>
                 <tr className="border-b border-border/70 bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <SortTh label="Company" col="company_name" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                  <SortTh label="Industry" col="industry" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                  <SortTh label="Status" col="agent_status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                  <SortTh label="Qualified" col="qualified" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                  <SortTh label="Created" col="created_at" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                  <SortTh
+                    label="Company"
+                    col="company_name"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Industry"
+                    col="industry"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Status"
+                    col="agent_status"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Qualified"
+                    col="qualified"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Created"
+                    col="created_at"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
                   <th className="w-20 px-4 py-2.5" />
                 </tr>
               </thead>
@@ -321,11 +348,7 @@ function ActiveDemos() {
           </div>
         )}
       </div>
-      <LeadDetailDrawer
-        lead={selected}
-        onClose={() => setSelected(null)}
-        onAgentDeleted={load}
-      />
+      <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} onAgentDeleted={load} />
     </>
   );
 }

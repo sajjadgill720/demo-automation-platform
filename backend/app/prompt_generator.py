@@ -208,6 +208,7 @@ def generate_company_context_block(
     library: Dict[str, Any],
     voice_gender: Optional[str] = None,
     lead_id: Optional[str] = None,
+    has_documents: bool = False,
 ) -> str:
     """Generates the company-specific markdown block via the LLM.
 
@@ -243,6 +244,29 @@ def generate_company_context_block(
         ) or "- (none)",
         default_escalation=library.get("default_escalation", ""),
     )
+
+    # When documents are present, the voice agent will have a Knowledge Base
+    # attached. The generator must write handling rules that REFERENCE the KB
+    # ("consult the Knowledge Base") rather than embedding document-specific
+    # facts (exact FAQ answers, prices, hours) inline in the prompt. The
+    # generator still sees the business_brief above for context, but its output
+    # must direct the agent to the KB for specifics.
+    if has_documents:
+        prompt += (
+            "\n\nKNOWLEDGE BASE AUTHORITY INSTRUCTIONS (CRITICAL): "
+            "This business uploaded operating documentation that will be available to "
+            "the voice agent at call time via a Knowledge Base (KB). You must NOT embed "
+            "document-specific facts (such as exact FAQ answers, policy details, "
+            "prices, or hours) into the block. Instead, write handling rules that instruct "
+            "the agent to query the Knowledge Base underneath and base the answer ONLY on the "
+            "retrieved content. "
+            "Write the handling rules such that the agent: "
+            "1. Treats the Knowledge Base as the absolute single source of truth for all coverage, pricing, services, and operational details; "
+            "2. Never answers from memory, prior knowledge, or assumptions; "
+            "3. Never infers missing details, generalizes local rules, or extends beyond what the retrieved documents explicitly support (the absence of info is not permission to infer it); "
+            "4. If documents do not explicitly answer the question or conflict, states that the info is unavailable and offers a callback; "
+            "5. Presents retrieved information naturally in conversation without mentioning the words 'knowledge base', 'database', 'documents', or referencing the retrieval process."
+        )
 
     try:
         result = call_structured_llm(

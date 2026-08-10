@@ -23,7 +23,10 @@ export function HelpMenu() {
     icon: React.ComponentType<{ className?: string }>;
     text: string;
   }[] = [
-    { icon: MousePointerClick, text: "Click any lead row to see its full details, profile and feedback." },
+    {
+      icon: MousePointerClick,
+      text: "Click any lead row to see its full details, profile and feedback.",
+    },
     { icon: Mic, text: "Voice Agents lists provisioned agents — test the voice or delete one." },
     { icon: MessageSquare, text: "Feedback shows what clients said about their demo." },
   ];

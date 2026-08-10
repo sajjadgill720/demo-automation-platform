@@ -16,13 +16,35 @@ VAPI_API_KEY = os.getenv("VAPI_API_KEY", "")
 import re
 
 def sanitize_filename(filename: str, lead_id: str = "") -> str:
-    """Sanitizes filename for Vapi file upload, handling path separators and special characters."""
+    """Sanitizes filename for Vapi file upload, handling path separators and special characters.
+
+    Vapi truncates the stored ``name`` field to 40 characters server-side.  If
+    the sanitised filename is longer than that, the extension gets chopped off
+    and downloads from the Vapi dashboard arrive without one (browsers default
+    to ``.txt``).  To prevent this we truncate the *basename* so that
+    ``basename + '.' + ext`` never exceeds 40 characters.
+    """
+    _VAPI_NAME_LIMIT = 40
+
     if not filename:
         return f"doc_{lead_id[:8]}.txt" if lead_id else "document.txt"
     clean_name = os.path.basename(filename)
     clean_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', clean_name)
     if not clean_name or clean_name.startswith('.'):
         clean_name = f"doc_{lead_id[:8]}.txt" if lead_id else "document.txt"
+
+    # Ensure the extension survives Vapi's 40-char name truncation.
+    if len(clean_name) > _VAPI_NAME_LIMIT:
+        if '.' in clean_name:
+            base, ext = clean_name.rsplit('.', 1)
+            max_base = _VAPI_NAME_LIMIT - len(ext) - 1  # 1 for the dot
+            if max_base > 0:
+                clean_name = f"{base[:max_base]}.{ext}"
+            else:
+                clean_name = clean_name[:_VAPI_NAME_LIMIT]
+        else:
+            clean_name = clean_name[:_VAPI_NAME_LIMIT]
+
     return clean_name
 
 
@@ -173,7 +195,7 @@ def attach_knowledge_base(assistant_id: str, kb_ids, prompt: Optional[str] = Non
     url = f"https://api.vapi.ai/assistant/{assistant_id}"
     model_obj = {
         "provider": "openai",
-        "model": "gpt-4o",
+        "model": "gpt-4.1",
         "knowledgeBase": {
             "provider": "canonical",
             "fileIds": file_ids

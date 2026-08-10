@@ -96,11 +96,35 @@ function Dashboard() {
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Stat label="Leads" value={stats.total} loading={loading} icon={Users} tone="primary" />
-          <Stat label="Qualified" value={stats.qualified} loading={loading} icon={BadgeCheck} tone="success" />
+          <Stat
+            label="Qualified"
+            value={stats.qualified}
+            loading={loading}
+            icon={BadgeCheck}
+            tone="success"
+          />
           <Stat label="Live" value={stats.live} loading={loading} icon={Radio} tone="accent" />
-          <Stat label="Pending" value={stats.pending} loading={loading} icon={Clock} tone="warning" />
-          <Stat label="Failed" value={stats.failed} loading={loading} icon={AlertTriangle} tone="danger" />
-          <Stat label="Skipped" value={stats.skipped} loading={loading} icon={MinusCircle} tone="muted" />
+          <Stat
+            label="Pending"
+            value={stats.pending}
+            loading={loading}
+            icon={Clock}
+            tone="warning"
+          />
+          <Stat
+            label="Failed"
+            value={stats.failed}
+            loading={loading}
+            icon={AlertTriangle}
+            tone="danger"
+          />
+          <Stat
+            label="Skipped"
+            value={stats.skipped}
+            loading={loading}
+            icon={MinusCircle}
+            tone="muted"
+          />
         </div>
 
         <div className="console-card-glass overflow-hidden">
@@ -176,11 +200,7 @@ function Dashboard() {
           </div>
         </div>
       </div>
-      <LeadDetailDrawer
-        lead={selected}
-        onClose={() => setSelected(null)}
-        onAgentDeleted={load}
-      />
+      <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} onAgentDeleted={load} />
     </>
   );
 }
@@ -192,7 +212,10 @@ const STAT_TONES: Record<StatTone, { icon: string; value: string }> = {
   success: { icon: "bg-success/10 text-success ring-success/20", value: "text-foreground" },
   accent: { icon: "bg-accent/15 text-accent ring-accent/25", value: "text-foreground" },
   warning: { icon: "bg-warning/15 text-warning ring-warning/25", value: "text-foreground" },
-  danger: { icon: "bg-destructive/10 text-destructive ring-destructive/20", value: "text-foreground" },
+  danger: {
+    icon: "bg-destructive/10 text-destructive ring-destructive/20",
+    value: "text-foreground",
+  },
   muted: { icon: "bg-muted text-muted-foreground ring-border", value: "text-foreground" },
 };
 
@@ -216,7 +239,12 @@ function Stat({
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </span>
-        <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-inset console-stat-glow-ring", t.icon)}>
+        <span
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-inset console-stat-glow-ring",
+            t.icon,
+          )}
+        >
           <Icon className="h-3.5 w-3.5" />
         </span>
       </div>

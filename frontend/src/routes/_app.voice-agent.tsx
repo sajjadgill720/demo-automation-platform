@@ -114,8 +114,7 @@ function VoiceAgent() {
         if (!cancelled) setCalls(rows);
       })
       .catch((err) => {
-        if (!cancelled)
-          setCallsError(err instanceof Error ? err.message : "Failed to load calls.");
+        if (!cancelled) setCallsError(err instanceof Error ? err.message : "Failed to load calls.");
       })
       .finally(() => {
         if (!cancelled) setCallsLoading(false);
@@ -312,7 +311,9 @@ function VoiceAgent() {
                     disabled={!selectedAgentId || callsLoading}
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 cursor-pointer pr-1"
                   >
-                    <RefreshCw className={callsLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+                    <RefreshCw
+                      className={callsLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
+                    />
                     Refresh
                   </button>
                 </div>
@@ -434,7 +435,9 @@ function Waveform() {
   const animRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setAmplitudes(Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40));
+    setAmplitudes(
+      Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40),
+    );
   }, []);
 
   const handleStartMic = async () => {
@@ -485,7 +488,9 @@ function Waveform() {
     streamRef.current = null;
     setIsMicTesting(false);
     toast.info("Microphone preview disconnected.");
-    setAmplitudes(Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40));
+    setAmplitudes(
+      Array.from({ length: bars }).map((_, i) => 20 + Math.abs(Math.sin(i * 0.7)) * 40),
+    );
   };
 
   useEffect(() => {

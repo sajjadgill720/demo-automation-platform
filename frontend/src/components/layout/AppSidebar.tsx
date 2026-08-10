@@ -53,7 +53,9 @@ export function AppSidebar() {
               <item.icon
                 className={cn(
                   "h-4 w-4 shrink-0 transition-colors",
-                  active ? "text-primary" : "text-sidebar-foreground/55 group-hover:text-sidebar-foreground",
+                  active
+                    ? "text-primary"
+                    : "text-sidebar-foreground/55 group-hover:text-sidebar-foreground",
                 )}
               />
               {item.label}

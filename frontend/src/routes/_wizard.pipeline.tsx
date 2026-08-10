@@ -59,7 +59,6 @@ function stageState(
   return "todo";
 }
 
-
 function PipelineRoute() {
   const { leadId } = Route.useSearch();
   const navigate = useNavigate();
@@ -73,7 +72,7 @@ function PipelineRoute() {
   const [initializing, setInitializing] = useState(true);
   // The real backend stage, straight from agent_status. Never inferred or timed.
   const [stage, setStage] = useState<LeadResponse["agent_status"]>("pending");
-  
+
   const [provisionedAssistantId, setProvisionedAssistantId] = useState<string | null>(null);
   const [pollingError, setPollingError] = useState<string | null>(null);
   const [skippedReason, setSkippedReason] = useState<string | null>(null);
@@ -130,7 +129,9 @@ function PipelineRoute() {
         } else if (lead.agent_status === "skipped") {
           clearInterval(pollId);
           setIsFormBuilding(false);
-          setSkippedReason(lead.qualification_reasoning || "Lead did not meet qualification criteria.");
+          setSkippedReason(
+            lead.qualification_reasoning || "Lead did not meet qualification criteria.",
+          );
         } else if (lead.agent_status === "failed") {
           clearInterval(pollId);
           setIsFormBuilding(false);
@@ -173,12 +174,12 @@ function PipelineRoute() {
               <Sparkles className="h-8 w-8" />
             </div>
             <div>
-              <h3 className="text-foreground text-2xl font-bold tracking-tight font-sans">
+              <h3 className="text-foreground text-2xl font-bold tracking-tight font-sans gradient-text">
                 Your agent is live
               </h3>
               <p className="text-xs text-foreground/75 mt-1 font-sans">
-                It's answering as {formBuildCompany} right now. Call it and hear what your
-                customers would hear.
+                It's answering as {formBuildCompany} right now. Call it and hear what your customers
+                would hear.
               </p>
             </div>
           </div>
@@ -192,7 +193,9 @@ function PipelineRoute() {
             </div>
             <div className="flex justify-between">
               <span>Demo ID:</span>
-              <span className="text-foreground font-semibold">{leadId.slice(0, 8).toUpperCase()}</span>
+              <span className="text-foreground font-semibold">
+                {leadId.slice(0, 8).toUpperCase()}
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Target Company:</span>
@@ -233,8 +236,8 @@ function PipelineRoute() {
                 Lead not qualified
               </h3>
               <p className="text-xs text-foreground/60 max-w-md font-sans">
-                Our qualification system determined this submission does not meet
-                the criteria for automated demo provisioning.
+                Our qualification system determined this submission does not meet the criteria for
+                automated demo provisioning.
               </p>
             </div>
             <div className="bg-secondary border border-border rounded-xl p-4 text-left max-w-lg w-full">
@@ -274,9 +277,7 @@ function PipelineRoute() {
               <div className="text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-2">
                 What went wrong
               </div>
-              <p className="text-sm text-foreground/80 font-sans leading-relaxed">
-                {pollingError}
-              </p>
+              <p className="text-sm text-foreground/80 font-sans leading-relaxed">{pollingError}</p>
             </div>
             <div className="flex items-center gap-4">
               <button
@@ -323,7 +324,8 @@ function PipelineRoute() {
                 Building your agent
               </h3>
               <p className="text-xs text-foreground/70 font-sans max-w-sm">
-                We're training it on everything you told us about {formBuildCompany}. This usually takes under a minute.
+                We're training it on everything you told us about {formBuildCompany}. This usually
+                takes under a minute.
               </p>
             </div>
 
@@ -338,10 +340,8 @@ function PipelineRoute() {
                     <span
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full border shrink-0",
-                        state === "done" &&
-                          "bg-success/15 border-success/40 text-success",
-                        state === "active" &&
-                          "bg-primary/15 border-primary/40 text-primary",
+                        state === "done" && "bg-success/15 border-success/40 text-success",
+                        state === "active" && "bg-primary/15 border-primary/40 text-primary",
                         state === "todo" && "border-border text-foreground/30",
                       )}
                     >

@@ -3,7 +3,6 @@ import { useEffect, useState, useRef } from "react";
 import {
   ArrowRight,
   Sparkles,
-  CheckCircle,
   ChevronDown,
   Sun,
   Moon,
@@ -28,6 +27,10 @@ import {
   UtensilsCrossed,
   Scissors,
   Star,
+  Twitter,
+  Linkedin,
+  Github,
+  Youtube,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence, useScroll, useSpring } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
@@ -54,13 +57,22 @@ const itemVariants = {
 
 /* ── Live phone call simulation ── */
 const CALL_TRANSCRIPT = [
-  { speaker: "ai", text: "Good morning! Thank you for calling Riverside Dental. How can I help you today?" },
+  {
+    speaker: "ai",
+    text: "Good morning! Thank you for calling Riverside Dental. How can I help you today?",
+  },
   { speaker: "caller", text: "Hi, I'd like to book a cleaning appointment." },
-  { speaker: "ai", text: "Of course! I have openings this Thursday at 10 AM or Friday at 2 PM. Which works better?" },
+  {
+    speaker: "ai",
+    text: "Of course! I have openings this Thursday at 10 AM or Friday at 2 PM. Which works better?",
+  },
   { speaker: "caller", text: "Thursday at 10 works great." },
-  { speaker: "ai", text: "Perfect. I've booked Dr. Chen for Thursday at 10 AM. You'll receive a confirmation text shortly. Is there anything else?" },
+  {
+    speaker: "ai",
+    text: "Perfect. I've booked Dr. Chen for Thursday at 10 AM. You'll receive a confirmation text shortly. Is there anything else?",
+  },
   { speaker: "caller", text: "That's all, thanks!" },
-  { speaker: "ai", text: "Wonderful — have a great day! Goodbye." },
+  { speaker: "ai", text: "Wonderful. Have a great day! Goodbye." },
 ];
 
 /* ── Feature cards ── */
@@ -76,7 +88,7 @@ const FEATURES = [
   {
     icon: Calendar,
     title: "Book Appointments",
-    desc: "Checks real availability, books slots, sends confirmations — all within the call.",
+    desc: "Checks real availability, books slots, sends confirmations, all within the call.",
     color: "text-primary",
     bg: "from-primary/15 to-primary/5",
     border: "border-primary/25",
@@ -84,7 +96,7 @@ const FEATURES = [
   {
     icon: MessageSquare,
     title: "Answer FAQs",
-    desc: "Trained on your business docs. Handles pricing, hours, locations — accurately.",
+    desc: "Trained on your business docs. Handles pricing, hours, locations accurately.",
     color: "text-success",
     bg: "from-success/15 to-success/5",
     border: "border-success/25",
@@ -125,12 +137,30 @@ const STATS = [
 
 /* ── FAQ ── */
 const FAQ_ITEMS = [
-  { q: "Is this a sales call?", a: "No. If clarification is needed, you'll speak with an AI assistant — not a salesperson. It's focused purely on building your demo." },
-  { q: "How long does it take?", a: "Under 5 minutes. The form takes 60 seconds, optional AI clarification averages 2 minutes, and demo generation completes in about 3 minutes." },
-  { q: "What if I don't like the demo?", a: "We'll rebuild it — free. Just tell us what to adjust and we regenerate a new version." },
-  { q: "Who sees my data?", a: "Nobody outside the demo pipeline. Encrypted in transit and at rest, EU-hosted, auto-deleted after 30 days." },
-  { q: "Do I need to install anything?", a: "No. Everything runs in your browser — voice call, demo portal, and dashboard." },
-  { q: "What does it cost?", a: "Free to try. Generate your first demo at no cost. Enterprise pricing available on request." },
+  {
+    q: "Is this a sales call?",
+    a: "No. If clarification is needed, you'll speak with an AI assistant, not a salesperson. It's focused purely on building your demo.",
+  },
+  {
+    q: "How long does it take?",
+    a: "Under 5 minutes. The form takes 60 seconds, optional AI clarification averages 2 minutes, and demo generation completes in about 3 minutes.",
+  },
+  {
+    q: "What if I don't like the demo?",
+    a: "We'll rebuild it for free. Just tell us what to adjust and we regenerate a new version.",
+  },
+  {
+    q: "Who sees my data?",
+    a: "Nobody outside the demo pipeline. Encrypted in transit and at rest, EU-hosted, auto-deleted after 30 days.",
+  },
+  {
+    q: "Do I need to install anything?",
+    a: "No. Everything runs in your browser, including the voice call, demo portal, and dashboard.",
+  },
+  {
+    q: "What does it cost?",
+    a: "Free to try. Generate your first demo at no cost. Enterprise pricing available on request.",
+  },
 ];
 
 /* ── Animated phone mockup component ── */
@@ -233,10 +263,14 @@ function PhoneMockup() {
                 <div className="text-center py-3 space-y-1">
                   <div className="flex items-center justify-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                    <span className="text-[10px] font-mono text-success uppercase tracking-widest">Live Call</span>
+                    <span className="text-[10px] font-mono text-success uppercase tracking-widest">
+                      Live Call
+                    </span>
                   </div>
                   <p className="text-foreground font-medium text-sm">Convoa AI Receptionist</p>
-                  <p className="text-foreground/40 text-[11px] font-mono">00:{String(Math.min(currentLine * 8, 59)).padStart(2, '0')}</p>
+                  <p className="text-foreground/40 text-[11px] font-mono">
+                    00:{String(Math.min(currentLine * 8, 59)).padStart(2, "0")}
+                  </p>
                 </div>
 
                 {/* Waveform visualization */}
@@ -244,8 +278,15 @@ function PhoneMockup() {
                   {Array.from({ length: 24 }).map((_, i) => (
                     <motion.div
                       key={i}
-                      animate={{ height: currentLine < CALL_TRANSCRIPT.length ? [4, Math.random() * 20 + 4, 4] : 4 }}
-                      transition={{ repeat: Infinity, duration: 0.5 + Math.random() * 0.5, delay: i * 0.05 }}
+                      animate={{
+                        height:
+                          currentLine < CALL_TRANSCRIPT.length ? [4, Math.random() * 20 + 4, 4] : 4,
+                      }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 0.5 + Math.random() * 0.5,
+                        delay: i * 0.05,
+                      }}
                       className="w-[2px] bg-primary/60 rounded-full"
                     />
                   ))}
@@ -261,7 +302,7 @@ function PhoneMockup() {
                       transition={{ duration: 0.3 }}
                       className={cn(
                         "flex",
-                        line.speaker === "ai" ? "justify-start" : "justify-end"
+                        line.speaker === "ai" ? "justify-start" : "justify-end",
                       )}
                     >
                       <div
@@ -269,7 +310,7 @@ function PhoneMockup() {
                           "max-w-[85%] px-3.5 py-2.5 text-[12px] leading-relaxed rounded-2xl",
                           line.speaker === "ai"
                             ? "bg-primary/10 text-foreground rounded-bl-md"
-                            : "bg-secondary text-foreground/80 rounded-br-md"
+                            : "bg-secondary text-foreground/80 rounded-br-md",
                         )}
                       >
                         {line.text}
@@ -280,7 +321,12 @@ function PhoneMockup() {
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={cn("flex", CALL_TRANSCRIPT[currentLine]?.speaker === "ai" ? "justify-start" : "justify-end")}
+                      className={cn(
+                        "flex",
+                        CALL_TRANSCRIPT[currentLine]?.speaker === "ai"
+                          ? "justify-start"
+                          : "justify-end",
+                      )}
                     >
                       <div className="px-4 py-3 flex gap-1">
                         {[0, 1, 2].map((d) => (
@@ -365,7 +411,9 @@ function AnimatedStat({ value, label }: { value: string; label: string }) {
       transition={{ duration: 0.5 }}
       className="text-center space-y-1"
     >
-      <p className="text-3xl sm:text-4xl font-bold text-foreground font-mono tracking-tight stat-glow">{value}</p>
+      <p className="text-3xl sm:text-4xl font-bold text-foreground font-mono tracking-tight stat-glow">
+        {value}
+      </p>
       <p className="text-[11px] text-foreground/50 font-mono uppercase tracking-widest">{label}</p>
     </motion.div>
   );
@@ -486,12 +534,19 @@ function IndustrySlider() {
             />
             {/* Readability scrim + colored wash */}
             <div className="absolute inset-0 bg-gradient-to-t from-card via-card/85 to-card/40 pointer-events-none" />
-            <div className={cn("absolute inset-0 bg-gradient-to-br pointer-events-none", slide.gradient)} />
+            <div
+              className={cn(
+                "absolute inset-0 bg-gradient-to-br pointer-events-none",
+                slide.gradient,
+              )}
+            />
 
             {/* Top row: industry tag */}
             <div className="relative z-10 flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50 bg-background/40 text-[10px] font-mono font-semibold uppercase tracking-widest text-foreground/60">
-                <span className={cn("h-1.5 w-1.5 rounded-full", slide.accent.replace("text-", "bg-"))} />
+                <span
+                  className={cn("h-1.5 w-1.5 rounded-full", slide.accent.replace("text-", "bg-"))}
+                />
                 {slide.industry}
               </span>
               <span className="text-[10px] font-mono text-foreground/30">
@@ -501,7 +556,13 @@ function IndustrySlider() {
 
             {/* Icon */}
             <div className="relative z-10 mt-6">
-              <div className={cn("h-16 w-16 rounded-2xl border bg-background/50 backdrop-blur flex items-center justify-center", slide.ring, slide.accent)}>
+              <div
+                className={cn(
+                  "h-16 w-16 rounded-2xl border bg-background/50 backdrop-blur flex items-center justify-center",
+                  slide.ring,
+                  slide.accent,
+                )}
+              >
                 <Icon className="h-8 w-8" />
               </div>
             </div>
@@ -514,7 +575,12 @@ function IndustrySlider() {
             {/* Stat pinned to bottom */}
             <div className="relative z-10 mt-auto flex items-end justify-between">
               <div>
-                <p className={cn("text-4xl sm:text-5xl font-bold font-mono tracking-tight", slide.accent)}>
+                <p
+                  className={cn(
+                    "text-4xl sm:text-5xl font-bold font-mono tracking-tight",
+                    slide.accent,
+                  )}
+                >
                   {slide.stat}
                 </p>
                 <p className="text-[11px] font-mono uppercase tracking-widest text-foreground/40 mt-1">
@@ -558,7 +624,7 @@ function IndustrySlider() {
             aria-label={`Go to slide ${i + 1}`}
             className={cn(
               "h-1.5 rounded-full transition-all cursor-pointer",
-              i === index ? "w-6 bg-primary" : "w-1.5 bg-foreground/20 hover:bg-foreground/40"
+              i === index ? "w-6 bg-primary" : "w-1.5 bg-foreground/20 hover:bg-foreground/40",
             )}
           />
         ))}
@@ -593,7 +659,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Convoa is an AI-powered receptionist that answers every call, books appointments, and qualifies leads — 24/7. Get a personalized demo in minutes.",
+          "Convoa is an AI-powered receptionist that answers every call, books appointments, and qualifies leads 24/7. Get a personalized demo in minutes.",
       },
     ],
   }),
@@ -617,10 +683,12 @@ function LandingPage() {
         <div
           className="absolute inset-0 opacity-[0.08] dark:opacity-[0.04]"
           style={{
-            backgroundImage: "radial-gradient(circle at 1px 1px, var(--border) 1.5px, transparent 1.5px)",
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, var(--border) 1.5px, transparent 1.5px)",
             backgroundSize: "32px 32px",
             maskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
-            WebkitMaskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
           }}
         />
         <motion.div
@@ -684,9 +752,15 @@ function LandingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 font-mono text-[11px] uppercase tracking-widest text-foreground/50">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a>
-            <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
+            <a href="#features" className="hover:text-foreground transition-colors">
+              Features
+            </a>
+            <a href="#how-it-works" className="hover:text-foreground transition-colors">
+              How It Works
+            </a>
+            <a href="#faq" className="hover:text-foreground transition-colors">
+              FAQ
+            </a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -743,10 +817,14 @@ function LandingPage() {
               variants={itemVariants}
               className="text-base lg:text-lg text-foreground/55 max-w-lg leading-relaxed font-sans mx-auto lg:mx-0"
             >
-              AI receptionist that picks up the phone, books appointments, answers questions, and qualifies leads — personalized to your business in minutes.
+              AI receptionist that picks up the phone, books appointments, answers questions, and
+              qualifies leads — personalized to your business in minutes.
             </motion.p>
 
-            <motion.div variants={itemVariants} className="flex items-center gap-4 flex-wrap justify-center lg:justify-start">
+            <motion.div
+              variants={itemVariants}
+              className="flex items-center gap-4 flex-wrap justify-center lg:justify-start"
+            >
               <Link
                 to="/build-demo"
                 className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer border-0 rounded-2xl shadow-xl shadow-primary/15 btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]"
@@ -756,21 +834,27 @@ function LandingPage() {
               </Link>
               <a
                 href="/demo-preview"
-                className="frosted-badge px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer transition-all duration-200 group rounded-2xl btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]"
+                className="bg-white text-zinc-950 hover:bg-zinc-100 transition-all duration-200 px-8 py-4 text-sm font-semibold uppercase tracking-wider inline-flex items-center gap-2.5 cursor-pointer border-0 rounded-2xl shadow-xl btn-themed-shadow hover:-translate-y-[3px] active:translate-y-0 active:scale-[0.97]"
               >
                 <Play className="h-4 w-4 text-primary fill-primary/20 group-hover:scale-110 transition-transform" />
-                Watch Demo
+                View Simple Demo
               </a>
             </motion.div>
 
             {/* Mini trust bar */}
-            <motion.div variants={itemVariants} className="flex items-center gap-6 flex-wrap justify-center lg:justify-start pt-2">
+            <motion.div
+              variants={itemVariants}
+              className="flex items-center gap-6 flex-wrap justify-center lg:justify-start pt-2"
+            >
               {[
                 { icon: Clock, text: "Setup in 5 min" },
                 { icon: Shield, text: "SOC 2 Certified" },
                 { icon: Zap, text: "No code needed" },
               ].map((item) => (
-                <span key={item.text} className="flex items-center gap-1.5 text-[11px] text-foreground/40 font-mono">
+                <span
+                  key={item.text}
+                  className="flex items-center gap-1.5 text-[11px] text-foreground/40 font-mono"
+                >
                   <item.icon className="h-3.5 w-3.5" />
                   {item.text}
                 </span>
@@ -778,7 +862,10 @@ function LandingPage() {
             </motion.div>
 
             {/* Social proof — avatar cluster */}
-            <motion.div variants={itemVariants} className="flex items-center gap-3 justify-center lg:justify-start pt-1">
+            <motion.div
+              variants={itemVariants}
+              className="flex items-center gap-3 justify-center lg:justify-start pt-1"
+            >
               <div className="flex -space-x-2.5">
                 {HERO_AVATARS.map((src, i) => (
                   <img
@@ -797,7 +884,8 @@ function LandingPage() {
                   ))}
                 </div>
                 <p className="text-[11px] text-foreground/45 font-mono mt-0.5">
-                  <span className="text-foreground/70 font-semibold">2,400+</span> businesses trust Convoa
+                  <span className="text-foreground/70 font-semibold">2,400+</span> businesses trust
+                  Convoa
                 </p>
               </div>
             </motion.div>
@@ -864,14 +952,30 @@ function LandingPage() {
                   className="group relative p-8 rounded-xl border border-border/40 bg-card/50 hover:border-border/80 hover:bg-card transition-all duration-300 cursor-default overflow-hidden"
                 >
                   {/* Hover glow */}
-                  <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br", feature.bg)} />
+                  <div
+                    className={cn(
+                      "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br",
+                      feature.bg,
+                    )}
+                  />
 
                   <div className="relative z-10 space-y-4">
-                    <div className={cn("h-12 w-12 rounded-xl bg-gradient-to-br border flex items-center justify-center", feature.bg, feature.border, feature.color)}>
+                    <div
+                      className={cn(
+                        "h-12 w-12 rounded-xl bg-gradient-to-br border flex items-center justify-center",
+                        feature.bg,
+                        feature.border,
+                        feature.color,
+                      )}
+                    >
                       <Icon className="h-5 w-5" />
                     </div>
-                    <h3 className="text-base font-semibold text-foreground font-mono tracking-tight">{feature.title}</h3>
-                    <p className="text-sm text-foreground/55 leading-relaxed font-sans">{feature.desc}</p>
+                    <h3 className="text-base font-semibold text-foreground font-mono tracking-tight">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm text-foreground/55 leading-relaxed font-sans">
+                      {feature.desc}
+                    </p>
                   </div>
                 </motion.div>
               );
@@ -883,7 +987,10 @@ function LandingPage() {
       {/* ═══════════════════════════════════════════════════════════════
           HOW IT WORKS — Visual 3-step with icons
       ═══════════════════════════════════════════════════════════════ */}
-      <section id="how-it-works" className="w-full bg-secondary/5 py-24 md:py-32 border-y border-border/30 px-6 scroll-mt-20">
+      <section
+        id="how-it-works"
+        className="w-full bg-secondary/5 py-24 md:py-32 border-y border-border/30 px-6 scroll-mt-20"
+      >
         <div className="max-w-6xl mx-auto space-y-16">
           <div className="text-center space-y-4">
             <motion.h2
@@ -908,13 +1015,13 @@ function LandingPage() {
               {
                 step: "02",
                 title: "AI Builds Your Agent",
-                desc: "We train a voice agent on your docs, FAQs, and business rules — automatically.",
+                desc: "We train a voice agent on your docs, FAQs, and business rules automatically.",
                 color: "text-primary",
               },
               {
                 step: "03",
                 title: "Test It Live",
-                desc: "Call your AI receptionist. Hear it answer like your best employee — on day one.",
+                desc: "Call your AI receptionist. Hear it answer like your best employee on day one.",
                 color: "text-success",
               },
             ].map((step, idx) => (
@@ -926,15 +1033,22 @@ function LandingPage() {
                 transition={{ duration: 0.55, delay: idx * 0.45, ease: "easeOut" }}
                 className={cn(
                   "relative p-10 border border-border/40 bg-background",
-                  idx < 2 && "md:border-r-0"
+                  idx < 2 && "md:border-r-0",
                 )}
               >
                 {/* Step number */}
-                <span className={cn("text-[10px] font-mono font-bold uppercase tracking-widest mb-6 block", step.color)}>
+                <span
+                  className={cn(
+                    "text-[10px] font-mono font-bold uppercase tracking-widest mb-6 block",
+                    step.color,
+                  )}
+                >
                   Step {step.step}
                 </span>
 
-                <h3 className="text-lg font-semibold text-foreground tracking-tight mb-2">{step.title}</h3>
+                <h3 className="text-lg font-semibold text-foreground tracking-tight mb-2">
+                  {step.title}
+                </h3>
                 <p className="text-sm text-foreground/50 leading-relaxed font-sans">{step.desc}</p>
 
                 {/* Connector arrow */}
@@ -992,7 +1106,8 @@ function LandingPage() {
                     Interactive Demo Portal
                   </h3>
                   <p className="text-sm text-foreground/50 leading-relaxed font-sans">
-                    Voice agent + dashboard — fully personalized. Call the agent, ask questions, and see database metrics update in real-time.
+                    Voice agent + dashboard, fully personalized. Call the agent, ask questions, and
+                    see database metrics update in real-time.
                   </p>
                 </div>
 
@@ -1037,7 +1152,8 @@ function LandingPage() {
               Ready to stop missing calls?
             </h2>
             <p className="text-foreground/50 font-sans max-w-md mx-auto">
-              Get a personalized AI receptionist demo for your business. No credit card. No commitment.
+              Get a personalized AI receptionist demo for your business. No credit card. No
+              commitment.
             </p>
           </motion.div>
 
@@ -1097,22 +1213,110 @@ function LandingPage() {
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="bg-background text-foreground/60 py-12 px-6 text-xs font-mono border-t border-border/30">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
-              <Headphones className="h-3.5 w-3.5" />
+      <footer className="bg-background text-foreground/60 pt-16 pb-10 px-6 text-xs font-mono border-t border-border/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-8">
+            {/* Brand + blurb */}
+            <div className="col-span-2 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
+                  <Headphones className="h-4 w-4" />
+                </div>
+                <span className="font-semibold tracking-widest uppercase text-foreground/80 text-sm">
+                  Convoa
+                </span>
+              </div>
+              <p className="text-[11px] text-foreground/45 font-sans leading-relaxed max-w-xs">
+                The AI receptionist that answers every call, books appointments, and qualifies leads
+                24/7.
+              </p>
+              <div className="flex items-center gap-2 text-foreground/35 text-[11px]">
+                <Lock className="h-3 w-3" />
+                <span>SOC 2 · GDPR · HIPAA-ready</span>
+              </div>
             </div>
-            <span className="font-semibold tracking-widest uppercase text-foreground/70">Convoa</span>
+
+            {/* Link columns */}
+            {[
+              {
+                title: "Product",
+                links: [
+                  { label: "Features", href: "#features" },
+                  { label: "How It Works", href: "#how-it-works" },
+                  { label: "View Simple Demo", href: "/demo-preview" },
+                ],
+              },
+              {
+                title: "Company",
+                links: [
+                  { label: "FAQ", href: "#faq" },
+                  { label: "Contact", href: "mailto:operations@dataquartz.ai" },
+                ],
+              },
+              {
+                title: "Legal",
+                links: [
+                  { label: "Privacy", href: "#" },
+                  { label: "Terms", href: "#" },
+                  { label: "Security", href: "#" },
+                ],
+              },
+            ].map((col) => (
+              <div key={col.title} className="space-y-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/70">
+                  {col.title}
+                </p>
+                <ul className="space-y-2.5">
+                  {col.links.map((link) => (
+                    <li key={link.label}>
+                      <a
+                        href={link.href}
+                        className="text-[11px] text-foreground/45 hover:text-foreground/80 transition-colors font-sans"
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-          <div className="flex items-center gap-6 text-foreground/40 font-sans text-[11px]">
-            <a href="#" className="hover:text-foreground/70 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground/70 transition-colors">Terms</a>
-            <a href="mailto:operations@dataquartz.ai" className="hover:text-foreground/70 transition-colors">Contact</a>
-          </div>
-          <div className="flex items-center gap-2 text-foreground/35">
-            <Lock className="h-3 w-3" />
-            <span>© 2026 Convoa. SOC 2 · GDPR · Encrypted</span>
+
+          {/* Bottom bar */}
+          <div className="mt-14 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-foreground/35 text-[11px]">
+              © 2026 Convoa. All rights reserved.
+            </span>
+            <div className="flex items-center gap-4 text-foreground/40">
+              <a
+                href="#"
+                aria-label="Twitter"
+                className="hover:text-foreground/70 transition-colors"
+              >
+                <Twitter className="h-4 w-4" />
+              </a>
+              <a
+                href="#"
+                aria-label="LinkedIn"
+                className="hover:text-foreground/70 transition-colors"
+              >
+                <Linkedin className="h-4 w-4" />
+              </a>
+              <a
+                href="#"
+                aria-label="GitHub"
+                className="hover:text-foreground/70 transition-colors"
+              >
+                <Github className="h-4 w-4" />
+              </a>
+              <a
+                href="#"
+                aria-label="YouTube"
+                className="hover:text-foreground/70 transition-colors"
+              >
+                <Youtube className="h-4 w-4" />
+              </a>
+            </div>
           </div>
         </div>
       </footer>

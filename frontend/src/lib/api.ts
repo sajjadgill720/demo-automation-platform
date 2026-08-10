@@ -394,7 +394,7 @@ export interface ClarificationStatusResponse {
 
 export async function uploadClarificationDocument(
   leadId: string,
-  file: File
+  file: File,
 ): Promise<{ message: string; document_id: string; file_url: string }> {
   const formData = new FormData();
   formData.append("file", file);
@@ -413,7 +413,8 @@ export async function uploadClarificationDocument(
     let detail = `Upload failed with status ${res.status}`;
     try {
       const body = await res.json();
-      if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      if (body.detail)
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
     } catch {}
     throw new NetworkError(detail);
   }
@@ -423,7 +424,7 @@ export async function uploadClarificationDocument(
 
 export async function setClarificationConsent(
   leadId: string,
-  consent: boolean
+  consent: boolean,
 ): Promise<{ message: string; ai_processing_consent: boolean }> {
   let res: Response;
   try {
@@ -443,9 +444,7 @@ export async function setClarificationConsent(
   return res.json();
 }
 
-export async function startClarification(
-  leadId: string
-): Promise<ClarificationStatusResponse> {
+export async function startClarification(leadId: string): Promise<ClarificationStatusResponse> {
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}/api/clarification/${leadId}/start`, {
@@ -464,7 +463,7 @@ export async function startClarification(
 
 export async function respondToClarification(
   leadId: string,
-  answer: string
+  answer: string,
 ): Promise<ClarificationStatusResponse> {
   let res: Response;
   try {
@@ -485,7 +484,7 @@ export async function respondToClarification(
 }
 
 export async function skipRemainingClarification(
-  leadId: string
+  leadId: string,
 ): Promise<ClarificationStatusResponse> {
   let res: Response;
   try {
@@ -503,9 +502,7 @@ export async function skipRemainingClarification(
   return res.json();
 }
 
-export async function getClarificationStatus(
-  leadId: string
-): Promise<ClarificationStatusResponse> {
+export async function getClarificationStatus(leadId: string): Promise<ClarificationStatusResponse> {
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}/api/clarification/${leadId}`);

@@ -42,6 +42,12 @@ def init_db():
                     conn.execute(text("ALTER TABLE leads ADD COLUMN voice_gender VARCHAR"))
                 else:
                     conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS voice_gender VARCHAR"))
+            prof_columns = [c["name"] for c in inspector.get_columns("company_profile")]
+            if "business_brief" not in prof_columns:
+                if DATABASE_URL.startswith("sqlite"):
+                    conn.execute(text("ALTER TABLE company_profile ADD COLUMN business_brief VARCHAR"))
+                else:
+                    conn.execute(text("ALTER TABLE company_profile ADD COLUMN IF NOT EXISTS business_brief VARCHAR"))
             doc_columns = [c["name"] for c in inspector.get_columns("documents")]
             if "file_name" not in doc_columns:
                 if DATABASE_URL.startswith("sqlite"):
