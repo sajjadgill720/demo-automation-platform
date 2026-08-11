@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   Sparkles,
-  AlertTriangle,
   XCircle,
   Check,
   Loader2,
@@ -65,17 +64,14 @@ function PipelineRoute() {
 
   const [isFormBuilding, setIsFormBuilding] = useState(true);
   // True until the FIRST status fetch resolves. Until then we show a neutral
-  // "checking" spinner rather than the "Building your agent" box — otherwise a
-  // lead that was skipped at intake would flash the build pipeline for a moment
-  // before the not-qualified screen appears. The build box belongs to the real
-  // post-clarification provisioning flow, not to an unqualified lead.
+  // "checking" spinner rather than the "Building your agent" box, so the build
+  // box only ever appears once we know the lead is genuinely provisioning.
   const [initializing, setInitializing] = useState(true);
   // The real backend stage, straight from agent_status. Never inferred or timed.
   const [stage, setStage] = useState<LeadResponse["agent_status"]>("pending");
 
   const [provisionedAssistantId, setProvisionedAssistantId] = useState<string | null>(null);
   const [pollingError, setPollingError] = useState<string | null>(null);
-  const [skippedReason, setSkippedReason] = useState<string | null>(null);
   const [flowStep, setFlowStep] = useState<"pipeline" | "completed">("pipeline");
 
   // Retrieve company name from local storage (saved on submit)
@@ -126,12 +122,6 @@ function PipelineRoute() {
           setProvisionedAssistantId(lead.assistant_id);
           setIsFormBuilding(false);
           setFlowStep("completed");
-        } else if (lead.agent_status === "skipped") {
-          clearInterval(pollId);
-          setIsFormBuilding(false);
-          setSkippedReason(
-            lead.qualification_reasoning || "Lead did not meet qualification criteria.",
-          );
         } else if (lead.agent_status === "failed") {
           clearInterval(pollId);
           setIsFormBuilding(false);
@@ -145,8 +135,8 @@ function PipelineRoute() {
       }
     };
 
-    // Poll immediately so a skipped lead lands on the not-qualified screen at
-    // once, instead of flashing the build box until the first interval tick.
+    // Poll immediately so the first status resolves at once, instead of showing
+    // the checking spinner until the first interval tick.
     checkStatus();
     pollId = setInterval(checkStatus, POLL_INTERVAL_MS);
 
@@ -158,11 +148,9 @@ function PipelineRoute() {
   // hardcoded log lines with invented timestamps ("Provisioning Vapi voice agent
   // in EU-Frankfurt cluster…"), none of which reflected backend state.
   //
-  // AgentStatus only exposes pending | active | completed | failed | skipped, and
-  // a lead goes straight from pending to active — there is no observable
-  // qualifying or provisioning phase. So the UI below reports exactly two real
-  // states (working / done) plus the two real terminal failures, rather than
-  // implying granular progress we cannot actually see.
+  // AgentStatus reports the real provisioning transitions, and a lead ends at
+  // active or completed. So the UI below reports the working / done states plus
+  // the real terminal failure, rather than implying progress we cannot see.
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-4">
@@ -224,38 +212,6 @@ function PipelineRoute() {
             </button>
           </div>
         </div>
-      ) : skippedReason ? (
-        <div className="w-full max-w-3xl mx-auto glass-card gradient-border bg-card rounded-2xl border-2 border-border/60 shadow-2xl p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
-          <div className="absolute top-0 left-0 w-full h-[3px] bg-primary" />
-          <div className="flex flex-col items-center text-center space-y-6 py-6">
-            <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
-              <AlertTriangle className="h-8 w-8 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-foreground text-xl font-bold tracking-tight font-sans">
-                Lead not qualified
-              </h3>
-              <p className="text-xs text-foreground/60 max-w-md font-sans">
-                Our qualification system determined this submission does not meet the criteria for
-                automated demo provisioning.
-              </p>
-            </div>
-            <div className="bg-secondary border border-border rounded-xl p-4 text-left max-w-lg w-full">
-              <div className="text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-2">
-                Why this happened
-              </div>
-              <p className="text-sm text-foreground/80 font-sans leading-relaxed">
-                {skippedReason}
-              </p>
-            </div>
-            <button
-              onClick={() => navigate({ to: "/" })}
-              className="mt-4 px-6 py-2.5 bg-primary/10 border border-primary/30 text-primary text-xs font-mono uppercase tracking-wider hover:bg-primary/20 transition-colors cursor-pointer"
-            >
-              ← Try another lead
-            </button>
-          </div>
-        </div>
       ) : pollingError ? (
         /* FAILED — a real terminal state, given its own treatment rather than a
            generic spinner that keeps turning. */
@@ -300,8 +256,7 @@ function PipelineRoute() {
         </div>
       ) : initializing ? (
         /* CHECKING — brief neutral state until the first status fetch resolves,
-           so a lead that was skipped at intake never flashes the build box
-           before the not-qualified screen. */
+           so the build box only appears once the lead is genuinely provisioning. */
         <div className="w-full max-w-2xl mx-auto flex items-center justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
         </div>

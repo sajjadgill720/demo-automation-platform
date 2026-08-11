@@ -12,6 +12,7 @@ from typing import Optional, Union, Any
 from sqlmodel import Session
 from app.db import engine
 from app.models import DiscoveryResponse, Lead, AgentStatus
+from app.prompt_lint import lint_compiled_prompt
 
 VAPI_API_KEY = os.getenv("VAPI_API_KEY", "")
 
@@ -222,20 +223,23 @@ SECTION_ORDER = [
     "general_role_and_tone",
     "business_context",
     "primary_purpose_and_scenarios",
+    "data_capture_policy",
     "escalation_rules",
     "follow_up_and_clarification_rules",
     "customization_notes",
+    "kb_discipline",
     "knowledge_base_directive",
     "restrictions",
     "closing_behavior",
 ]
 
-# The company-specific sections. In HYBRID mode these are replaced wholesale by a
-# single LLM-generated block (see compile_lead_prompt's company_context_block
-# argument and app/prompt_generator.py). Everything NOT in this set is
-# conversation-behaviour template text that no LLM ever writes, so it always
-# brackets the generated block — restrictions included — and behaviour can never
-# be redefined by the generated content.
+# The VARIABLE-layer sections — filled from per-business slots and dropped when a
+# slot has no real content. Everything NOT in this set is INVARIANT behaviour
+# text that no LLM ever writes and that is always emitted (a rule per section,
+# each stated exactly once — enforced by app/prompt_lint.py). The variable
+# sections carry only {{slots}}; the LLM may write the four content fields those
+# slots are filled from (greeting_line, business_context, escalation_terms,
+# escalation_action) but never the structure or any invariant block.
 COMPANY_SECTIONS = {
     "business_context",
     "primary_purpose_and_scenarios",
@@ -243,8 +247,11 @@ COMPANY_SECTIONS = {
     "customization_notes",
 }
 
+# Tolerant of an optional `RULE: <ids>` clause after the section name in the
+# marker — the rule ids document which invariant block owns which rule; the lint
+# uses distinctive sentinels (app/prompt_lint.py), not this parse.
 _SECTION_RE = re.compile(
-    r"<!--\s*SECTION:\s*(?P<name>[a-z_]+)\s*-->(?P<body>.*?)<!--\s*/SECTION\s*-->",
+    r"<!--\s*SECTION:\s*(?P<name>[a-z_]+)[^>]*?-->(?P<body>.*?)<!--\s*/SECTION\s*-->",
     re.DOTALL,
 )
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -298,178 +305,149 @@ def _render_section(body: str, variables: dict) -> str:
     return rendered.strip()
 
 
+def _clean_field(value: Any) -> str:
+    """A trimmed string, or '' if the value is empty or an UNKNOWN-style sentinel."""
+    if value is None:
+        return ""
+    s = str(value).strip()
+    return "" if s.upper() in _EMPTY_SENTINELS else s
+
+
+def _join_terms(terms: list) -> str:
+    """Renders escalation triggers as a natural 'a, b, or c' phrase."""
+    cleaned = [str(t).strip() for t in (terms or []) if str(t).strip()]
+    if not cleaned:
+        return "anything the caller clearly presents as an emergency or as urgent"
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]} or {cleaned[1]}"
+    return ", ".join(cleaned[:-1]) + f", or {cleaned[-1]}"
+
+
+def _deterministic_business_context(company: str, prof: dict) -> str:
+    """The 2-3 sentence business-context slot when no generated field is supplied.
+
+    Built only from profile fields the business actually gave us — never invented,
+    never pulled from KB text. The industry-stakes line in the template already
+    frames the sector, so an all-UNKNOWN profile simply yields an empty slot.
+    """
+    lines = []
+    services = prof.get("services_and_offerings")
+    if _is_filled(services):
+        lines.append(f"{company} provides {sanitize_profile_text(str(services))}.")
+    problem = prof.get("primary_problem")
+    if _is_filled(problem):
+        lines.append(
+            f"The problem they came to Convoa to solve is {sanitize_profile_text(str(problem))} — "
+            f"the calls that relate to it are the ones that matter most to them."
+        )
+    scenarios = prof.get("must_handle_scenarios")
+    if _is_filled(scenarios) and isinstance(scenarios, (list, tuple)):
+        cleaned = [sanitize_profile_text(str(s)).strip() for s in scenarios if str(s).strip()]
+        if cleaned:
+            # Descriptive — the calls the business said matter most, not an if-then
+            # branch (retrieval + the generic capture rule handle topic coverage).
+            lines.append("The calls they most want handled well include: " + ", ".join(cleaned) + ".")
+    workflow = prof.get("current_workflow_summary")
+    if _is_filled(workflow):
+        lines.append(
+            f"Today their calls are handled like this: {sanitize_profile_text(str(workflow))}. "
+            f"You are the improvement on that, so do not replicate its gaps."
+        )
+    return " ".join(lines)
+
+
 def compile_lead_prompt(
     company_name: str,
     industry: str,
     profile: Optional[Union[dict, Any]] = None,
     business_brief: str = "",
-    company_context_block: Optional[str] = None,
+    content_fields: Optional[dict] = None,
     has_documents: bool = False,
 ) -> str:
-    """Assembles the Vapi system prompt from vetted template sections.
+    """Assembles the Vapi system prompt as two layers: invariant + variable.
 
-    HYBRID COMPOSITION
-    ------------------
-    The conversation-behaviour sections (opening, patience/turn-taking, tone,
-    follow-ups, restrictions, closing) are ALWAYS vetted template text rendered by
-    pure string substitution — no LLM writes them, ever. They are what keeps agent
-    behaviour reviewable and stops lead-supplied text from redefining it.
+    TWO LAYERS
+    ----------
+    The INVARIANT behaviour sections (opening, turn-taking, speech style, KB
+    discipline, generic data capture, follow-ups, restrictions, closing, and the
+    conditional KB retrieval directive) are vetted template text rendered by pure
+    substitution — no LLM writes them, ever. Each owns its rule exactly once,
+    enforced by app/prompt_lint.py.
 
-    The company-specific sections (business context, scenarios, escalation,
-    specific requests — see COMPANY_SECTIONS) are produced one of two ways:
+    The VARIABLE sections carry only {{slots}} filled per business:
+      * Identity — {{business_name}}, {{industry}}, and the optional hours/address
+        notes — is SINGLE-SOURCED from intake + profile, never from KB text. That
+        is what stops a document letterhead drifting from the intake name.
+      * The four CONTENT fields — greeting_line, business_context, escalation_terms,
+        escalation_action — come from `content_fields` when a (constrained,
+        lint-gated) LLM produced them, and otherwise from a deterministic fallback
+        built from the profile + scenario library. Either way they are just text
+        dropped into fixed slots; they can never alter structure or an invariant
+        block.
 
-      * company_context_block is provided (the normal path): the block was written
-        by the LLM in app/prompt_generator.py from the intake form, the full
-        clarification Q&A, the extracted profile and the document brief. It is
-        emitted verbatim in place of the four deterministic company sections, at
-        the position of the first company section in SECTION_ORDER. The behaviour
-        sections still bracket it, restrictions included, so nothing in the block
-        can override how the agent behaves.
-      * company_context_block is None/empty (the fallback path): the four company
-        sections are rendered deterministically from the profile + scenario
-        library exactly as before, so a generation failure still yields a complete,
-        correct prompt.
-
-    Sections are emitted only when they have real content, so a lead with two
-    profile fields gets a shorter complete prompt rather than a full-length one
-    with visible gaps. core_identity and closing_behavior are unconditional.
-
-    PRECEDENCE RULE (profile beats library, library fills gaps)
-    ----------------------------------------------------------
-    Where the lead's own CompanyProfile and the industry scenario library both
-    speak to the same category, the profile always wins, because it is what this
-    specific business told us about itself, whereas the library is a sensible
-    default for businesses of that type:
-
-      * scenario_handling — the lead's must_handle_scenarios are emitted FIRST and
-        labelled as their stated priorities. Library (trigger, action) rules are
-        then appended to cover situations the lead did not mention. They are
-        additive, never contradictory, because library rules describe call types
-        the lead simply did not think to list. If the lead named no scenarios at
-        all, the section is built from library rules alone.
-      * escalation_rules — the lead's escalation_preferences REPLACE the library
-        default outright rather than being appended. Two competing escalation
-        instructions would be worse than either alone, so only one is ever emitted.
-      * business_context — carries THREE independent inputs, and none gates another:
-        the industry-stakes sentence from the library, the `business_brief`
-        distilled from uploaded documents by app/document_summarizer.py, and the
-        profile-derived lines. The brief is emitted whether or not the five
-        structured profile fields were ever filled — a lead who skipped the
-        clarification questions still gets a richly-informed agent if they
-        uploaded a document. The profile lines supplement the brief; they no
-        longer block it.
-      * customization_notes — profile-only. The library has no equivalent, and the
-        section is omitted entirely when the lead gave us nothing.
+    PRECEDENCE (business's own words > generated > library default)
+    --------------------------------------------------------------
+      * escalation_action — the lead's stated escalation_preferences win; then the
+        generated field; then the library's conservative default.
+      * escalation_terms — generated/stated triggers win; otherwise the industry
+        library's vetted default triggers.
+      * customization — profile-only and deterministic; the section is omitted when
+        the business asked for nothing.
     """
     sanitized_company = sanitize_input(company_name)
     sanitized_industry = sanitize_input(industry)
 
     prof = _normalize_profile(profile)
     # Enrich unknown industries with cached, LLM-generated INFO (display name,
-    # stakes, common questions); conversation behaviour stays the vetted default.
+    # stakes, escalation-term defaults); conversation behaviour stays the vetted default.
     library = resolve_industry_entry(industry)
     sections = _load_template_sections()
+    cf = content_fields or {}
 
-    # ── business_context ──────────────────────────────────────────────────────
-    # Each line is independently conditional so a partial profile yields a
-    # shorter honest section rather than one padded with placeholders.
-    context_lines = []
-    primary_problem = prof.get("primary_problem")
-    if _is_filled(primary_problem):
-        context_lines.append(
-            f"The problem they came to Convoa to solve: {sanitize_profile_text(str(primary_problem))}. "
-            f"Keep this in mind on every call — the calls that relate to this are the ones that matter most to them."
-        )
-    workflow = prof.get("current_workflow_summary")
-    if _is_filled(workflow):
-        context_lines.append(
-            f"How their calls are handled today: {sanitize_profile_text(str(workflow))}. "
-            f"You are the improvement on that, so do not replicate its gaps."
-        )
+    # ── identity notes (single-sourced from intake/profile; never from LLM/KB) ──
+    hours = prof.get("hours_and_availability")
+    hours_note = f" They operate {sanitize_profile_text(str(hours))}." if _is_filled(hours) else ""
+    address = prof.get("service_area_and_locations")
+    address_note = f" They serve {sanitize_profile_text(str(address))}." if _is_filled(address) else ""
 
-    # ── scenario_handling ─────────────────────────────────────────────────────
-    # Profile scenarios first and explicitly labelled, then library rules to fill gaps.
-    scenario_blocks = []
-    lead_scenarios = prof.get("must_handle_scenarios")
-    if _is_filled(lead_scenarios) and isinstance(lead_scenarios, (list, tuple)):
-        cleaned = [sanitize_profile_text(str(s)).strip() for s in lead_scenarios if str(s).strip()]
-        if cleaned:
-            scenario_blocks.append(
-                f"{sanitized_company} specifically asked that you handle these situations. "
-                f"Treat them as the priority calls on this line:\n"
-                + "\n".join(f"- {s}" for s in cleaned)
-            )
+    # ── greeting_line ─────────────────────────────────────────────────────────
+    greeting_line = _clean_field(cf.get("greeting_line")) or (
+        f"Thanks for calling {sanitized_company}, how can I help you today?"
+    )
 
-    library_rules = format_scenarios_as_rules(library)
-    if library_rules:
-        lead_in = (
-            f"These are the calls a {library['display_name']} line reliably gets. "
-            f"Handle them this way unless the business told you otherwise:"
-            if scenario_blocks
-            else f"These are the calls a {library['display_name']} line reliably gets:"
-        )
-        scenario_blocks.append(lead_in + "\n" + "\n".join(f"- {r}" for r in library_rules))
+    # ── business_context (2-3 sentences) ──────────────────────────────────────
+    business_context = _clean_field(cf.get("business_context")) or _deterministic_business_context(
+        sanitized_company, prof
+    )
 
-    common_qs = library.get("common_questions") or []
-    if common_qs:
-        scenario_blocks.append(
-            "Callers commonly ask these. Answer from the business information you were given, "
-            "and take a message when you were not given it:\n"
-            + "\n".join(f"- {q}" for q in common_qs)
-        )
-
-    # ── escalation_rules ──────────────────────────────────────────────────────
-    # Profile REPLACES the default; the two are never concatenated.
-    lead_escalation = prof.get("escalation_preferences")
-    if _is_filled(lead_escalation):
-        escalation_content = (
-            f"{sanitized_company} told us exactly how they want this handled: "
-            f"{sanitize_profile_text(str(lead_escalation))}\n\nFollow that instruction as written."
-        )
+    # ── escalation terms + action (stated > generated > library default) ──────
+    gen_terms = cf.get("escalation_terms")
+    if isinstance(gen_terms, (list, tuple)) and any(str(t).strip() for t in gen_terms):
+        escalation_terms = _join_terms([sanitize_profile_text(str(t)) for t in gen_terms if str(t).strip()])
     else:
-        escalation_content = (
-            f"{sanitized_company} has not told us their escalation preference yet, so use this "
-            f"conservative default: {library['default_escalation']}\n\n"
-            f"Because this is a default rather than their stated policy, do not promise a specific "
-            f"person, a specific timeframe, or a live transfer."
+        escalation_terms = _join_terms(library.get("escalation_terms") or [])
+
+    escalation_action = _clean_field(cf.get("escalation_action"))
+    if not escalation_action:
+        lead_escalation = prof.get("escalation_preferences")
+        escalation_action = (
+            sanitize_profile_text(str(lead_escalation))
+            if _is_filled(lead_escalation)
+            else library.get("default_escalation", "")
         )
 
-    # ── customization_notes ───────────────────────────────────────────────────
+    # ── customization (deterministic, profile only) ───────────────────────────
     customizations = prof.get("desired_customizations")
-    customization_content = ""
-    if _is_filled(customizations):
-        customization_content = (
-            f"They asked specifically for the following: {sanitize_profile_text(str(customizations))}"
-        )
+    customization_content = (
+        f"They asked specifically for the following: {sanitize_profile_text(str(customizations))}"
+        if _is_filled(customizations)
+        else ""
+    )
 
-    # ── business_brief (from the document summarizer) ─────────────────────────
-    # Deliberately NOT gated on the profile being complete. This is the whole
-    # point of the decoupling: a document can carry the operational detail even
-    # when the Q&A loop was skipped and every structured field came back UNKNOWN.
-    brief_text = (business_brief or "").strip()
-    brief_block = ""
-    if has_documents:
-        # KB-first path: documents are uploaded to the Vapi Knowledge Base.
-        # The prompt does NOT embed the full brief inline — the agent retrieves
-        # document facts at call time via the KB search. We include a short
-        # referral notice so the business_context section still reads naturally.
-        brief_block = (
-            "Detailed operating documentation for this business has been loaded "
-            "into your Knowledge Base. When answering caller questions about "
-            "services, procedures, prices, hours, or policies, consult the "
-            "Knowledge Base for the authoritative answer rather than guessing."
-        )
-    elif brief_text:
-        # No-documents path: embed the brief inline as before.
-        brief_block = (
-            "Here is what their own operating documentation says about how they work. "
-            "Treat it as authoritative:\n\n"
-            f"{brief_text}"
-        )
-
-    # ── primary_purpose ───────────────────────────────────────────────────────
-    # Leads the scenario section with WHY this line exists, so the rules that
-    # follow are read as serving a goal rather than as a checklist.
+    # ── primary purpose (frames the line) ─────────────────────────────────────
+    primary_problem = prof.get("primary_problem")
     if _is_filled(primary_problem):
         primary_purpose = (
             f"{sanitized_company} came to us to solve one thing above all: "
@@ -482,56 +460,59 @@ def compile_lead_prompt(
             f"and that every caller either gets what they needed or leaves details for a callback."
         )
 
+    # ── business_brief slot: KB-referral notice with docs, inline brief without ─
+    brief_text = (business_brief or "").strip()
+    if has_documents:
+        brief_block = (
+            "Detailed operating documentation for this business is available to you during the call. "
+            "When a caller asks about services, procedures, prices, hours, or policies, use it for the "
+            "authoritative answer rather than guessing."
+        )
+    elif brief_text:
+        brief_block = (
+            "Here is what their own operating documentation says about how they work. "
+            "Treat it as authoritative:\n\n"
+            f"{brief_text}"
+        )
+    else:
+        brief_block = ""
+
     variables = {
-        "company_name": sanitized_company,
+        "business_name": sanitized_company,
         "industry": sanitized_industry,
+        "hours_note": hours_note,
+        "address_note": address_note,
         "industry_stakes": library.get("business_stakes", ""),
+        "greeting_line": greeting_line,
+        "business_context": business_context,
         "business_brief": brief_block,
-        "business_context_lines": "\n\n".join(context_lines),
         "primary_purpose": primary_purpose,
-        "scenario_rules": "\n\n".join(scenario_blocks),
-        "escalation_content": escalation_content,
+        "escalation_terms": escalation_terms,
+        "escalation_action": escalation_action,
         "customization_content": customization_content,
     }
 
-    # Sections with no real content are dropped rather than rendered empty.
-    # core_identity and closing_behavior are always emitted.
-    # Sections with no real content are dropped rather than rendered as empty
-    # scaffolding. The behavioural sections (opening, patience, tone, follow-ups,
-    # restrictions, closing) are universal and always emitted.
+    # Invariant sections are always emitted. Variable sections drop out only when
+    # their slot genuinely has nothing (an empty customization ask, a lead with no
+    # escalation info at all). knowledge_base_directive is gated on documents.
     has_content = {
         "opening_and_purpose": True,
         "patience_and_turn_taking": True,
         "general_role_and_tone": True,
-        "business_context": bool(brief_block)
-        or bool(context_lines)
-        or bool(library.get("business_stakes")),
-        "primary_purpose_and_scenarios": bool(scenario_blocks) or bool(primary_purpose),
-        "escalation_rules": bool(escalation_content),
+        "business_context": True,
+        "primary_purpose_and_scenarios": True,
+        "data_capture_policy": True,
+        "escalation_rules": bool(escalation_terms and escalation_action),
         "follow_up_and_clarification_rules": True,
         "customization_notes": bool(customization_content),
+        "kb_discipline": True,
+        "knowledge_base_directive": has_documents,
         "restrictions": True,
         "closing_behavior": True,
-        # knowledge_base_directive is ONLY emitted when documents are present
-        # and uploaded to the Vapi KB. This keeps the KB-first instruction out
-        # of prompts for businesses that have no documents.
-        "knowledge_base_directive": has_documents,
     }
-
-    hybrid_block = (company_context_block or "").strip()
-    company_block_emitted = False
 
     parts = []
     for name in SECTION_ORDER:
-        # Hybrid path: the four company sections are collapsed into the single
-        # LLM-generated block, emitted once at the position of the first company
-        # section reached, and the deterministic company rendering is skipped.
-        if hybrid_block and name in COMPANY_SECTIONS:
-            if not company_block_emitted:
-                parts.append(hybrid_block)
-                company_block_emitted = True
-            continue
-
         if not has_content.get(name):
             continue
         body = sections.get(name)
@@ -542,7 +523,20 @@ def compile_lead_prompt(
             continue
         parts.append(_render_section(body, variables))
 
-    return "\n\n".join(parts) + "\n"
+    compiled = "\n\n".join(parts) + "\n"
+
+    # Lint is advisory here: the deterministic path cannot drift, but a duplicate
+    # rule reintroduced by a template edit should surface loudly in the logs.
+    try:
+        violations = lint_compiled_prompt(compiled, has_documents=has_documents)
+        if violations:
+            logging.getLogger(__name__).warning(
+                "Compiled prompt lint violations: %s", "; ".join(violations)
+            )
+    except Exception:
+        logging.getLogger(__name__).debug("Prompt lint skipped due to error", exc_info=True)
+
+    return compiled
 
 
 #: Vapi built-in voices offered to the client. Male maps to Elliot per product
@@ -600,41 +594,6 @@ def provision_vapi_assistant_task(lead_id: str):
             return
             
         try:
-            # ── Stage 0: qualification gate ──────────────────────────────────
-            # Qualification normally already ran at intake (POST /api/demo-request),
-            # so we TRUST that stored result and avoid a second LLM call. We only
-            # qualify here when it hasn't been done yet — a defensive fallback for a
-            # lead that reaches provisioning without an intake-time result (created
-            # before this existed, or provisioned via another path).
-            #
-            # The qualifier FAILS OPEN by design (see qualifier.py): a missing
-            # GROQ_API_KEY or a bad LLM response yields qualified=True, so an outage
-            # never blocks a genuine lead. Either way, an unqualified lead is set to
-            # skipped and never provisions an agent.
-            if lead.qualified is None:
-                from app.qualifier import qualify_lead_internal
-
-                qualification = qualify_lead_internal(lead.company_name, lead.industry)
-                lead.qualified = qualification.qualified
-                lead.qualification_confidence = qualification.confidence
-                lead.qualification_reasoning = qualification.reasoning
-                session.add(lead)
-                session.commit()
-
-            if lead.qualified is False:
-                lead.agent_status = AgentStatus.skipped
-                lead.updated_at = datetime.utcnow()
-                session.add(lead)
-                session.commit()
-                logger.info(
-                    "Lead is not qualified — Vapi provisioning skipped",
-                    extra={"extra_data": {
-                        "lead_id": lead_id,
-                        "reasoning": lead.qualification_reasoning,
-                    }},
-                )
-                return
-
             # Recompile prompt using the finalized company profile
             from app.models import CompanyProfileDB, Document
             from sqlmodel import select
@@ -765,7 +724,7 @@ def provision_vapi_assistant_task(lead_id: str):
             _set_stage(session, lead, AgentStatus.building_profile, logger)
 
             from app.models import ClarificationMessage
-            from app.prompt_generator import generate_company_context_block
+            from app.prompt_generator import generate_company_content_fields
 
             msg_stmt = (
                 select(ClarificationMessage)
@@ -779,12 +738,13 @@ def provision_vapi_assistant_task(lead_id: str):
 
             library = resolve_industry_entry(lead.industry)
             # has_documents is True when uploaded documents passed sanitisation
-            # and will be sent to the Vapi Knowledge Base. This flag tells the
-            # generator to write KB-referral rules, and tells compile_lead_prompt
-            # to emit the KB directive section instead of embedding the brief.
+            # and will be sent to the Vapi Knowledge Base. This flag tells
+            # compile_lead_prompt to emit the KB directive section instead of
+            # embedding the brief, and tells the generator to keep business_context
+            # high-level rather than quoting document specifics.
             has_documents = bool(sanitized_text)
 
-            company_context_block = generate_company_context_block(
+            content_fields = generate_company_content_fields(
                 lead.company_name,
                 lead.industry,
                 profile_data,
@@ -795,14 +755,14 @@ def provision_vapi_assistant_task(lead_id: str):
                 lead_id=str(lead_id),
                 has_documents=has_documents,
             )
-            if company_context_block:
+            if content_fields:
                 logger.info(
-                    "Company context block generated by LLM",
-                    extra={"extra_data": {"lead_id": lead_id, "block_chars": len(company_context_block)}},
+                    "Company content fields generated by LLM",
+                    extra={"extra_data": {"lead_id": lead_id, "fields": list(content_fields.keys())}},
                 )
             else:
                 logger.warning(
-                    "Company context block empty — falling back to deterministic company sections",
+                    "Company content fields empty — falling back to deterministic slots",
                     extra={"extra_data": {"lead_id": lead_id}},
                 )
 
@@ -811,7 +771,7 @@ def provision_vapi_assistant_task(lead_id: str):
                 lead.industry,
                 profile_data,
                 business_brief=business_brief,
-                company_context_block=company_context_block,
+                content_fields=content_fields,
                 has_documents=has_documents,
             )
             lead.rendered_prompt = rendered_prompt

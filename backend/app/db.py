@@ -3,11 +3,11 @@ from app.config import DATABASE_URL
 
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
-    engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
+    engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 else:
     engine = create_engine(
         DATABASE_URL,
-        echo=True,
+        echo=False,
         pool_size=5,
         max_overflow=10,
         pool_pre_ping=True,

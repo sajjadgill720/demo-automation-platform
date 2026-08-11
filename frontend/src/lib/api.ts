@@ -61,9 +61,6 @@ export interface LeadResponse {
     | "skipped";
   assistant_id: string | null;
   failure_reason: string | null;
-  qualified?: boolean | null;
-  qualification_confidence?: number | null;
-  qualification_reasoning?: string | null;
   created_at: string;
   updated_at: string;
 }

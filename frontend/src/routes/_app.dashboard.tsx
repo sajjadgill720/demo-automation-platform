@@ -4,11 +4,9 @@ import {
   Sparkles,
   RefreshCw,
   Users,
-  BadgeCheck,
   Radio,
   Clock,
   AlertTriangle,
-  MinusCircle,
   type LucideIcon,
 } from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
@@ -65,8 +63,6 @@ function Dashboard() {
       pending: by("pending"),
       live: by("active") + by("completed"),
       failed: by("failed"),
-      skipped: by("skipped"),
-      qualified: leads.filter((l) => l.qualified === true).length,
     };
   }, [leads]);
 
@@ -94,15 +90,8 @@ function Dashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Leads" value={stats.total} loading={loading} icon={Users} tone="primary" />
-          <Stat
-            label="Qualified"
-            value={stats.qualified}
-            loading={loading}
-            icon={BadgeCheck}
-            tone="success"
-          />
           <Stat label="Live" value={stats.live} loading={loading} icon={Radio} tone="accent" />
           <Stat
             label="Pending"
@@ -117,13 +106,6 @@ function Dashboard() {
             loading={loading}
             icon={AlertTriangle}
             tone="danger"
-          />
-          <Stat
-            label="Skipped"
-            value={stats.skipped}
-            loading={loading}
-            icon={MinusCircle}
-            tone="muted"
           />
         </div>
 

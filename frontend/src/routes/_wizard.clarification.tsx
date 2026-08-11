@@ -159,36 +159,61 @@ function ClarificationRoute() {
     return unique.length;
   }, [clarificationStatus?.conversation_history]);
 
-  // Load the initial status when navigating here
+  // Load the initial status when navigating here, then poll until the first
+  // question is ready. The heavy first pass (document extraction + profile build
+  // + first-question generation) now runs in a background task on the server, so
+  // on arrival the status is `in_progress` with no question yet — the empty-state
+  // "Analyzing requirements…" indicator shows while we poll. Once a question
+  // arrives (or the flow completes) we stop polling; from there the conversation
+  // is driven turn-by-turn by respondToClarification.
   useEffect(() => {
     let mounted = true;
+    let pollId: ReturnType<typeof setInterval> | undefined;
+
+    const stopPolling = () => {
+      if (pollId) {
+        clearInterval(pollId);
+        pollId = undefined;
+      }
+    };
+
     const fetchStatus = async () => {
       try {
         const status = await getClarificationStatus(leadId);
-        if (mounted) {
-          setClarificationStatus(status);
+        if (!mounted) return;
+        setClarificationStatus(status);
 
-          const initialFlatCount =
-            (status.conversation_history?.length || 0) +
-            (status.current_question &&
-            !status.conversation_history?.some(
-              (m) => m.role === "assistant" && m.content.trim() === status.current_question?.trim(),
-            )
-              ? 1
-              : 0);
-          setStaticHistoryLength(initialFlatCount);
+        const initialFlatCount =
+          (status.conversation_history?.length || 0) +
+          (status.current_question &&
+          !status.conversation_history?.some(
+            (m) => m.role === "assistant" && m.content.trim() === status.current_question?.trim(),
+          )
+            ? 1
+            : 0);
+        setStaticHistoryLength(initialFlatCount);
 
-          if (status.status === "completed") {
-            navigate({ to: "/pipeline", search: { leadId } });
-          }
+        if (status.status === "completed") {
+          stopPolling();
+          navigate({ to: "/pipeline", search: { leadId } });
+          return;
+        }
+
+        // First question is ready — stop polling and hand off to the turn-by-turn
+        // answer flow so we never clobber in-progress input.
+        if (status.current_question) {
+          stopPolling();
         }
       } catch (err) {
         console.error("Failed to fetch clarification status:", err);
       }
     };
+
     fetchStatus();
+    pollId = setInterval(fetchStatus, 2000);
     return () => {
       mounted = false;
+      stopPolling();
     };
   }, [leadId, navigate]);
 

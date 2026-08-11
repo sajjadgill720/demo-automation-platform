@@ -48,9 +48,9 @@ from app.agents import (
     provision_vapi_assistant_task,
     delete_vapi_assistant
 )
-from app.qualifier import QualifyRequest, QualificationResult, qualify_lead_internal
 from app.clarification import (
     start_clarification,
+    ensure_clarification_pending,
     submit_clarification_answer,
     skip_remaining_questions,
     get_clarification_status,
@@ -172,9 +172,6 @@ class LeadResponse(BaseModel):
     agent_status: AgentStatus
     assistant_id: Optional[str] = None
     failure_reason: Optional[str] = None
-    qualified: Optional[bool] = None
-    qualification_confidence: Optional[float] = None
-    qualification_reasoning: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -519,15 +516,6 @@ def get_agents(session: Session = Depends(get_session)):
     return results
 
 
-@app.post("/api/qualify", response_model=QualificationResult)
-def qualify_lead(payload: QualifyRequest):
-    """Exposes the internal lead qualification LangGraph workflow.
-    
-    Exposed for backward compatibility and integration testing.
-    """
-    return qualify_lead_internal(payload.company_name, payload.industry)
-
-
 @app.post("/api/demo-request", response_model=LeadResponse, status_code=201)
 def create_demo_request(
     payload: DemoRequestCreate,
@@ -546,15 +534,6 @@ def create_demo_request(
 
     problem = payload.problem_text.strip() if payload.problem_text else None
 
-    # Qualify at intake so obvious junk / off-target submissions are filtered here,
-    # before the lead enters the clarification chat and provisioning. An unqualified
-    # lead is created as `skipped`; the frontend routes it straight to the "not
-    # qualified" screen instead of /upload. The qualifier FAILS OPEN (see
-    # qualifier.py) — a missing key or LLM error yields qualified=True — so a real
-    # lead is never blocked by a qualification outage. Provisioning trusts this
-    # stored result and does not re-run qualification.
-    qualification = qualify_lead_internal(payload.company_name, payload.industry)
-
     lead = Lead(
         company_name=payload.company_name,
         contact_name=payload.contact_name,
@@ -564,10 +543,7 @@ def create_demo_request(
         problem_statement=problem or None,
         voice_gender=(payload.voice_gender or "female").strip().lower(),
         rendered_prompt=rendered_prompt,
-        agent_status=AgentStatus.pending if qualification.qualified else AgentStatus.skipped,
-        qualified=qualification.qualified,
-        qualification_confidence=qualification.confidence,
-        qualification_reasoning=qualification.reasoning,
+        agent_status=AgentStatus.pending,
     )
 
     session.add(lead)
@@ -578,7 +554,6 @@ def create_demo_request(
         "Saved lead to database",
         extra={"extra_data": {
             "lead_id": str(lead.id),
-            "qualified": qualification.qualified,
             "agent_status": lead.agent_status.value,
         }},
     )
@@ -772,15 +747,34 @@ def start_lead_clarification(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
-    """Invokes the LangGraph clarification workflow for the lead."""
+    """Kicks off the LangGraph clarification workflow for the lead.
+
+    The heavy first pass (document parsing + profile extraction + summarization +
+    first-question generation) runs in a background task rather than blocking this
+    request, which previously took ~20s on a lead with an uploaded document. We
+    return immediately with an `in_progress` status; the client polls
+    GET /api/clarification/{lead_id} until the first question appears.
+    """
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")
     try:
-        status = start_clarification(str(lead_id))
-        if status.status == "completed":
+        # If a previous run already produced a question or finished, don't restart —
+        # just return where things stand (handles refresh / re-entry).
+        current = get_clarification_status(str(lead_id))
+        if current.status == "completed":
             background_tasks.add_task(provision_vapi_assistant_task, str(lead_id))
-        return status
+            return current
+        if current.current_question:
+            return current
+
+        # Ensure the profile row exists so polling immediately reports in_progress,
+        # then run the pipeline in the background. Return a lightweight in_progress
+        # status directly rather than a second get_state round-trip — the client
+        # polls GET /api/clarification/{lead_id} for the first question anyway.
+        ensure_clarification_pending(str(lead_id))
+        background_tasks.add_task(start_clarification, str(lead_id))
+        return ClarificationStatus(lead_id=str(lead_id), status="in_progress")
     except Exception as e:
         logger.error(f"[{lead_id}] Error starting clarification: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -815,7 +809,7 @@ def skip_lead_clarification(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
-    """Skips the remaining questions to immediately qualify/disqualify the lead with existing profile."""
+    """Skips the remaining questions to finalize the lead's profile and begin provisioning."""
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")

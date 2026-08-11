@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_app/active-demos")({
 });
 
 type StatusFilter = "all" | LeadResponse["agent_status"];
-type SortKey = "company_name" | "industry" | "agent_status" | "qualified" | "created_at";
+type SortKey = "company_name" | "industry" | "agent_status" | "created_at";
 type SortDir = "asc" | "desc";
 
 // Status quick-filters shown as buttons with live counts. A chip is rendered
@@ -39,12 +39,7 @@ const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
   { value: "building_profile", label: "Building" },
   { value: "summarizing_documents", label: "Summarizing" },
   { value: "failed", label: "Failed" },
-  { value: "skipped", label: "Skipped" },
 ];
-
-function qualifiedLabel(l: LeadResponse): string {
-  return l.qualified == null ? "—" : l.qualified ? "Yes" : "No";
-}
 
 function statusLabel(value: StatusFilter): string {
   return STATUS_CHIPS.find((c) => c.value === value)?.label ?? value;
@@ -115,8 +110,6 @@ function ActiveDemos() {
           return l.industry.toLowerCase();
         case "agent_status":
           return l.agent_status;
-        case "qualified":
-          return l.qualified == null ? -1 : l.qualified ? 1 : 0;
         case "created_at":
           return new Date(l.created_at).getTime() || 0;
       }
@@ -135,16 +128,16 @@ function ActiveDemos() {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      // Text columns read best A→Z; dates/qualification default newest/highest first.
+      // Text columns read best A→Z; dates default newest first.
       setSortDir(key === "company_name" || key === "industry" ? "asc" : "desc");
     }
   };
 
   const exportCsv = () => {
-    const header = ["Company", "Contact email", "Industry", "Status", "Qualified", "Created"];
+    const header = ["Company", "Contact email", "Industry", "Status", "Created"];
     const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
     const body = rows.map((l) =>
-      [l.company_name, l.contact_email, l.industry, l.agent_status, qualifiedLabel(l), l.created_at]
+      [l.company_name, l.contact_email, l.industry, l.agent_status, l.created_at]
         .map(esc)
         .join(","),
     );
@@ -262,13 +255,6 @@ function ActiveDemos() {
                     onToggle={toggleSort}
                   />
                   <SortTh
-                    label="Qualified"
-                    col="qualified"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onToggle={toggleSort}
-                  />
-                  <SortTh
                     label="Created"
                     col="created_at"
                     sortKey={sortKey}
@@ -281,13 +267,13 @@ function ActiveDemos() {
               <tbody>
                 {loading && leads.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                       No demos match.
                     </td>
                   </tr>
@@ -308,7 +294,6 @@ function ActiveDemos() {
                           {l.agent_status}
                         </StatusBadge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{qualifiedLabel(l)}</td>
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
                         {formatDate(l.created_at)}
                       </td>

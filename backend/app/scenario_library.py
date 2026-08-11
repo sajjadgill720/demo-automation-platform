@@ -78,6 +78,10 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "the fault, then tell them the on-call team will call back. Do not promise a specific "
             "arrival time."
         ),
+        "escalation_terms": [
+            "a complete loss of heating or cooling",
+            "a gas smell, a burning smell, or a carbon-monoxide alarm",
+        ],
         "common_questions": [
             "Do you charge a diagnostic or call-out fee?",
             "How soon can someone get here?",
@@ -115,6 +119,10 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "tell them the practice will call back. For anything involving significant pain or "
             "swelling, say clearly that the message will be passed on as urgent."
         ),
+        "escalation_terms": [
+            "severe pain, swelling, or bleeding",
+            "a knocked-out tooth",
+        ],
         "common_questions": [
             "Do you take my insurance?",
             "Are you accepting new patients?",
@@ -151,6 +159,9 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "Take the caller's name, callback number, and reason for calling, and tell them a member "
             "of staff will return the call. Flag anything clinical as urgent rather than triaging it."
         ),
+        "escalation_terms": [
+            "chest pain, breathing difficulty, severe bleeding, or signs of a stroke",
+        ],
         "common_questions": [
             "Can I get an appointment this week?",
             "Do you accept my insurance?",
@@ -189,6 +200,9 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "a short factual summary of the matter, then confirm that the intake team will follow up. "
             "Escalate anything with a stated deadline as urgent."
         ),
+        "escalation_terms": [
+            "a filing deadline, a court date, or a statute of limitations",
+        ],
         "common_questions": [
             "Do you handle this type of case?",
             "What do you charge for a consultation?",
@@ -228,6 +242,10 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "dispatch will return the call. Escalate anything involving a stopped, damaged, or "
             "detained load straight away rather than queuing it."
         ),
+        "escalation_terms": [
+            "a breakdown, an accident, or a detained trailer",
+            "damaged or missing freight",
+        ],
         "common_questions": [
             "Where is my load right now?",
             "What would you charge for this lane?",
@@ -263,6 +281,10 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "Take the caller's name, callback number, property address, and what is happening, then "
             "confirm the on-call plumber will call back. Do not promise an arrival window."
         ),
+        "escalation_terms": [
+            "an active leak, a burst pipe, or flooding",
+            "a gas smell",
+        ],
         "common_questions": [
             "How fast can someone come out?",
             "What is your call-out charge?",
@@ -300,6 +322,9 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "Take the caller's name, callback number, property address, and whether there is active "
             "water entry, then confirm a callback. Escalate active leaks ahead of estimate requests."
         ),
+        "escalation_terms": [
+            "active water entry into the property, or storm damage",
+        ],
         "common_questions": [
             "Can you come out and look at it?",
             "Do you work with my insurance company?",
@@ -337,6 +362,9 @@ SCENARIO_LIBRARY: Dict[str, Dict[str, Any]] = {
             "the reason for the call, then confirm an agent will follow up. Treat loss of heat, water, "
             "power, or security as urgent."
         ),
+        "escalation_terms": [
+            "a tenant losing heat, water, power, or security",
+        ],
         "common_questions": [
             "Is this property still available?",
             "Can I arrange a viewing?",
@@ -379,6 +407,9 @@ GENERIC_ENTRY: Dict[str, Any] = {
         "team will get back to them. Do not commit to a specific time unless the business information "
         "provides one."
     ),
+    "escalation_terms": [
+        "anything the caller clearly presents as an emergency or as urgent",
+    ],
     "common_questions": [
         "What services do you offer?",
         "How much does it cost?",
@@ -508,6 +539,7 @@ def _build_generated_entry(industry_key: str, info: Dict[str, Any]) -> Dict[str,
         # never generated. This is the line the model is not allowed to cross.
         "caller_scenarios": list(GENERIC_ENTRY["caller_scenarios"]),
         "default_escalation": GENERIC_ENTRY["default_escalation"],
+        "escalation_terms": list(GENERIC_ENTRY["escalation_terms"]),
         "common_questions": questions or list(GENERIC_ENTRY["common_questions"]),
     }
 

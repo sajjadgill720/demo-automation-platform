@@ -28,7 +28,6 @@ def test_summarization_bypass():
             rendered_prompt="placeholder",
             ai_processing_consent=True,
             agent_status=AgentStatus.pending,
-            qualified=True,
         )
         session.add(lead)
         session.commit()
@@ -64,7 +63,7 @@ def test_summarization_bypass():
          patch("app.vapi_knowledge_base.attach_knowledge_base", return_value=True) as mock_attach, \
          patch("app.storage.download_document", return_value=b"%PDF-1.4 raw bytes") as mock_download, \
          patch("app.agents._call_vapi_create_assistant", return_value="vapi_ast_123") as mock_create_ast, \
-         patch("app.prompt_generator.generate_company_context_block", return_value="mock context block") as mock_gen_block:
+         patch("app.prompt_generator.generate_company_content_fields", return_value={}) as mock_gen_block:
 
         provision_vapi_assistant_task(str(lead_id))
 
@@ -92,7 +91,7 @@ def test_summarization_bypass():
          patch("app.vapi_knowledge_base.attach_knowledge_base", return_value=True) as mock_attach, \
          patch("app.storage.download_document", return_value=b"%PDF-1.4") as mock_download, \
          patch("app.agents._call_vapi_create_assistant", return_value="vapi_ast_456") as mock_create_ast, \
-         patch("app.prompt_generator.generate_company_context_block", return_value="mock context block") as mock_gen_block:
+         patch("app.prompt_generator.generate_company_content_fields", return_value={}) as mock_gen_block:
 
         provision_vapi_assistant_task(str(lead_id))
 

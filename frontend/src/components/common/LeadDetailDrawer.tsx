@@ -21,8 +21,8 @@ import { toast } from "sonner";
  *
  * The list pages (dashboard, active-demos) fetch the lead record but only render
  * a few columns; clicking a row opens this to reveal the rest — full contact
- * details, qualification reasoning, the provisioned assistant id, any failure
- * reason, the captured company profile, and submitted feedback. The lead's own
+ * details, the provisioned assistant id, any failure reason, the captured
+ * company profile, and submitted feedback. The lead's own
  * fields come from the row (no refetch); the profile and feedback are loaded
  * lazily from their existing endpoints when the drawer opens.
  */
@@ -272,7 +272,7 @@ export function LeadDetailDrawer({
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                 >
-                  Profile & Qualification
+                  Profile
                 </button>
                 <button
                   onClick={() => setActiveTab("calls")}
@@ -326,30 +326,6 @@ export function LeadDetailDrawer({
               <div className="space-y-6 animate-in fade-in duration-200">
                 {activeTab === "profile" && (
                   <>
-                    {/* Qualification Card */}
-                    <Section title="Qualification Reasoning">
-                      <Row
-                        label="Qualified Status"
-                        value={lead.qualified == null ? "—" : lead.qualified ? "Yes" : "No"}
-                      />
-                      {lead.qualification_confidence != null && (
-                        <Row
-                          label="Qualification Confidence"
-                          value={`${Math.round(lead.qualification_confidence * 100)}%`}
-                        />
-                      )}
-                      {lead.qualification_reasoning && (
-                        <div className="flex flex-col gap-1.5 border-b border-border/40 pb-2 last:border-0 last:pb-0">
-                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Qualification Reasoning
-                          </span>
-                          <span className="text-sm font-medium text-foreground break-words leading-relaxed whitespace-pre-wrap bg-muted/40 p-4 rounded-xl border border-border/50">
-                            {lead.qualification_reasoning}
-                          </span>
-                        </div>
-                      )}
-                    </Section>
-
                     {/* Captured Company Profile */}
                     <Section title="Captured Profile Characteristics">
                       {loading ? (

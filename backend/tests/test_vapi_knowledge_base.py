@@ -44,10 +44,6 @@ def create_sample_lead(session: Session, company_name: str, consent: bool) -> Le
         rendered_prompt="Base System Prompt",
         ai_processing_consent=consent,
         agent_status=AgentStatus.pending,
-        # Pre-mark as qualified so the Stage-0 qualifier gate (a live LLM call
-        # that would otherwise judge these fake company names) doesn't skip
-        # provisioning — these tests exercise the KB upload path, not qualification.
-        qualified=True,
     )
     session.add(lead)
     session.commit()

@@ -50,8 +50,8 @@ export function HelpMenu() {
 
         <div className="px-3 py-3">
           <p className="text-sm leading-relaxed text-foreground/85">
-            A lead fills the form → we qualify it → an AI voice agent is provisioned → the client
-            tries it on their demo page and leaves feedback.
+            A lead fills the form → an AI voice agent is provisioned → the client tries it on their
+            demo page and leaves feedback.
           </p>
         </div>
 

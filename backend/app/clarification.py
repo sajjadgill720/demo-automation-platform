@@ -25,7 +25,6 @@ from app.models import (
 )
 from app.llm_client import call_structured_llm
 from app.utils import sanitize_input, sanitize_document_text, sanitize_profile_text
-from app.qualifier import qualify_lead_internal
 from app.agents import provision_vapi_assistant_task
 from app.scenario_library import lookup_industry, format_scenarios_as_rules
 
@@ -688,6 +687,31 @@ def summarize_documents_node(state: ClarificationState) -> ClarificationState:
 
 # ── Incremental profile merge (replaces per-answer full re-extraction) ──
 
+
+class ProfilePatch(BaseModel):
+    """A sparse delta of profile fields the latest answer changed.
+
+    Every field is optional and defaults to None so the model can emit ONLY what
+    the answer actually updated. This is what makes the per-turn merge cheap: the
+    old approach re-emitted all 12 CompanyProfile fields every turn (the slowest
+    call in the interview at ~7s), even when a three-word answer changed one field.
+    Returning just the changed keys collapses the output — and output tokens, which
+    dominate LLM latency — to the handful that actually moved.
+    """
+    primary_problem: Optional[str] = None
+    services_and_offerings: Optional[str] = None
+    must_handle_scenarios: Optional[List[str]] = None
+    current_workflow_summary: Optional[str] = None
+    hours_and_availability: Optional[str] = None
+    escalation_preferences: Optional[str] = None
+    data_to_capture: Optional[str] = None
+    key_people_and_roles: Optional[str] = None
+    pricing_and_quote_policy: Optional[str] = None
+    top_caller_questions: Optional[str] = None
+    service_area_and_locations: Optional[str] = None
+    desired_customizations: Optional[str] = None
+
+
 MERGE_ANSWER_PROMPT = """You are Convoa's profile updater.
 Company: "{company_name}"
 Industry: "{industry}"
@@ -702,18 +726,18 @@ LATEST EXCHANGE:
 Question asked: {question}
 Business answered: {answer}
 
-Your task: examine the answer and update ONLY the profile fields that the answer
-provides new or better information for. Return the COMPLETE updated profile with
-all fields — keeping existing values unchanged for fields the answer does not address.
+Your task: examine the answer and return ONLY the profile fields that this answer
+adds new or better information for. Omit every field the answer does not change.
 
 Rules:
-- Only update a field if the answer provides clear, relevant information for it.
-- Never downgrade a known value to "UNKNOWN".
-- If must_handle_scenarios gains new items, APPEND them to the existing list.
+- Include a field ONLY if the answer provides clear, relevant new information for it.
+  If the answer changes nothing, return an empty JSON object: {{}}.
+- Never emit "UNKNOWN" or an empty value — simply omit a field you have nothing for.
+- For must_handle_scenarios, return ONLY the NEW scenario strings to add (they are
+  appended to the existing list — do not repeat ones already known).
 - Extract only what is stated or clearly implied — never invent.
-- Return all 12 fields, even unchanged ones.
 
-Return a valid JSON object matching the CompanyProfile schema.
+Return a valid JSON object containing only the changed fields.
 """
 
 
@@ -721,12 +745,13 @@ Return a valid JSON object matching the CompanyProfile schema.
 def merge_answer_node(state: ClarificationState) -> ClarificationState:
     """Incrementally updates the profile from the latest Q&A pair only.
 
-    Far cheaper than the old full re-extraction: sends ~the profile JSON + one
-    Q&A pair + the compact brief, instead of 6000 chars of raw document text +
-    the entire (growing) conversation history.
+    Sends the profile JSON + one Q&A pair + the compact brief, and asks the model
+    for a sparse patch (only the fields the answer changed) rather than the whole
+    profile. Applying the patch in Python keeps this the cheapest LLM call in the
+    interview instead of the most expensive.
     """
     lead_id_str = state.get("lead_id")
-    profile = state.get("extracted_profile") or {}
+    profile = dict(state.get("extracted_profile") or {})
     history = state.get("conversation_history", [])
 
     # Get the latest user answer from history
@@ -751,19 +776,30 @@ def merge_answer_node(state: ClarificationState) -> ClarificationState:
 
     _llm_t0 = time.perf_counter()
     try:
-        res = call_structured_llm(prompt, CompanyProfile, retry_on_failure=True)
-        updated = res.model_dump()
+        # max_tokens trimmed: a sparse patch never needs room for a full profile.
+        patch = call_structured_llm(
+            prompt, ProfilePatch, retry_on_failure=True, max_tokens=512
+        ).model_dump()
         logger.info(
             f"LLM_TIMING call=merge_answer lead_id={lead_id_str} "
-            f"duration_ms={(time.perf_counter() - _llm_t0) * 1000:.1f}"
+            f"duration_ms={(time.perf_counter() - _llm_t0) * 1000:.1f} "
+            f"changed_fields={[k for k, v in patch.items() if v not in (None, '', 'UNKNOWN', [])]}"
         )
-        # Safety: never let a merge downgrade a known field to UNKNOWN
-        for key, val in profile.items():
-            if val not in (None, "", "UNKNOWN", []):
-                new_val = updated.get(key)
-                if new_val in (None, "", "UNKNOWN", []):
-                    updated[key] = val
-        return {**state, "extracted_profile": updated}
+
+        for key, val in patch.items():
+            # Only apply real values — never let a patch blank out a known field.
+            if val in (None, "", "UNKNOWN", []):
+                continue
+            if key == "must_handle_scenarios":
+                existing = list(profile.get("must_handle_scenarios") or [])
+                for item in val:
+                    if item and item not in existing:
+                        existing.append(item)
+                profile["must_handle_scenarios"] = existing
+            else:
+                profile[key] = val
+
+        return {**state, "extracted_profile": profile}
     except Exception as e:
         logger.error(f"[{lead_id_str}] merge_answer failed: {e}", exc_info=True)
         return state  # Keep existing profile on failure
@@ -1490,7 +1526,52 @@ workflow.add_edge("finalize", END)
 
 # ── API Interface Functions ──
 
+# Lead IDs whose start pipeline is currently running in a background task, so a
+# duplicate /start (page refresh, double-submit) is a no-op instead of kicking off
+# a second heavy graph invoke against the same thread.
+_ACTIVE_STARTS: set[str] = set()
+_ACTIVE_STARTS_LOCK = threading.Lock()
+
+
+def ensure_clarification_pending(lead_id: str) -> None:
+    """Synchronously ensure a CompanyProfileDB row exists in an in-progress state.
+
+    Called by the /start endpoint before it hands the heavy pipeline to a
+    background task, so the UI can immediately poll `in_progress` and wait for the
+    first question rather than blocking the request on document extraction.
+    """
+    lead_id_uuid = uuid.UUID(lead_id)
+    with Session(engine) as session:
+        profile_db = session.exec(
+            select(CompanyProfileDB).where(CompanyProfileDB.lead_id == lead_id_uuid)
+        ).first()
+        if not profile_db:
+            profile_db = CompanyProfileDB(
+                lead_id=lead_id_uuid,
+                status=ProfileStatus.in_progress,
+                profile=None,
+                missing_fields=None,
+            )
+            session.add(profile_db)
+            session.commit()
+
+
 def start_clarification(lead_id: str) -> ClarificationStatus:
+    # Guard against a second concurrent run for the same lead (the pipeline is now
+    # dispatched as a background task, so a duplicate /start could otherwise race).
+    with _ACTIVE_STARTS_LOCK:
+        if lead_id in _ACTIVE_STARTS:
+            logger.info(f"[{lead_id}] start_clarification already running — returning current status")
+            return get_clarification_status(lead_id)
+        _ACTIVE_STARTS.add(lead_id)
+    try:
+        return _run_start_clarification(lead_id)
+    finally:
+        with _ACTIVE_STARTS_LOCK:
+            _ACTIVE_STARTS.discard(lead_id)
+
+
+def _run_start_clarification(lead_id: str) -> ClarificationStatus:
     lead_id_uuid = uuid.UUID(lead_id)
     with Session(engine) as session:
         lead = session.get(Lead, lead_id_uuid)

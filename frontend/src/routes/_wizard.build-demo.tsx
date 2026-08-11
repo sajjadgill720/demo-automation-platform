@@ -600,12 +600,6 @@ function BuildDemoPage() {
         }),
       );
 
-      if (lead.agent_status === "skipped") {
-        setFormSubmitting(false);
-        navigate({ to: "/pipeline", search: { leadId: lead.id } });
-        return;
-      }
-
       toast.success("Onboarding data registered!");
       navigate({ to: "/upload", search: { leadId: lead.id } });
     } catch (err) {
