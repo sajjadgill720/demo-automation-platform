@@ -33,3 +33,10 @@ dist-ssr
 
 #sensistive data
 .env
+.claude
+.gemini
+
+# Python
+__pycache__/
+*.pyc
+
