@@ -25,3 +25,17 @@ export const loginPortal = createServerFn({ method: "POST" })
     }
     return { success: false, error: "Incorrect password" };
   });
+
+export const logoutPortal = createServerFn({ method: "POST" }).handler(async () => {
+  // Clear the session cookie the same way it was set (httpOnly, so it can only
+  // be removed server-side). Overwriting with an immediate expiry deletes it.
+  const { setCookie } = await import("@tanstack/react-start/server");
+  setCookie("dq_session", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    sameSite: "lax",
+    maxAge: 0,
+  });
+  return { success: true };
+});

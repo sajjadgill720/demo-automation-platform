@@ -17,6 +17,9 @@ import {
   ChevronDown,
   MessageSquare,
   DollarSign,
+  Clock,
+  UserCheck,
+  BarChart3,
 } from "lucide-react";
 import { CompanyLogo } from "@/components/common/CompanyCard";
 import { cn } from "@/lib/utils";
@@ -66,6 +69,17 @@ const fadeUp: any = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
+
+/* Value props shown alongside the live-call orb in the hero. */
+const HERO_POINTS = [
+  { icon: Volume2, text: "Sounds human, callers never ask to be put through to someone else." },
+  {
+    icon: Clock,
+    text: "Answers at 2am, on weekends, and through the rush. Every call, every time.",
+  },
+  { icon: UserCheck, text: "Every caller captured, qualified, and ready for you to follow up." },
+  { icon: BarChart3, text: "See every call and every missed opportunity in one place." },
+] as const;
 
 function DemoPreview() {
   const search = Route.useSearch();
@@ -141,12 +155,7 @@ function DemoPreview() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const IN_PROGRESS = [
-      "pending",
-      "summarizing_documents",
-      "building_profile",
-      "provisioning",
-    ];
+    const IN_PROGRESS = ["pending", "summarizing_documents", "building_profile", "provisioning"];
 
     const load = () => {
       getDemoRequestStatus(dynamicLeadId)
@@ -200,11 +209,11 @@ function DemoPreview() {
     const name = personalization.company;
     const initials = name
       ? name
-        .split(" ")
-        .map((w: string) => w[0])
-        .join("")
-        .substring(0, 2)
-        .toUpperCase()
+          .split(" ")
+          .map((w: string) => w[0])
+          .join("")
+          .substring(0, 2)
+          .toUpperCase()
       : "DQ";
 
     // Previously hashed the company name into an arbitrary hue, which produced
@@ -243,7 +252,6 @@ function DemoPreview() {
     return () => clearInterval(timer);
   }, [callStatus]);
 
-
   // Native call capture. Vapi is the source of truth: when a call starts we grab
   // Vapi's call id, and when it ends we hand that id to the backend, which pulls
   // the official report (recording, transcript, summary) from Vapi's API. Refs
@@ -253,6 +261,9 @@ function DemoPreview() {
   const callStartRef = useRef<number | null>(null);
   const assistantIdRef = useRef<string | null>(null);
   const leadIdRef = useRef<string | null>(dynamicLeadId);
+  // Mirror of callStatus so the once-registered Vapi handlers can read the LIVE
+  // status (a handler closes over the value at registration time otherwise).
+  const callStatusRef = useRef(callStatus);
 
   // Keep the refs in sync so the once-registered call-end handler always saves
   // against the currently-resolved agent and lead (the assistant id can arrive
@@ -261,6 +272,10 @@ function DemoPreview() {
     assistantIdRef.current = resolvedAssistantId;
     leadIdRef.current = dynamicLeadId;
   }, [resolvedAssistantId, dynamicLeadId]);
+
+  useEffect(() => {
+    callStatusRef.current = callStatus;
+  }, [callStatus]);
 
   // The two primary actions (feedback + booking) live in this block, directly
   // below the demo. When a call ends — the moment the client is most primed to
@@ -300,7 +315,6 @@ function DemoPreview() {
     };
   }, [dynamicLeadId]);
 
-
   // Dynamic load of Vapi
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -310,25 +324,55 @@ function DemoPreview() {
       console.warn("VITE_VAPI_PUBLIC_KEY is not defined in environment variables.");
     }
 
+    let createdVapi: any = null;
+
     import("@vapi-ai/web").then((VapiModule) => {
       try {
         let VapiClass = VapiModule.default;
-        if (typeof VapiClass !== "function" && VapiClass && typeof (VapiClass as any).default === "function") {
+        if (
+          typeof VapiClass !== "function" &&
+          VapiClass &&
+          typeof (VapiClass as any).default === "function"
+        ) {
           VapiClass = (VapiClass as any).default;
         }
         if (typeof VapiClass !== "function") {
           VapiClass = VapiModule as any;
         }
         const vapiInstance = new (VapiClass as any)(VAPI_PUBLIC_KEY);
+        createdVapi = vapiInstance;
 
-        vapiInstance.on("call-start", (payload: any) => {
-          setCallStatus("on-call");
-          callStartRef.current = Date.now();
-          // Some SDK versions surface the call id on the event; otherwise it comes
-          // from the start() promise (see handleStartBrowserCall).
-          const idFromEvent = payload?.call?.id || payload?.id;
-          if (typeof idFromEvent === "string") vapiCallIdRef.current = idFromEvent;
-          toast.success("Connected to generated demo agent.");
+        // Flip out of the "connecting" spinner into the live-call UI. Idempotent,
+        // and driven by SEVERAL signals because in the current SDK (2.6.x) the
+        // bare `call-start` event does not always land before the agent's first
+        // words — `call-start-success` and `speech-start` are used as fallbacks
+        // so the loader never sticks while the agent is already talking.
+        const markConnected = () => {
+          if (!callStartRef.current) callStartRef.current = Date.now();
+          if (callStatusRef.current !== "on-call") {
+            setCallStatus("on-call");
+            toast.success("Connected to generated demo agent.");
+          }
+        };
+
+        vapiInstance.on("call-start", () => markConnected());
+        vapiInstance.on("call-start-success", (evt: any) => {
+          // This event DOES carry the call id in 2.6.x; capture it for the report.
+          if (evt?.callId && typeof evt.callId === "string") vapiCallIdRef.current = evt.callId;
+          markConnected();
+        });
+        // The agent (or the caller) producing speech proves the call is live —
+        // clear the loader even if the connection events were missed.
+        vapiInstance.on("speech-start", () => {
+          if (callStatusRef.current === "connecting") markConnected();
+        });
+
+        vapiInstance.on("call-start-failed", (evt: any) => {
+          console.error("Vapi call-start-failed:", evt);
+          setCallStatus("idle");
+          toast.error(
+            evt?.error ? `Couldn't start the call: ${evt.error}` : "Couldn't start the call.",
+          );
         });
 
         vapiInstance.on("call-end", () => {
@@ -355,8 +399,13 @@ function DemoPreview() {
 
         vapiInstance.on("error", (err: any) => {
           console.error("Vapi error:", err);
-          setCallStatus("idle");
-          toast.error("Connection failed.");
+          // Only tear the UI down if we never got connected. An error emitted
+          // mid-call is left to `call-end` to handle, so a benign warning does
+          // not yank an active call back to the idle screen.
+          if (callStatusRef.current === "connecting" || callStatusRef.current === "idle") {
+            setCallStatus("idle");
+            toast.error("Connection failed. Check your microphone permission and try again.");
+          }
         });
 
         setVapi(vapiInstance);
@@ -366,11 +415,19 @@ function DemoPreview() {
     });
 
     return () => {
-      if (vapi) {
-        vapi.stop();
+      // Stop the instance THIS effect created. The previous code closed over the
+      // `vapi` state (still null when the empty-deps effect ran), so the call and
+      // microphone were never released on unmount.
+      if (createdVapi) {
+        try {
+          createdVapi.stop();
+        } catch {
+          /* already stopped / never started */
+        }
       }
-      // Best-effort unmount cleanup for the Vapi assistant.
-      // Removed endDemoSession here because React StrictMode triggers it instantly during dev, deleting the backend agent before the user can even test it!
+      // endDemoSession is intentionally NOT called here: React StrictMode would
+      // trigger it instantly during dev, deleting the backend agent before the
+      // user can even test it.
     };
   }, []);
 
@@ -382,7 +439,7 @@ function DemoPreview() {
     if (!resolvedAssistantId) {
       toast.error(
         agentBuilding
-          ? "Your agent is still being built — this will be ready in a moment."
+          ? "Your agent is still being built, this will be ready in a moment."
           : "No agent is attached to this demo yet.",
       );
       return;
@@ -416,7 +473,6 @@ function DemoPreview() {
       );
     }
   };
-
 
   const handleCopyShareLink = () => {
     const baseUrl = window.location.origin + window.location.pathname;
@@ -456,7 +512,7 @@ function DemoPreview() {
       setFeedbackSubmitted(true);
       toast.success(
         feedbackRating === "positive"
-          ? "Thanks — your feedback has been sent to the team."
+          ? "Thanks, your feedback has been sent to the team."
           : "Sent. The team will review what needs adjusting.",
       );
     } catch (err) {
@@ -465,7 +521,6 @@ function DemoPreview() {
       setFeedbackSending(false);
     }
   };
-
 
   return (
     <div className={cn(theme === "dark" && "dark")}>
@@ -501,10 +556,12 @@ function DemoPreview() {
           <div
             className="absolute inset-0 opacity-[0.1] dark:opacity-[0.04]"
             style={{
-              backgroundImage: "radial-gradient(circle at 1px 1px, var(--border) 1.5px, transparent 1.5px)",
+              backgroundImage:
+                "radial-gradient(circle at 1px 1px, var(--border) 1.5px, transparent 1.5px)",
               backgroundSize: "32px 32px",
               maskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
-              WebkitMaskImage: "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
+              WebkitMaskImage:
+                "radial-gradient(ellipse 60% 50% at 50% 0%, #000 40%, transparent 100%)",
             }}
           />
           <div
@@ -517,249 +574,285 @@ function DemoPreview() {
           />
         </div>
 
-
-
         {/* Hero Section */}
         <motion.section
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="relative z-10 mx-auto max-w-6xl px-6 pt-4 pb-20 space-y-12"
+          className="relative z-10 mx-auto w-full max-w-[1600px] px-6 lg:px-10 pt-4 pb-20 space-y-12"
         >
-          {/* C1: Personalization Signaling banner */}
-          <div className="flex items-center gap-2.5 px-4 py-2 border border-primary/20 w-fit bg-primary/[0.04] mx-auto text-[10px] font-semibold text-primary uppercase tracking-widest font-mono">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            Prepared for {personalization.name} · {personalization.company}
-          </div>
-
-          <div className="rounded-3xl border border-border bg-card/85 backdrop-blur-sm p-10 md:p-14 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-primary to-blue-400" />
-
-            <div className="flex flex-col items-center gap-8 text-center">
-              {/* Company Logo representation */}
-              <motion.div variants={fadeUp} className="flex items-center gap-4">
-                <CompanyLogo company={companyRepresentation} size={56} />
-                <span className="text-muted-foreground text-xl font-light">×</span>
-                <div className="flex h-14 w-14 items-center justify-center border border-border bg-secondary text-foreground">
-                  <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+          <div className="relative pt-2">
+            <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 lg:items-center">
+              {/* Left — the pitch */}
+              <motion.div variants={fadeUp} className="space-y-7 text-center lg:text-left">
+                {/* Company lockup */}
+                <div className="flex items-center gap-3 justify-center lg:justify-start">
+                  <CompanyLogo company={companyRepresentation} size={44} />
+                  <span className="text-muted-foreground text-lg font-light">×</span>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary text-foreground">
+                    <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                  </div>
                 </div>
-              </motion.div>
 
-              {/* Minimal headline */}
-              <motion.div variants={fadeUp} className="max-w-2xl space-y-4">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-foreground leading-[1.1]">
-                  {personalization.company}'s new receptionist never misses a call
-                </h1>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto font-sans">
-                  Trained on how you work. Call it right now — this is exactly what your
-                  customers would hear.
-                </p>
-              </motion.div>
+                {/* Headline */}
+                <div className="space-y-4">
+                  <h1 className="text-3xl sm:text-4xl xl:text-5xl font-normal tracking-tight text-foreground leading-[1.1]">
+                    {personalization.company}'s new receptionist{" "}
+                    <span className="text-primary">never misses a call</span>
+                  </h1>
+                  <p className="text-base text-muted-foreground leading-relaxed max-w-md mx-auto lg:mx-0 font-sans">
+                    Trained on how you work. Call it right now, this is exactly what your customers
+                    would hear.
+                  </p>
+                </div>
 
-              {/* CV: Convoa Command Grid — Bento hero with central live-call orb */}
-              <motion.div
-                variants={fadeUp}
-                className="w-full no-print pt-2"
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 text-left">
-                  {/* Top-left — Human-like voice */}
-                  <FeatureCell
-                    text="Sounds human. Your customers won't ask to be put through to someone else."
-                    illustration={<VoiceRosterIllustration />}
-                  />
-
-                  {/* Center hub — eclipse orb, spans two rows on desktop, whole surface is clickable */}
-                  <button
-                    onClick={
-                      callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall
-                    }
-                    disabled={callStatus === "connecting" || !canCall}
-                    aria-label={
-                      callStatus === "on-call"
-                        ? "End the live voice call"
-                        : "Start a live voice call now"
-                    }
-                    className={cn(
-                      "lg:row-span-2 group relative flex flex-col items-center justify-start gap-5 rounded-3xl p-6 md:p-8 text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                      // Light mode: contain the orb as its own dark "spotlight" panel so the
-                      // glow never smudges the light page. Dark mode: let it float in the void.
-                      theme !== "dark" &&
-                        "overflow-hidden border border-border/50 shadow-[0_24px_70px_-24px_rgba(2,6,15,0.55)]",
-                    )}
-                    style={{
-                      background:
-                        theme === "dark"
-                          ? "radial-gradient(ellipse 78% 62% at 50% 54%, #05070d 0%, #05070d 44%, transparent 82%)"
-                          : "radial-gradient(ellipse 120% 100% at 50% 42%, #0d1a2b 0%, #060910 70%)",
-                    }}
-                  >
-                    {/* Brand + tagline */}
-                    <div className="relative z-10 space-y-3 min-h-[110px] md:min-h-[120px] flex flex-col items-center justify-start w-full">
-                      <span
-                        className="block text-3xl md:text-4xl font-bold tracking-tight lowercase"
-                        style={{
-                          background: "linear-gradient(90deg, var(--color-primary), var(--color-primary))",
-                          WebkitBackgroundClip: "text",
-                          backgroundClip: "text",
-                          color: "transparent",
-                        }}
-                      >
-                        convoa
+                {/* Value list */}
+                <ul className="space-y-3.5 max-w-md mx-auto lg:mx-0 text-left">
+                  {HERO_POINTS.map((p) => (
+                    <li key={p.text} className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+                        <p.icon className="h-3.5 w-3.5" />
                       </span>
-                      <div className="h-[60px] flex items-center justify-center w-full px-4 overflow-hidden">
-                        <AnimatePresence mode="wait">
-                          {callStatus === "idle" || callStatus === "ended" || callStatus === "connecting" ? (
-                            <motion.p
-                              key="idle"
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              transition={{ duration: 0.2 }}
-                              className="text-sm text-white/55 leading-relaxed max-w-xs mx-auto font-sans"
-                            >
-                              Answers every call, books the job, and never puts anyone on hold.
-                            </motion.p>
-                          ) : (
-                            <motion.div
-                              key="on-call"
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              transition={{ duration: 0.2 }}
-                              className="space-y-1 text-center"
-                            >
-                              <p className="text-[11px] font-mono uppercase tracking-widest text-primary/80 font-bold animate-pulse">
-                                🎙️ Connected & Listening
-                              </p>
-                              <p className="text-xs text-white/70 font-sans max-w-xs mx-auto leading-normal">
-                                Try asking: {narrative.faqs[0] ? `"${narrative.faqs[0].q}"` : `"Who are you?"`}
-                              </p>
-                              {narrative.faqs[1] && (
-                                <p className="text-[10px] text-white/40 font-sans max-w-xs mx-auto leading-normal truncate">
-                                  or: "{narrative.faqs[1].q}"
-                                </p>
-                              )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
+                      <span className="text-sm text-foreground/75 font-sans leading-relaxed">
+                        {p.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
 
-                    {/* Eclipse */}
-                    <div className="relative flex-1 flex items-center justify-center w-full min-h-[380px] md:min-h-[460px]">
-                      {/* Outer halo glow */}
-                      <div
-                        className="absolute h-[460px] w-[460px] rounded-full blur-3xl animate-pulse pointer-events-none"
-                        style={{
-                          background:
-                            "radial-gradient(circle, rgba(245,158,11,0.30) 0%, rgba(34,211,238,0.12) 44%, transparent 68%)",
-                          animationDuration: "7s",
-                        }}
-                      />
-                      {/* Dark disc: glowing teal rim + faint starfield */}
-                      <div
-                        className="absolute h-[300px] w-[300px] md:h-[360px] md:w-[360px] rounded-full transition-transform duration-500 group-hover:scale-[1.04] pointer-events-none"
-                        style={{
-                          background:
-                            "radial-gradient(circle, #03050a 50%, rgba(245,158,11,0.05) 68%, transparent 73%), radial-gradient(1.5px 1.5px at 30% 38%, rgba(255,255,255,0.55), transparent), radial-gradient(1px 1px at 68% 30%, rgba(255,255,255,0.4), transparent), radial-gradient(1.5px 1.5px at 58% 72%, rgba(255,255,255,0.45), transparent), radial-gradient(1px 1px at 38% 64%, rgba(255,255,255,0.3), transparent), radial-gradient(1px 1px at 74% 58%, rgba(255,255,255,0.35), transparent), radial-gradient(1px 1px at 46% 44%, rgba(255,255,255,0.25), transparent)",
-                          boxShadow:
-                            "0 0 0 1px rgba(245,158,11,0.30), 0 0 100px -6px rgba(245,158,11,0.55), 0 0 46px -4px rgba(245,158,11,0.4), inset 0 0 80px -16px rgba(45,212,191,0.7)",
-                        }}
-                      />
-                      {/* Organic ribbon knot — faint counter layer (depth) */}
-                      <EclipseRibbon
-                        className="absolute h-[230px] w-[230px] md:h-[262px] md:w-[262px] opacity-35"
-                        gradientId="ribbonGradFaint"
-                        rotate={-360}
-                        duration={95}
-                        strokeWidth={0.5}
-                      />
-                      {/* Organic ribbon knot — primary */}
-                      <EclipseRibbon
-                        className="absolute h-[188px] w-[188px] md:h-[216px] md:w-[216px]"
-                        gradientId="ribbonGradMain"
-                        rotate={360}
-                        duration={58}
-                        strokeWidth={0.7}
-                        glow
-                      />
-                      {/* Center label */}
-                      <div className="relative z-10 flex flex-col items-center gap-0.5 pointer-events-none">
-                        {callStatus === "on-call" ? (
-                          <>
-                            <VoiceWaveform />
-                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-destructive/70">
-                              In call
-                            </span>
-                            <span className="text-lg md:text-xl font-semibold text-destructive">
-                              tap to end
-                            </span>
-                          </>
-                        ) : callStatus === "connecting" ? (
-                          <>
-                            <LoadingPulseRing />
-                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 mb-1">
-                              Connecting
-                            </span>
-                            <span className="text-sm md:text-base font-semibold text-primary animate-pulse text-center max-w-[220px] leading-snug">
-                              {connectionSteps[connectStepIndex]}
-                            </span>
-                          </>
-                        ) : !canCall ? (
-                          <>
-                            <span className="text-[11px] font-light uppercase tracking-[0.2em] text-white/40">
-                              {agentBuilding ? "Your agent is" : "Agent"}
-                            </span>
-                            <span className="text-xl md:text-2xl font-semibold tracking-tight text-white/55">
-                              {agentBuilding ? "almost ready…" : "not available"}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-[11px] font-light uppercase tracking-[0.2em] text-white/40">
-                              Click here to
-                            </span>
-                            <span
-                              className="text-2xl md:text-3xl font-semibold tracking-tight"
-                              style={{
-                                background: "linear-gradient(90deg, var(--color-primary), var(--color-primary))",
-                                WebkitBackgroundClip: "text",
-                                backgroundClip: "text",
-                                color: "transparent",
-                              }}
-                            >
-                              talk now
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Top-right — Heat maps */}
-                  <FeatureCell
-                    text="See every call and every missed opportunity in one place."
-                    illustration={<HeatmapIllustration />}
-                  />
-
-                  {/* Bottom-left — 24/7 revenue */}
-                  <FeatureCell
-                    text="Answers at 2am, on weekends, and through the rush. Every call, every time."
-                    illustration={<RevenueIllustration />}
-                  />
-
-                  {/* Bottom-right — Real-time data */}
-                  <FeatureCell
-                    text="Every caller captured, qualified and ready for you to follow up."
-                    illustration={<TimelineIllustration />}
-                  />
+                {/* Trust row */}
+                <div className="flex items-center gap-5 flex-wrap justify-center lg:justify-start pt-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> Live
+                    agent
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5" /> Real voice
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5" /> No setup
+                  </span>
                 </div>
+              </motion.div>
+
+              {/* Right — the live-call orb (the primary action, now the hero visual) */}
+              <motion.div variants={fadeUp} className="w-full no-print">
+                <button
+                  onClick={callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall}
+                  disabled={callStatus === "connecting" || !canCall}
+                  aria-label={
+                    callStatus === "on-call"
+                      ? "End the live voice call"
+                      : "Start a live voice call now"
+                  }
+                  className="w-full group relative flex flex-col items-center justify-start gap-5 rounded-3xl p-6 md:p-8 text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  style={{
+                    background:
+                      theme === "dark"
+                        ? "radial-gradient(ellipse 78% 62% at 50% 54%, #05070d 0%, #05070d 44%, transparent 82%)"
+                        : "transparent",
+                  }}
+                >
+                  {/* Brand + tagline */}
+                  <div className="relative z-10 space-y-3 min-h-[110px] md:min-h-[120px] flex flex-col items-center justify-start w-full">
+                    <span
+                      className="block text-3xl md:text-4xl font-bold tracking-tight lowercase"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, var(--color-primary), var(--color-primary))",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        color: "transparent",
+                      }}
+                    >
+                      convoa
+                    </span>
+                    <div className="h-[60px] flex items-center justify-center w-full px-4 overflow-hidden">
+                      <AnimatePresence mode="wait">
+                        {callStatus === "idle" ||
+                        callStatus === "ended" ||
+                        callStatus === "connecting" ? (
+                          <motion.p
+                            key="idle"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.2 }}
+                            className="text-sm text-white/55 leading-relaxed max-w-xs mx-auto font-sans"
+                          >
+                            Answers every call, books the job, and never puts anyone on hold.
+                          </motion.p>
+                        ) : (
+                          <motion.div
+                            key="on-call"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.2 }}
+                            className="space-y-1 text-center"
+                          >
+                            <p className="text-[11px] font-mono uppercase tracking-widest text-primary/80 font-bold animate-pulse">
+                              🎙️ Connected & Listening
+                            </p>
+                            <p className="text-xs text-white/70 font-sans max-w-xs mx-auto leading-normal">
+                              Try asking:{" "}
+                              {narrative.faqs[0] ? `"${narrative.faqs[0].q}"` : `"Who are you?"`}
+                            </p>
+                            {narrative.faqs[1] && (
+                              <p className="text-[10px] text-white/40 font-sans max-w-xs mx-auto leading-normal truncate">
+                                or: "{narrative.faqs[1].q}"
+                              </p>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Eclipse */}
+                  <div className="relative flex-1 flex items-center justify-center w-full min-h-[380px] md:min-h-[460px]">
+                    {/* Outer halo glow */}
+                    <div
+                      className="absolute h-[460px] w-[460px] rounded-full blur-3xl animate-pulse pointer-events-none"
+                      style={{
+                        background:
+                          "radial-gradient(circle, rgba(245,158,11,0.30) 0%, rgba(34,211,238,0.12) 44%, transparent 68%)",
+                        animationDuration: "7s",
+                      }}
+                    />
+                    {/* Dark disc: glowing teal rim + faint starfield */}
+                    <div
+                      className="absolute h-[300px] w-[300px] md:h-[360px] md:w-[360px] rounded-full transition-transform duration-500 group-hover:scale-[1.04] pointer-events-none"
+                      style={{
+                        background:
+                          "radial-gradient(circle, #03050a 50%, rgba(245,158,11,0.05) 68%, transparent 73%), radial-gradient(1.5px 1.5px at 30% 38%, rgba(255,255,255,0.55), transparent), radial-gradient(1px 1px at 68% 30%, rgba(255,255,255,0.4), transparent), radial-gradient(1.5px 1.5px at 58% 72%, rgba(255,255,255,0.45), transparent), radial-gradient(1px 1px at 38% 64%, rgba(255,255,255,0.3), transparent), radial-gradient(1px 1px at 74% 58%, rgba(255,255,255,0.35), transparent), radial-gradient(1px 1px at 46% 44%, rgba(255,255,255,0.25), transparent)",
+                        boxShadow:
+                          "0 0 0 1px rgba(245,158,11,0.30), 0 0 100px -6px rgba(245,158,11,0.55), 0 0 46px -4px rgba(245,158,11,0.4), inset 0 0 80px -16px rgba(45,212,191,0.7)",
+                      }}
+                    />
+                    {/* Organic ribbon knot — faint counter layer (depth) */}
+                    <EclipseRibbon
+                      className="absolute h-[230px] w-[230px] md:h-[262px] md:w-[262px] opacity-35"
+                      gradientId="ribbonGradFaint"
+                      rotate={-360}
+                      duration={95}
+                      strokeWidth={0.5}
+                    />
+                    {/* Organic ribbon knot — primary */}
+                    <EclipseRibbon
+                      className="absolute h-[188px] w-[188px] md:h-[216px] md:w-[216px]"
+                      gradientId="ribbonGradMain"
+                      rotate={360}
+                      duration={58}
+                      strokeWidth={0.7}
+                      glow
+                    />
+                    {/* Center label */}
+                    <div className="relative z-10 flex flex-col items-center gap-0.5 pointer-events-none">
+                      {callStatus === "on-call" ? (
+                        <>
+                          <VoiceWaveform />
+                          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-destructive/70">
+                            In call
+                          </span>
+                          <span className="text-lg md:text-xl font-semibold text-destructive">
+                            tap to end
+                          </span>
+                        </>
+                      ) : callStatus === "connecting" ? (
+                        <>
+                          <LoadingPulseRing />
+                          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 mb-1">
+                            Connecting
+                          </span>
+                          <span className="text-sm md:text-base font-semibold text-primary animate-pulse text-center max-w-[220px] leading-snug">
+                            {connectionSteps[connectStepIndex]}
+                          </span>
+                        </>
+                      ) : !canCall ? (
+                        <>
+                          <span className="text-[11px] font-light uppercase tracking-[0.2em] text-white/40">
+                            {agentBuilding ? "Your agent is" : "Agent"}
+                          </span>
+                          <span className="text-xl md:text-2xl font-semibold tracking-tight text-white/55">
+                            {agentBuilding ? "almost ready…" : "not available"}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[11px] font-light uppercase tracking-[0.2em] text-white/40">
+                            Click here to
+                          </span>
+                          <span
+                            className="text-2xl md:text-3xl font-semibold tracking-tight"
+                            style={{
+                              background:
+                                "linear-gradient(90deg, var(--color-primary), var(--color-primary))",
+                              WebkitBackgroundClip: "text",
+                              backgroundClip: "text",
+                              color: "transparent",
+                            }}
+                          >
+                            talk now
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </button>
               </motion.div>
             </div>
           </div>
+
+          {/* Dashboard preview — the four product panels, reframed as labeled
+              previews of what the client sees inside the live console. */}
+          <motion.div variants={fadeUp} className="space-y-6 no-print">
+            <div className="text-center lg:text-left space-y-2">
+              <span className="text-[10px] font-mono text-primary uppercase tracking-widest font-semibold">
+                Inside the console
+              </span>
+              <h2 className="text-2xl font-normal tracking-tight">
+                Everything Convoa captures, in one view
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+              {[
+                {
+                  label: "Agent activity",
+                  desc: "Live roster of calls handled",
+                  el: <VoiceRosterIllustration />,
+                },
+                {
+                  label: "Service heatmap",
+                  desc: "Where demand concentrates",
+                  el: <HeatmapIllustration />,
+                },
+                {
+                  label: "Revenue trend",
+                  desc: "Booked jobs over time",
+                  el: <RevenueIllustration />,
+                },
+                {
+                  label: "Call timings",
+                  desc: "Peak hours at a glance",
+                  el: <TimelineIllustration />,
+                },
+              ].map((t) => (
+                <div
+                  key={t.label}
+                  className="group flex flex-col gap-4 rounded-3xl border border-border bg-card/60 backdrop-blur-sm p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_8px_32px_-12px_rgba(45,212,191,0.25)]"
+                >
+                  <div className="relative h-40 overflow-hidden rounded-2xl border border-border/60 bg-secondary/30 transition-colors group-hover:border-primary/25">
+                    {t.el}
+                  </div>
+                  <div className="px-1">
+                    <p className="text-sm font-medium text-foreground">{t.label}</p>
+                    <p className="text-xs text-muted-foreground font-sans">{t.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
           {/* Act now — the two primary actions, directly below the demo so the
               client reaches them without scrolling past secondary content. On lg
@@ -770,7 +863,7 @@ function DemoPreview() {
             {justEnded && (
               <div className="mb-4 flex items-center justify-center gap-2 text-center text-sm font-sans text-primary animate-fade-in">
                 <Sparkles className="h-4 w-4 shrink-0" />
-                <span>That's your agent. What did you think — ready to take it live?</span>
+                <span>That's your agent. What did you think? Ready to take it live?</span>
               </div>
             )}
             <div
@@ -786,146 +879,152 @@ function DemoPreview() {
                     <MessageSquare className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <div>
-                    <h3 className="text-base font-medium tracking-tight leading-tight">How was that?</h3>
-                    <p className="text-xs text-muted-foreground font-sans">Tell us if the agent got it right.</p>
+                    <h3 className="text-base font-medium tracking-tight leading-tight">
+                      How was that?
+                    </h3>
+                    <p className="text-xs text-muted-foreground font-sans">
+                      Tell us if the agent got it right.
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-4 flex-1">
-              {!feedbackSubmitted ? (
-                <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-sm">
-                  {/* Rating Selector */}
-                  <div className="flex gap-4 justify-center">
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackRating("positive")}
-                      className={cn(
-                        "flex items-center gap-2 rounded-xl border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent transition-all duration-200 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
-                        feedbackRating === "positive"
-                          ? "border-success text-success bg-success/[0.05]"
-                          : "border-border text-foreground hover:bg-secondary",
-                      )}
-                    >
-                      <ThumbsUp className="h-4 w-4" /> Yes, Accurate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackRating("negative")}
-                      className={cn(
-                        "flex items-center gap-2 rounded-xl border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent transition-all duration-200 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
-                        feedbackRating === "negative"
-                          ? "border-destructive text-destructive bg-destructive/[0.05]"
-                          : "border-border text-foreground hover:bg-secondary",
-                      )}
-                    >
-                      <ThumbsDown className="h-4 w-4" /> Needs Tweaks
-                    </button>
-                  </div>
+                  {!feedbackSubmitted ? (
+                    <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-sm">
+                      {/* Rating Selector */}
+                      <div className="flex gap-4 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setFeedbackRating("positive")}
+                          className={cn(
+                            "flex items-center gap-2 rounded-xl border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent transition-all duration-200 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
+                            feedbackRating === "positive"
+                              ? "border-success text-success bg-success/[0.05]"
+                              : "border-border text-foreground hover:bg-secondary",
+                          )}
+                        >
+                          <ThumbsUp className="h-4 w-4" /> Yes, Accurate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFeedbackRating("negative")}
+                          className={cn(
+                            "flex items-center gap-2 rounded-xl border px-6 py-3 font-mono uppercase tracking-wider text-sm font-semibold cursor-pointer bg-transparent transition-all duration-200 btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]",
+                            feedbackRating === "negative"
+                              ? "border-destructive text-destructive bg-destructive/[0.05]"
+                              : "border-border text-foreground hover:bg-secondary",
+                          )}
+                        >
+                          <ThumbsDown className="h-4 w-4" /> Needs Tweaks
+                        </button>
+                      </div>
 
-                  {/* Rating text prompt */}
-                  {feedbackRating && (
-                    <div className="space-y-2 text-left animate-fade-in">
-                      <label className="text-xs font-mono uppercase tracking-wider text-foreground/75 font-semibold">
-                        {feedbackRating === "positive"
-                          ? "What works well? (Optional)"
-                          : "What did the agent miss? (e.g. tools, workflow instructions) *"}
-                      </label>
-                      <textarea
-                        required={feedbackRating === "negative"}
-                        rows={3}
-                        value={feedbackText}
-                        onChange={(e) => setFeedbackText(e.target.value)}
-                        placeholder={
-                          feedbackRating === "positive"
-                            ? "Provide any comments..."
-                            : "Tell us what to adjust so we can rebuild your agent..."
-                        }
-                        className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm font-sans resize-none"
-                      />
-                      <button
-                        type="submit"
-                        disabled={feedbackSending}
-                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-200 text-sm font-mono font-semibold uppercase tracking-wider py-3 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        {feedbackSending ? "Sending…" : "Send feedback"}
-                      </button>
-                    </div>
-                  )}
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  <div className="text-center py-2 space-y-2 font-mono">
-                    <div className="h-10 w-10 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
-                      <Check className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm uppercase tracking-wider font-bold">Feedback sent</p>
-                    <p className="text-xs text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
-                      Thanks — this is now with the team.
-                    </p>
-                  </div>
-
-                  {/* The client's own submissions, read back from the server so they
-                      can see exactly what was sent and when. */}
-                  {pastFeedback.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                        Your feedback
-                      </p>
-                      <ul className="space-y-2">
-                        {pastFeedback.map((fb) => (
-                          <li
-                            key={fb.id}
-                            className="border border-border bg-secondary/40 p-3.5 space-y-1.5"
+                      {/* Rating text prompt */}
+                      {feedbackRating && (
+                        <div className="space-y-2 text-left animate-fade-in">
+                          <label className="text-xs font-mono uppercase tracking-wider text-foreground/75 font-semibold">
+                            {feedbackRating === "positive"
+                              ? "What works well? (Optional)"
+                              : "What did the agent miss? (e.g. tools, workflow instructions) *"}
+                          </label>
+                          <textarea
+                            required={feedbackRating === "negative"}
+                            rows={3}
+                            value={feedbackText}
+                            onChange={(e) => setFeedbackText(e.target.value)}
+                            placeholder={
+                              feedbackRating === "positive"
+                                ? "Provide any comments..."
+                                : "Tell us what to adjust so we can rebuild your agent..."
+                            }
+                            className="w-full bg-secondary border border-border px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm font-sans resize-none"
+                          />
+                          <button
+                            type="submit"
+                            disabled={feedbackSending}
+                            className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-200 text-sm font-mono font-semibold uppercase tracking-wider py-3 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider font-semibold",
-                                  fb.rating === "positive" ? "text-success" : "text-destructive",
-                                )}
+                            <Send className="h-3.5 w-3.5" />
+                            {feedbackSending ? "Sending…" : "Send feedback"}
+                          </button>
+                        </div>
+                      )}
+                    </form>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="text-center py-2 space-y-2 font-mono">
+                        <div className="h-10 w-10 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
+                          <Check className="h-5 w-5" />
+                        </div>
+                        <p className="text-sm uppercase tracking-wider font-bold">Feedback sent</p>
+                        <p className="text-xs text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
+                          Thanks, this is now with the team.
+                        </p>
+                      </div>
+
+                      {/* The client's own submissions, read back from the server so they
+                      can see exactly what was sent and when. */}
+                      {pastFeedback.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                            Your feedback
+                          </p>
+                          <ul className="space-y-2">
+                            {pastFeedback.map((fb) => (
+                              <li
+                                key={fb.id}
+                                className="border border-border bg-secondary/40 p-3.5 space-y-1.5"
                               >
-                                {fb.rating === "positive" ? (
-                                  <ThumbsUp className="h-3 w-3" />
-                                ) : (
-                                  <ThumbsDown className="h-3 w-3" />
+                                <div className="flex items-center justify-between gap-2">
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider font-semibold",
+                                      fb.rating === "positive"
+                                        ? "text-success"
+                                        : "text-destructive",
+                                    )}
+                                  >
+                                    {fb.rating === "positive" ? (
+                                      <ThumbsUp className="h-3 w-3" />
+                                    ) : (
+                                      <ThumbsDown className="h-3 w-3" />
+                                    )}
+                                    {fb.rating === "positive" ? "Accurate" : "Needs tweaks"}
+                                  </span>
+                                  <time
+                                    dateTime={fb.created_at}
+                                    className="text-xs font-mono text-muted-foreground"
+                                  >
+                                    {new Date(fb.created_at).toLocaleString(undefined, {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </time>
+                                </div>
+                                {fb.comment && (
+                                  <p className="text-sm font-sans text-foreground/90 leading-relaxed">
+                                    {fb.comment}
+                                  </p>
                                 )}
-                                {fb.rating === "positive" ? "Accurate" : "Needs tweaks"}
-                              </span>
-                              <time
-                                dateTime={fb.created_at}
-                                className="text-xs font-mono text-muted-foreground"
-                              >
-                                {new Date(fb.created_at).toLocaleString(undefined, {
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </time>
-                            </div>
-                            {fb.comment && (
-                              <p className="text-sm font-sans text-foreground/90 leading-relaxed">
-                                {fb.comment}
-                              </p>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFeedbackSubmitted(false);
-                          setFeedbackRating(null);
-                          setFeedbackText("");
-                        }}
-                        className="text-xs font-sans text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer bg-transparent border-0 p-0"
-                      >
-                        Add more feedback
-                      </button>
+                              </li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFeedbackSubmitted(false);
+                              setFeedbackRating(null);
+                              setFeedbackText("");
+                            }}
+                            className="text-xs font-sans text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer bg-transparent border-0 p-0"
+                          >
+                            Add more feedback
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
                 </div>
               </div>
 
@@ -933,7 +1032,9 @@ function DemoPreview() {
               <div className="relative overflow-hidden rounded-3xl border border-primary/30 bg-primary/[0.03] p-6 md:p-8 flex flex-col">
                 <div
                   className="absolute inset-x-0 -top-24 mx-auto h-48 w-96 max-w-full rounded-full blur-3xl pointer-events-none"
-                  style={{ background: "radial-gradient(circle, rgba(245,158,11,0.14), transparent 70%)" }}
+                  style={{
+                    background: "radial-gradient(circle, rgba(245,158,11,0.14), transparent 70%)",
+                  }}
                 />
                 <div className="relative z-10 flex flex-col flex-1">
                   <div className="flex items-center gap-2.5 mb-5">
@@ -941,13 +1042,16 @@ function DemoPreview() {
                       <DollarSign className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div>
-                      <h3 className="text-base font-medium tracking-tight leading-tight">Take it live</h3>
+                      <h3 className="text-base font-medium tracking-tight leading-tight">
+                        Take it live
+                      </h3>
                       <p className="text-xs text-muted-foreground font-sans">Pricing & Plans</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed font-sans">
                     Every day this isn't live is another day of calls going to voicemail. Choose a
-                    pricing plan that suits your call volume and start answering for {personalization.company}.
+                    pricing plan that suits your call volume and start answering for{" "}
+                    {personalization.company}.
                   </p>
                   <div className="mt-auto pt-6 space-y-2.5">
                     <a
@@ -977,7 +1081,7 @@ function DemoPreview() {
             initial="hidden"
             whileInView="show"
             viewport={{ once: true }}
-            className="rounded-3xl border border-border p-8 md:p-10 space-y-8 bg-card/60 backdrop-blur-sm"
+            className="space-y-8"
           >
             <div className="space-y-2">
               <span className="text-[10px] font-mono text-primary uppercase tracking-widest font-semibold">
@@ -1023,7 +1127,6 @@ function DemoPreview() {
               </p>
             </div>
           </motion.div>
-
         </motion.section>
 
         {/* FAQ — real questions a caller to this business asks, with how the
@@ -1078,26 +1181,20 @@ function DemoPreview() {
             })}
           </div>
           <p className="mt-4 text-center text-xs text-muted-foreground font-sans">
-            Don't take our word for it — call the agent above and ask it yourself.
+            Don't take our word for it, call the agent above and ask it yourself.
           </p>
         </section>
 
-
-
         {/* Footer */}
         <footer className="relative z-10 border-t border-border bg-background">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-[11px] text-muted-foreground font-mono">
+          <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between px-6 lg:px-10 py-8 text-[11px] text-muted-foreground font-mono">
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              <span className="uppercase tracking-widest text-[9px]">
-                Your demo is live
-              </span>
+              <span className="uppercase tracking-widest text-[9px]">Your demo is live</span>
             </div>
             <span>&copy; DataQuartz &middot; Built for {displayCompany}</span>
           </div>
         </footer>
-
-
       </div>
     </div>
   );
@@ -1137,8 +1234,7 @@ const RIBBON_PATHS: { d: string; opacity: number }[] = (() => {
     for (let k = 0; k < points; k++) {
       const a = (k / points) * Math.PI * 2;
       const r =
-        radius *
-        (1 + 0.11 * Math.sin(3 * a + phase) + 0.05 * Math.sin(5 * a - phase * 1.4));
+        radius * (1 + 0.11 * Math.sin(3 * a + phase) + 0.05 * Math.sin(5 * a - phase * 1.4));
       pts.push([Math.cos(a) * r, Math.sin(a) * r]);
     }
     return {
@@ -1211,9 +1307,7 @@ function VoiceWaveform() {
 function LoadingPulseRing() {
   return (
     <div className="relative flex items-center justify-center h-8 w-8 mb-2">
-      <motion.div
-        className="absolute h-full w-full rounded-full border-2 border-primary/20"
-      />
+      <motion.div className="absolute h-full w-full rounded-full border-2 border-primary/20" />
       <motion.div
         className="absolute h-full w-full rounded-full border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent"
         animate={{ rotate: 360 }}
@@ -1223,23 +1317,6 @@ function LoadingPulseRing() {
           ease: "linear",
         }}
       />
-    </div>
-  );
-}
-
-function FeatureCell({
-  text,
-  illustration,
-}: {
-  text: string;
-  illustration: React.ReactNode;
-}) {
-  return (
-    <div className="group flex flex-col justify-between gap-5 rounded-3xl border border-border bg-card/60 backdrop-blur-sm p-6 md:p-7 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_8px_32px_-12px_rgba(45,212,191,0.25)]">
-      <div className="relative h-40 overflow-hidden rounded-2xl border border-border/60 bg-secondary/30 transition-colors group-hover:border-primary/25">
-        {illustration}
-      </div>
-      <p className="text-sm leading-relaxed text-foreground/75 font-sans">{text}</p>
     </div>
   );
 }

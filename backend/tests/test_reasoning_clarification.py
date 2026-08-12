@@ -18,7 +18,6 @@ from app.clarification import (
     QUESTION_PROMPT
 )
 from app.agents import provision_vapi_assistant_task
-from app.qualifier import qualify_lead_internal
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,7 +137,7 @@ def test_scenario_aware_question_comparison():
 
 
 def test_end_to_end_pipeline():
-    """Test 4: Verify qualification & Vapi assistant provisioning after final question completion."""
+    """Test 4: Verify Vapi assistant provisioning after final question completion."""
     print("\n--- Running Test 4: End-to-End Pipeline Verification ---")
     lead_id = create_test_lead("Omni Dental Clinic", "Healthcare")
 
@@ -165,15 +164,6 @@ def test_end_to_end_pipeline():
         else:
             status = submit_clarification_answer(lead_id, "We handle bookings by emergency dispatch and email confirmation.")
 
-    # Run lead qualification
-    with Session(engine) as session:
-        lead_db = session.get(Lead, uuid.UUID(lead_id))
-        company_name = lead_db.company_name
-        industry = lead_db.industry
-
-    qualification = qualify_lead_internal(company_name, industry)
-    print(f"  Lead Qualification Outcome: {qualification.qualified}")
-
     # Run Vapi provisioning
     provision_vapi_assistant_task(lead_id)
 
@@ -184,7 +174,7 @@ def test_end_to_end_pipeline():
         rendered_prompt = lead.rendered_prompt or ""
 
     log_result(
-        "End-to-End pipeline (Qualification + Vapi Provisioning) succeeded",
+        "End-to-End pipeline (Vapi Provisioning) succeeded",
         is_active and has_ast_id and len(rendered_prompt) > 50,
         f"— Agent Status: {lead.agent_status}, Assistant ID: {lead.assistant_id}",
     )

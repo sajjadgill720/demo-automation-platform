@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   Sparkles,
-  AlertTriangle,
   XCircle,
   Check,
   Loader2,
@@ -59,18 +58,20 @@ function stageState(
   return "todo";
 }
 
-
 function PipelineRoute() {
   const { leadId } = Route.useSearch();
   const navigate = useNavigate();
 
   const [isFormBuilding, setIsFormBuilding] = useState(true);
+  // True until the FIRST status fetch resolves. Until then we show a neutral
+  // "checking" spinner rather than the "Building your agent" box, so the build
+  // box only ever appears once we know the lead is genuinely provisioning.
+  const [initializing, setInitializing] = useState(true);
   // The real backend stage, straight from agent_status. Never inferred or timed.
   const [stage, setStage] = useState<LeadResponse["agent_status"]>("pending");
-  
+
   const [provisionedAssistantId, setProvisionedAssistantId] = useState<string | null>(null);
   const [pollingError, setPollingError] = useState<string | null>(null);
-  const [skippedReason, setSkippedReason] = useState<string | null>(null);
   const [flowStep, setFlowStep] = useState<"pipeline" | "completed">("pipeline");
 
   // Retrieve company name from local storage (saved on submit)
@@ -99,10 +100,13 @@ function PipelineRoute() {
     const MAX_POLL_DURATION_MS = 300000;
     const startTime = Date.now();
 
-    const pollId = setInterval(async () => {
+    let pollId: ReturnType<typeof setInterval>;
+
+    const checkStatus = async () => {
       if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
         clearInterval(pollId);
         setIsFormBuilding(false);
+        setInitializing(false);
         setPollingError("This is taking longer than expected. Please try again.");
         return;
       }
@@ -118,19 +122,23 @@ function PipelineRoute() {
           setProvisionedAssistantId(lead.assistant_id);
           setIsFormBuilding(false);
           setFlowStep("completed");
-        } else if (lead.agent_status === "skipped") {
-          clearInterval(pollId);
-          setIsFormBuilding(false);
-          setSkippedReason(lead.qualification_reasoning || "Lead did not meet qualification criteria.");
         } else if (lead.agent_status === "failed") {
           clearInterval(pollId);
           setIsFormBuilding(false);
           setPollingError(lead.failure_reason || "Vapi agent provisioning failed.");
         }
+        // First resolved status decides which screen to show, so the build box
+        // is only ever rendered once we know the lead is genuinely building.
+        setInitializing(false);
       } catch (err) {
         // Swallow transient network blips during polling
       }
-    }, POLL_INTERVAL_MS);
+    };
+
+    // Poll immediately so the first status resolves at once, instead of showing
+    // the checking spinner until the first interval tick.
+    checkStatus();
+    pollId = setInterval(checkStatus, POLL_INTERVAL_MS);
 
     return () => clearInterval(pollId);
   }, [isFormBuilding, leadId]);
@@ -140,11 +148,9 @@ function PipelineRoute() {
   // hardcoded log lines with invented timestamps ("Provisioning Vapi voice agent
   // in EU-Frankfurt cluster…"), none of which reflected backend state.
   //
-  // AgentStatus only exposes pending | active | completed | failed | skipped, and
-  // a lead goes straight from pending to active — there is no observable
-  // qualifying or provisioning phase. So the UI below reports exactly two real
-  // states (working / done) plus the two real terminal failures, rather than
-  // implying granular progress we cannot actually see.
+  // AgentStatus reports the real provisioning transitions, and a lead ends at
+  // active or completed. So the UI below reports the working / done states plus
+  // the real terminal failure, rather than implying progress we cannot see.
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-4">
@@ -156,12 +162,12 @@ function PipelineRoute() {
               <Sparkles className="h-8 w-8" />
             </div>
             <div>
-              <h3 className="text-foreground text-2xl font-bold tracking-tight font-sans">
+              <h3 className="text-foreground text-2xl font-bold tracking-tight font-sans gradient-text">
                 Your agent is live
               </h3>
               <p className="text-xs text-foreground/75 mt-1 font-sans">
-                It's answering as {formBuildCompany} right now. Call it and hear what your
-                customers would hear.
+                It's answering as {formBuildCompany} right now. Call it and hear what your customers
+                would hear.
               </p>
             </div>
           </div>
@@ -175,7 +181,9 @@ function PipelineRoute() {
             </div>
             <div className="flex justify-between">
               <span>Demo ID:</span>
-              <span className="text-foreground font-semibold">{leadId.slice(0, 8).toUpperCase()}</span>
+              <span className="text-foreground font-semibold">
+                {leadId.slice(0, 8).toUpperCase()}
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Target Company:</span>
@@ -204,38 +212,6 @@ function PipelineRoute() {
             </button>
           </div>
         </div>
-      ) : skippedReason ? (
-        <div className="w-full max-w-3xl mx-auto glass-card gradient-border bg-card rounded-2xl border-2 border-border/60 shadow-2xl p-8 font-mono relative overflow-hidden animate-fade-in transition-all">
-          <div className="absolute top-0 left-0 w-full h-[3px] bg-primary" />
-          <div className="flex flex-col items-center text-center space-y-6 py-6">
-            <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
-              <AlertTriangle className="h-8 w-8 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-foreground text-xl font-bold tracking-tight font-sans">
-                Lead not qualified
-              </h3>
-              <p className="text-xs text-foreground/60 max-w-md font-sans">
-                Our qualification system determined this submission does not meet
-                the criteria for automated demo provisioning.
-              </p>
-            </div>
-            <div className="bg-secondary border border-border rounded-xl p-4 text-left max-w-lg w-full">
-              <div className="text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-2">
-                Why this happened
-              </div>
-              <p className="text-sm text-foreground/80 font-sans leading-relaxed">
-                {skippedReason}
-              </p>
-            </div>
-            <button
-              onClick={() => navigate({ to: "/" })}
-              className="mt-4 px-6 py-2.5 bg-primary/10 border border-primary/30 text-primary text-xs font-mono uppercase tracking-wider hover:bg-primary/20 transition-colors cursor-pointer"
-            >
-              ← Try another lead
-            </button>
-          </div>
-        </div>
       ) : pollingError ? (
         /* FAILED — a real terminal state, given its own treatment rather than a
            generic spinner that keeps turning. */
@@ -257,9 +233,7 @@ function PipelineRoute() {
               <div className="text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-2">
                 What went wrong
               </div>
-              <p className="text-sm text-foreground/80 font-sans leading-relaxed">
-                {pollingError}
-              </p>
+              <p className="text-sm text-foreground/80 font-sans leading-relaxed">{pollingError}</p>
             </div>
             <div className="flex items-center gap-4">
               <button
@@ -280,6 +254,12 @@ function PipelineRoute() {
             </div>
           </div>
         </div>
+      ) : initializing ? (
+        /* CHECKING — brief neutral state until the first status fetch resolves,
+           so the build box only appears once the lead is genuinely provisioning. */
+        <div className="w-full max-w-2xl mx-auto flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+        </div>
       ) : (
         /* WORKING — the one real in-progress state. Indeterminate on purpose: the
            backend reports pending until provisioning completes, so any finer
@@ -299,7 +279,8 @@ function PipelineRoute() {
                 Building your agent
               </h3>
               <p className="text-xs text-foreground/70 font-sans max-w-sm">
-                We're training it on everything you told us about {formBuildCompany}. This usually takes under a minute.
+                We're training it on everything you told us about {formBuildCompany}. This usually
+                takes under a minute.
               </p>
             </div>
 
@@ -314,10 +295,8 @@ function PipelineRoute() {
                     <span
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full border shrink-0",
-                        state === "done" &&
-                          "bg-success/15 border-success/40 text-success",
-                        state === "active" &&
-                          "bg-primary/15 border-primary/40 text-primary",
+                        state === "done" && "bg-success/15 border-success/40 text-success",
+                        state === "active" && "bg-primary/15 border-primary/40 text-primary",
                         state === "todo" && "border-border text-foreground/30",
                       )}
                     >

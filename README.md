@@ -1,649 +1,410 @@
-# DataQuartz — Convoa Demo Generation Platform
+# Demoflow — Convoa Demo Automation Platform
 
-> Automated, personalized demo generation for **Convoa**, an AI voice-receptionist
-> product. A prospective business submits an intake form (optionally with an
-> uploaded process document), answers a short AI-led clarification chat, and the
-> system provisions a **personalized live Vapi voice agent** they can call in the
-> browser — tailored to their company, industry, and stated needs. Built for
-> **dataquartz's sales process**: it turns a cold lead into a working, on-brand
-> voice demo with no manual prompt-writing per prospect.
-
-This document reflects the codebase **as it actually exists** at the time of
-writing. Where something is half-built, stubbed, or not wired in, it is marked as
-such rather than described as finished. See [Known limitations](#known-limitations--open-items).
+Demoflow is the automation pipeline that takes a prospective Convoa customer from an initial intake form to a fully provisioned, personalized AI voice receptionist demo — ready for a live phone call — in roughly 10–15 minutes. It replaces what was previously a multi-day, manual sales engineering process: gathering requirements over email, writing a system prompt by hand, configuring Vapi, and sending a demo link. Now the prospect fills out a form, answers a short AI-guided scoping interview, optionally uploads an SOP document, and walks straight into a working demo they can call from their browser.
 
 ---
 
-## Table of contents
+## High-Level Architecture
 
-- [Project overview](#project-overview)
-- [Architecture](#architecture)
-- [Tech stack](#tech-stack)
-- [Key architectural decisions](#key-architectural-decisions)
-- [Database schema](#database-schema)
-- [API reference](#api-reference)
-- [Environment variables](#environment-variables)
-- [Setup instructions](#setup-instructions)
-- [Known limitations / open items](#known-limitations--open-items)
-- [Testing](#testing)
+The system is a two-process stack: a **FastAPI backend** (Python, modular monolith) handling all business logic, LLM orchestration, and third-party API calls, and a **TanStack Start + React frontend** (TypeScript, Vite) that drives the multi-step wizard UI and the internal team dashboard.
 
----
+```mermaid
+graph TB
+    subgraph Frontend ["Frontend (TanStack Start + React)"]
+        LandingPage["Landing Page"]
+        Wizard["Demo Wizard<br/>(intake → upload → clarification → pipeline → preview)"]
+        Dashboard["Internal Dashboard<br/>(leads, active demos, feedback, calls)"]
+    end
 
-## Project overview
+    subgraph Backend ["Backend (FastAPI)"]
+        API["REST API<br/>(main.py)"]
+        Clarification["Clarification Engine<br/>(LangGraph + PostgresSaver)"]
+        PromptAssembly["Prompt Assembly<br/>(agents.py + prompt_generator.py)"]
+        DocSummarizer["Document Summarizer<br/>(map-reduce)"]
+        ScenarioLib["Scenario Library<br/>(human-written, per-industry)"]
+        PromptLint["Prompt Lint<br/>(compile-time invariant checks)"]
+        VapiIntegration["Vapi Integration<br/>(provisioning, KB, calls)"]
+    end
 
-DataQuartz is the backend + frontend for generating **Convoa** voice-agent demos on
-demand. Convoa is an AI front-desk receptionist; this platform is the machinery
-that produces a *personalized* demo of it for each sales lead.
+    subgraph External ["External Services"]
+        Supabase["Supabase<br/>(PostgreSQL + Storage)"]
+        LLM["LLM Provider<br/>(Fireworks primary /<br/>Groq fallback)"]
+        Vapi["Vapi API<br/>(voice agent, KB, calls)"]
+    end
 
-A lead fills in a short form (company, contact, industry, and a free-text problem
-statement). They can optionally upload a process/SOP document and grant consent
-for AI to process it. An AI "solutions advisor" then runs a brief clarification
-chat (3–5 tailored questions) to fill in a structured profile of how the business
-handles calls. From that profile, any uploaded document, and a vetted per-industry
-scenario library, the system **deterministically compiles a Vapi system prompt**
-and provisions a live Vapi assistant. The lead is handed to a demo-preview screen
-where they can place a browser call to *their own* agent, then leave feedback. An
-internal, password-gated portal lets the dataquartz team browse leads, provisioned
-agents, recorded calls (with Vapi's native transcript/recording), and feedback.
-
----
-
-## Architecture
-
-### Overall shape: a modular monolith
-
-This is a **modular monolith**, not a set of deployed microservices. There is one
-FastAPI application (`backend/app/main.py`) and one TanStack Start frontend. The
-backend is split into logically separate modules — clarification, qualifier,
-document summarizer, scenario library, prompt compiler, Vapi client, storage — but
-they run **in one process and call each other as ordinary Python functions**.
-There are no inter-service network hops, no Docker Compose topology, no message
-broker, and no per-module deployment unit.
-
-**Why this shape:** it avoids premature operational complexity (no container
-orchestration, no service mesh, no duplicated boilerplate or cross-service auth)
-for a system at current team size and scale. The module boundaries are drawn where
-they'd matter if the system ever *did* need to split — e.g. the LLM provider is
-already behind `llm_client.py`, and the qualifier is already its own graph — so a
-genuine future bottleneck can be extracted without a rewrite. That extraction is
-deliberately deferred until a specific module actually becomes a bottleneck or
-multiple people need independent deploy cycles.
-
-### Primary data flow (the Lead pipeline)
-
-This is the flow the product actually runs today. Steps that are **not fully
-wired** are called out inline.
-
-```
-1. Lead submits intake form
-   frontend /build-demo  →  POST /api/demo-request
-   → creates a Lead (status = pending)
-   → renders a SEED prompt (company + industry only, no profile yet)
-   → NOTE: does NOT enqueue provisioning here, and does NOT run qualification
-                     │
-                     ▼
-2. Optional document upload + AI-processing consent
-   frontend /upload
-   → POST /api/clarification/{lead_id}/documents   (Supabase Storage + DB)
-   → POST /api/clarification/{lead_id}/consent      (ai_processing_consent flag)
-                     │
-                     ▼
-3. AI clarification chat  (LangGraph, interrupt/resume, Postgres-checkpointed)
-   frontend /clarification
-   → POST /api/clarification/{lead_id}/start
-   → POST /api/clarification/{lead_id}/respond  (repeated, 3–5 questions)
-   → POST /api/clarification/{lead_id}/skip-remaining  (optional early finish)
-   Graph: parse_documents → extract_profile → detect_gaps
-          → generate_question ⇄ await_answer (pauses across HTTP requests)
-          → ask_final_question → finalize (writes CompanyProfile)
-                     │  (on status == "completed")
-                     ▼
-4. Personalized Vapi agent provisioning  (FastAPI BackgroundTask)
-   provision_vapi_assistant_task(lead_id):
-     a. summarizing_documents  → document_summarizer (map-reduce, if consented
-                                  document passed the injection gate)
-     b. building_profile       → compile_lead_prompt() assembles the Vapi prompt
-                                  DETERMINISTICALLY from profile + brief + library
-        (KB upload)            → sanitized doc text → Vapi Files
-     c. provisioning           → Vapi assistant created (+ KB attached)
-     → agent_status = active, assistant_id stored
-                     │
-                     ▼
-5. Demo delivered to the client
-   frontend /demo-preview
-   → in-browser call via @vapi-ai/web using the lead's own assistant
-   → on call end: POST /api/demo-request/{lead_id}/calls
-                  → background fetch of Vapi's native call report
-   → feedback: POST /api/demo-request/{lead_id}/feedback
-   → POST /api/demo-request/{lead_id}/end-session (tears down the assistant)
+    LandingPage --> Wizard
+    Wizard --> API
+    Dashboard --> API
+    API --> Clarification
+    API --> PromptAssembly
+    API --> VapiIntegration
+    Clarification --> LLM
+    Clarification --> DocSummarizer
+    DocSummarizer --> LLM
+    PromptAssembly --> ScenarioLib
+    PromptAssembly --> PromptLint
+    API --> Supabase
+    Clarification --> Supabase
+    VapiIntegration --> Vapi
+    Wizard -.->|"Vapi Web SDK<br/>(browser calls)"| Vapi
 ```
 
-**Qualification is defined but not in this flow.** A separate lead-qualification
-LangGraph exists (`qualifier.py`, exposed at `POST /api/qualify`) but nothing in
-the demo pipeline calls it, so no lead is actually qualified/disqualified during
-the flow above and `AgentStatus.skipped` is never set. See
-[Known limitations](#known-limitations--open-items).
+### Key Integrations
 
-**A second, legacy path exists** alongside the Lead pipeline: the
-"discovery"/`VoiceAgent` endpoints (`/api/discovery`, `/api/agents/provision/...`)
-using `compile_agent_prompt()`. It is functional but separate from, and not used
-by, the main Lead flow described above.
+| Service | Role | Accessed via |
+|---------|------|--------------|
+| **Supabase (PostgreSQL)** | Primary database for all tables; also hosts LangGraph's `PostgresSaver` checkpoint tables | `DATABASE_URL` env var, SQLModel ORM |
+| **Supabase Storage** | Stores uploaded SOP/process documents (PDF, TXT) | `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` |
+| **Fireworks AI** | Primary LLM inference (structured JSON extraction, question generation, prompt generation) | `FIREWORKS_API_KEY`, OpenAI-compatible API |
+| **Groq** | Fallback LLM inference (automatic failover from Fireworks) | `GROQ_API_KEY` |
+| **Vapi** | Voice agent provisioning, Knowledge Base file uploads, call recording/transcript retrieval | `VAPI_API_KEY` (server), `VITE_VAPI_PUBLIC_KEY` (client) |
+| **Slack Webhook** | Optional incoming webhook to send detailed lead capture notifications to your internal team | `SLACK_WEBHOOK_URL` (frontend server env var) |
 
----
+### Rate Limiting & Operations
 
-## Tech stack
+To protect downstream systems and API budgets from abuse, the application includes built-in rate-limiting and alert components:
 
-Only technologies actually present and used in the code are listed.
+- **SlowAPI Rate Limiting**: The backend API enforces client IP rate limits using `SlowAPI` on key routes:
+  - `POST /api/clarification/{lead_id}/documents` is limited to **5 requests per minute** per IP.
+  - `POST /api/clarification/{lead_id}/respond` is limited to **20 requests per minute** per IP.
+- **Slack Alert Integration**: Form submissions on the onboarding wizard invoke a frontend server function (`submitLead`) which packages lead profile information and posts it directly to your Slack channel via `SLACK_WEBHOOK_URL`. If the webhook is missing, details are printed to the console output as a fallback.
 
-| Layer | Technology | Why (as reflected in the code) |
-|---|---|---|
-| Backend framework | **FastAPI** | Async HTTP, dependency injection for DB sessions, `BackgroundTasks` for provisioning and call-report fetching. |
-| ORM / models | **SQLModel** (SQLAlchemy + Pydantic) | One class defines both the table and the (base) serialization shape. |
-| Database | **PostgreSQL via Supabase** (managed) | Managed Postgres avoids self-hosting overhead (backups/patching/pooling). Same connection string used for dev and prod; a sqlite branch exists in `db.py` for local/test convenience. |
-| Agent orchestration | **LangGraph** + **PostgresSaver** checkpointing | Used by the clarification module specifically because it needs multi-turn, pause/resume conversation whose state persists across separate HTTP requests. The qualifier also uses LangGraph but as a simple linear graph (no checkpointing). |
-| LLM provider | **Groq** (`llama-3.3-70b-versatile`) | All LLM calls (question generation, response classification, profile extraction, document summarization, qualification). Abstracted behind `llm_client.py` so the provider can be swapped. |
-| Voice agent platform | **Vapi** | Assistant creation/deletion, file (knowledge base) upload + attach, and native call-report retrieval. Frontend uses `@vapi-ai/web` for the in-browser call. |
-| File storage | **Supabase Storage** | Uploaded SOP/process documents (REST API in `storage.py`). |
-| PDF text extraction | **pypdf** | `extract_text_from_file()` in `main.py`. |
-| Rate limiting | **SlowAPI** | On document upload (5/min) and clarification respond (20/min). |
-| DB migrations | **Alembic** | Three revisions present — but see the [dual-schema caveat](#known-limitations--open-items). |
-| Frontend framework | **TanStack Start** + **React 19** + **TanStack Router** | File-based routing (`src/routes`), server functions for auth and Slack notification. |
-| Frontend build/runtime | **Vite 8**, **Bun** (lockfile present) | |
-| UI | **Tailwind CSS v4**, **Radix UI**, **shadcn-style components**, **framer-motion**, **lucide-react**, **recharts** | |
-| HTTP clients (backend → external) | Python stdlib **`urllib`** | Groq, Vapi, and Supabase are all called via `urllib` directly — no vendor SDKs on the backend. |
-
-**Not present** (do not assume): no Redis, no Celery/task queue, no Docker, no
-message broker, no vendor LLM SDK. Provisioning and call-report fetching use
-FastAPI's in-process `BackgroundTasks`.
 
 ---
 
-## Key architectural decisions
+## Complete Workflow / Data Flow
 
-This is the most important section. Each decision below traces to specific code;
-where reasoning is *documented in the code itself* it is noted, and where it is an
-inference it is flagged in [Verification notes](#verification-notes).
+End-to-end steps from a prospect landing on the site to a live voice demo:
 
-### 1. Modular monolith over microservices
-One FastAPI process, logically separated modules, no inter-service calls. Resolves
-the tradeoff between clean separation and operational cost: you get module
-boundaries (and the option to extract later) without paying for orchestration,
-network hops, or duplicated boilerplate now. Revisit only when a module becomes a
-real bottleneck or needs an independent deploy cycle.
+### Phase 1: Intake
 
-### 2. Supabase-managed Postgres over self-hosted / Docker
-`db.py` connects to a single `DATABASE_URL` (Supabase pooler in practice), with a
-sqlite fallback branch for local runs. The tradeoff resolved: backups, patching,
-and connection pooling are someone else's job, which is the right call for the
-current team size. The same database serves dev and prod.
+#### Step 1: Intake Form Submission
+The prospect fills out the demo request form on the frontend (`_wizard.build-demo.tsx`).
+Captures: company name, contact info, industry, optional problem statement, voice preference (male/female).
 
-### 3. Deterministic prompt compilation — `compile_lead_prompt()` never calls an LLM
-The final Vapi system prompt is assembled by `compile_lead_prompt()` in
-`agents.py` using **pure conditional assembly + literal `{{variable}}`
-substitution** against the vetted template in `templates/vapi_prompt_template.md`.
-All *generation* (question generation, document summarization, profile extraction)
-happens in **earlier** pipeline stages; only their already-generated, already-
-sanitized output is dropped into the template.
-
-The code states this as an explicit **"DETERMINISM CONTRACT"** (comment in
-`agents.py`): *"no LLM call may ever be added to this path… the same inputs always
-produce byte-identical output."* Why it matters: it guarantees that no
-client-facing demo agent's behavior was authored unpredictably by an LLM at
-runtime with no review step. The prompt a client's agent runs is always a
-composition of reviewable, human-written template sections plus bounded,
-sanitized variable values.
-
-### 4. Vetted, human-written templates + variable injection — never freeform LLM system prompts
-The Vapi prompt template (`vapi_prompt_template.md`) is human-written and section-
-delimited; the scenario library (`scenario_library.py`) is human-curated
-(trigger, action) pairs. Both files carry explicit editing rules stating that **an
-LLM never writes any part of them**. Same principle as #3, applied to the content
-itself: a lead's uploaded document or chat answers can *fill variables* but can
-never *redefine agent behavior*.
-
-### 5. Fail-open vs fail-safe — deliberately different per risk category
-The codebase makes a conscious distinction:
-
-- **Fail-open (proceed) where losing a legitimate lead is the worse outcome.**
-  The qualifier (`qualifier.py`) defaults to `qualified: true, confidence: 1.0,
-  reasoning: "qualification check failed, defaulting to proceed"` on missing
-  `GROQ_API_KEY` or repeated LLM failure. The clarification response classifier
-  (`ingest_answer_node`) also fails open — an unclassifiable answer is treated as
-  a real answer so the conversation always advances. Documented reasoning: don't
-  silently drop a real lead because of a transient technical failure.
-- **Fail-safe (reject) where untrusted content would reach a third party.**
-  `sanitize_document_text()` (`utils.py`) **rejects the document outright** when
-  it detects ≥2 prompt-injection patterns, and the provisioning task then refuses
-  to summarize or upload it. Documented reasoning (in `agents.py` /
-  `document_summarizer.py`): untrusted content flowing into a third party (the
-  Vapi agent / knowledge base) is a different risk category than an internal
-  classifier having a bad day.
-
-### 6. Consent gating for AI processing of uploaded documents — enforced server-side
-`ai_processing_consent` is a column on `leads`, set via
-`POST /api/clarification/{lead_id}/consent`. The gate is enforced **server-side in
-the code paths that would touch document content**, not just as a frontend toggle:
-- `parse_documents_node` (`clarification.py`) returns empty document text when
-  `consent` is false.
-- `provision_vapi_assistant_task` (`agents.py`) skips summarization/KB upload
-  entirely when `ai_processing_consent` is false (logged as
-  `"Document stage skipped: ai_processing_consent is False"`).
-Enforced there because that is the choke point where document content would
-otherwise be sent to Groq (summarization) or Vapi (knowledge base).
-
-### 7. Scenario library — vetted, human-curated, with a real generic fallback
-`scenario_library.py` contains eight curated industry entries (hvac, dental,
-healthcare, legal, logistics, plumbing, roofing, real_estate) plus a
-**complete** `GENERIC_ENTRY` for unmatched industries (the code comment
-stresses it is *"deliberately NOT a stub"*). `lookup_industry()` resolves a
-free-text industry string deterministically (exact key → specificity → longest
-alias → generic). **LLM-assisted generation of new industry entries is NOT
-implemented** — unmatched industries always fall back to `GENERIC_ENTRY`.
-
-### 8. Scripted Vapi first message + explicit voice mapping
-`_call_vapi_create_assistant` sets both `firstMessage` and
-`firstMessageMode="assistant-speaks-first"`. Documented reasoning: without both,
-Vapi lets the model improvise an opener from a large system prompt, which
-sometimes produced calls that "connected to dead air." Voice is mapped explicitly
-(`male → Elliot`, `female → Emma`, default Emma).
-
-### 9. Native Vapi call report as source of truth
-Rather than reconstructing a call client-side, `vapi_calls.py` polls Vapi's
-`GET /call/{id}` after a call ends and stores Vapi's own recording URL,
-transcript, summary, cost, and timing on `call_records`. Runs as an in-process
-background task, so **no public webhook URL is required**.
-
-### 10. Warm, pooled LangGraph checkpointer
-`clarification.py` opens one `psycopg_pool.ConnectionPool` + `PostgresSaver` per
-process and reuses it. Documented reasoning: opening a fresh connection and
-re-running `checkpointer.setup()` per request cost ~1.5–3.4s against the remote DB.
+#### Step 2: REST API Lead Creation
+Frontend calls `POST /api/demo-request` → `create_demo_request()` in `main.py`.
+- Calls `compile_lead_prompt()` in `agents.py` to render a baseline Vapi system prompt from the template (`templates/vapi_prompt_template.md`) using only intake data — no LLM, pure string substitution.
+- Creates a `Lead` row with `agent_status = pending`.
+- Returns `lead_id` immediately; everything below runs asynchronously.
 
 ---
 
-## Database schema
+### Phase 2: Document Upload (Optional)
 
-Source of truth is `models.py` (`SQLModel.metadata.create_all`); Alembic covers a
-subset (see caveat below). LangGraph additionally creates its own checkpoint
-tables at runtime via `PostgresSaver.setup()`.
+#### Step 3: SOP Upload & Extraction
+Prospect uploads an SOP/process document (PDF or TXT, max 10 MB) on the upload step (`_wizard.upload.tsx`).
+- Calls `POST /api/clarification/{lead_id}/documents` → `upload_clarification_documents()`.
+- File bytes go to **Supabase Storage** via `storage.upload_document()`.
+- Text is extracted inline (`extract_text_from_file()` — `pypdf` for PDF, UTF-8/Latin-1 for TXT).
+- A `Document` row is created with the extracted text and the Supabase public URL.
 
-### `leads`  (`Lead`) — the central entity
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| company_name | str(255) | |
-| contact_name | str(255) | |
-| contact_email | str(255) | |
-| contact_phone | str(50) | |
-| industry | str(255) | |
-| problem_statement | str? | Free-text problem from the intake form |
-| voice_gender | str(16)? | `"male"`/`"female"`, default `female` |
-| rendered_prompt | str | Seed prompt at creation, overwritten with the full prompt at provisioning |
-| assistant_id | str(255)? | Vapi assistant id once provisioned |
-| agent_status | enum `AgentStatus` | pending, summarizing_documents, building_profile, provisioning, active, completed, failed, skipped |
-| failure_reason | str? | Set on provisioning failure |
-| qualified | bool? | **Never populated by the pipeline** |
-| qualification_confidence | float? | **Never populated by the pipeline** |
-| qualification_reasoning | str? | **Never populated by the pipeline** |
-| ai_processing_consent | bool | Default false |
-| consent_recorded_at | datetime? | |
-| created_at / updated_at | datetime | |
-
-### `documents`  (`Document`)
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| lead_id | UUID | **FK → leads.id** |
-| file_name | str? | |
-| file_url | str | Supabase Storage public URL (or simulated in dev) |
-| file_type | str(50) | |
-| file_size_bytes | int | |
-| extracted_text | str? | Text extracted at upload time |
-| uploaded_at | datetime | |
-
-### `company_profile`  (`CompanyProfileDB`)
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| lead_id | UUID | **FK → leads.id, UNIQUE** (one profile per lead) |
-| profile | JSON/JSONB? | The extracted `CompanyProfile` (JSON) |
-| status | enum `ProfileStatus` | not_started, in_progress, awaiting_user, completed |
-| missing_fields | JSON/JSONB? | Fields still unknown |
-| created_at / updated_at | datetime | |
-
-### `clarification_messages`  (`ClarificationMessage`)
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| lead_id | UUID | **FK → leads.id** |
-| role | enum `MessageRole` | assistant / user |
-| content | str | |
-| created_at | datetime | |
-
-### `demo_feedback`  (`DemoFeedback`)
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| lead_id | UUID | **FK → leads.id**, indexed |
-| rating | enum `FeedbackRating` | positive / negative |
-| comment | str? | Length-capped, control-char stripped; **not** injection-sanitized (only ever rendered as escaped text) |
-| created_at | datetime | |
-
-### `call_records`  (`CallRecord`)
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| lead_id | UUID | **FK → leads.id**, indexed |
-| vapi_call_id | str(255)? | Indexed; dedup key |
-| assistant_id | str(255)? | |
-| started_at / ended_at | datetime? | |
-| duration_seconds | int | Default 0 |
-| turn_count | int | Default 0 |
-| transcript | str? | JSON string of `[{role, text}]` |
-| summary | str? | Vapi's end-of-call summary |
-| recording_url | str? | Vapi recording URL |
-| ended_reason | str(255)? | |
-| cost | float? | |
-| status | str(32) | processing / completed / failed (native-report fetch state) |
-| created_at | datetime | |
-
-### Legacy / unused tables
-- **`discoveryresponse`** (`DiscoveryResponse`) — id(int PK), company_name,
-  contact_email, missed_calls_per_week, average_booking_value,
-  calculated_monthly_leakage, calendar_system, booking_requirements,
-  escalation_path, integration_destination, created_at. Used only by the legacy
-  discovery endpoints.
-- **`voiceagent`** (`VoiceAgent`) — id(str PK, Vapi assistant id), company_name,
-  discovery_id(int), system_prompt, llm_model(`"gpt-4o"`),
-  voice_provider(`"playht"`), created_at. Legacy discovery path. `discovery_id`
-  is a plain int column, **not a declared FK**.
-- **`company`** (`Company`) and **`demojob`** (`DemoJob`) — defined as tables but
-  referenced by **no endpoint**. Effectively dead schema.
-
-**Relationships:** `documents`, `company_profile`, `clarification_messages`,
-`demo_feedback`, and `call_records` all FK to `leads.id`. `company_profile.lead_id`
-is unique (1:1). The legacy `voiceagent.discovery_id` conceptually references
-`discoveryresponse.id` but is not enforced as a foreign key.
+#### Step 4: AI Consent Update
+Prospect gives AI processing consent via `POST /api/clarification/{lead_id}/consent`.
+Records `ai_processing_consent = True` and `consent_recorded_at` on the `Lead`.
 
 ---
 
-## API reference
+### Phase 3: Clarification Interview (LangGraph)
 
-Base URL defaults to `http://localhost:8000`. All bodies are JSON unless noted.
+#### Step 5: Scoping Graph Initiation
+Frontend kicks off the interview via `POST /api/clarification/{lead_id}/start` → `start_lead_clarification()`.
+- Creates a `CompanyProfileDB` row in `in_progress` state.
+- Dispatches the heavy first pass as a **FastAPI background task** (previously blocked the request for ~20s).
+- Returns `in_progress` immediately; the frontend polls `GET /api/clarification/{lead_id}`.
 
-### Health
-- **GET `/`** → `{"status": "healthy", "service": "DataQuartz API"}`
+#### Step 6: Clarification Execution Cycle
+LangGraph clarification graph executes (`clarification.py`). The graph is compiled once per process with a shared `PostgresSaver` connection pool. Nodes, in order:
 
-### Demo requests (Lead lifecycle)
-- **POST `/api/demo-request`** → `201 LeadResponse`
-  Body: `{company_name, contact_name, contact_email (EmailStr), contact_phone,
-  industry, problem_text?, voice_gender?}`. Creates a `Lead` (status `pending`)
-  and renders a seed prompt. **Does not** start provisioning or qualification.
-- **GET `/api/demo-request/{lead_id}`** → `LeadResponse` (404 if missing). Used to
-  poll `agent_status` during background provisioning.
-- **DELETE `/api/demo-request/{lead_id}/agent`** → `LeadResponse`. Internal team
-  action: deletes the Vapi assistant, clears `assistant_id`, marks `completed`,
-  keeps the lead. Remote delete failure is non-blocking (logged, local state still
-  cleared).
-- **POST `/api/demo-request/{lead_id}/end-session`** → `{message, agent_status}`.
-  Client action: deletes the assistant, marks `completed`. Assistant-delete
-  failure is caught and logged so it never crashes the request.
+| Node | What it does |
+|------|-------------|
+| `parse_documents` | Loads extracted text from DB, runs `sanitize_document_text()` injection gate. |
+| `extract_profile` | Calls the LLM with `EXTRACTION_PROMPT` to fill a `CompanyProfile` (12 structured fields) from documents + intake. |
+| `detect_gaps` | Diffs filled fields against `PROFILE_FIELDS` to find what's still `UNKNOWN`. |
+| `summarize_documents` | *(first pass only, if documents exist)* Calls `document_summarizer.summarize_documents()` — map-reduce over the full document text to produce a `business_brief`. Persists brief to `CompanyProfileDB.business_brief`. |
+| `generate_question` | Calls the LLM with `QUESTION_PROMPT` to produce one concrete, industry-grounded scoping question + 2–4 recommended answers. Steered by missing fields, the scenario library, and already-asked topics. |
+| `await_answer` | **LangGraph `interrupt()`** — pauses the graph and waits for the user's response. The frontend renders the question + recommendations. |
+| `ingest_answer` | Classifies the response (`RESPONSE_CLASSIFIER_PROMPT`): direct answer vs. meta-question. Meta-questions get a helpful reply and re-pause on the same question. |
+| `merge_answer` | Calls the LLM to incrementally update the profile with the new answer (not a full re-extraction). |
+| `ask_final_question` | After 5–9 scoping questions, asks a single open-ended "anything else?" wrap-up. |
+| `finalize` | Marks the profile `completed`, persists final state. |
 
-### Feedback
-- **POST `/api/demo-request/{lead_id}/feedback`** → `201 FeedbackResponse`.
-  Body: `{rating: "positive"|"negative", comment?}`. Comment is length-capped
-  (2000) and control-char stripped, stored verbatim otherwise. 404 if lead missing.
-- **GET `/api/demo-request/{lead_id}/feedback`** → `FeedbackResponse[]` (newest first).
-- **GET `/api/feedback?limit=&rating=`** → `FeedbackWithLead[]` (joined with
-  company/industry, newest first; limit clamped 1–500).
+#### Step 7: Continuous Interview Loop
+For each scoping turn: frontend calls `POST /api/clarification/{lead_id}/respond` → `submit_clarification_answer()` resumes the graph from its checkpoint, which cycles through `ingest_answer → merge_answer → detect_gaps → generate_question → await_answer`.
 
-### Calls
-- **POST `/api/demo-request/{lead_id}/calls`** → `201 CallRecordResponse`.
-  Body: `{vapi_call_id (required), assistant_id?, started_at?, ended_at?}`. Stores
-  a `processing` row and kicks a background task to fetch Vapi's native report.
-  **Idempotent** by `vapi_call_id` (returns the existing row on retry). 400 if
-  `vapi_call_id` blank; 404 if lead missing.
-- **GET `/api/demo-request/{lead_id}/calls`** → `CallRecordResponse[]` (newest first).
-- **GET `/api/calls?limit=`** → `CallRecordWithLead[]` (joined, newest first).
-
-### Leads (internal views)
-- **GET `/api/leads?limit=&status=`** → `LeadResponse[]` (newest first; optional
-  `agent_status` filter; limit clamped 1–200).
-
-### Qualification (standalone — not used by the pipeline)
-- **POST `/api/qualify`** → `QualificationResult {qualified, confidence, reasoning}`.
-  Body: `{company_name, industry}`. Runs the qualifier graph. Result is **not
-  persisted** and nothing else calls this.
-
-### Clarification
-- **POST `/api/clarification/{lead_id}/documents`** (multipart, `file=`) →
-  `{message, document_id, file_url, extracted_text_preview}`. Rate-limited
-  **5/min**. Rejects >10MB or non-pdf/txt. Extracts text, uploads to Supabase
-  Storage bucket `clarifications`, stores a `Document`.
-- **POST `/api/clarification/{lead_id}/consent`** → `{message, lead_id,
-  ai_processing_consent, consent_recorded_at}`. Body: `{ai_processing_consent: bool}`.
-- **POST `/api/clarification/{lead_id}/start`** → `ClarificationStatus`. Invokes
-  the graph. If it returns `completed` (e.g. profile already complete), enqueues
-  provisioning as a background task.
-- **POST `/api/clarification/{lead_id}/respond`** → `ClarificationStatus`. Body:
-  `{answer}`. Resumes the interrupted graph with the user's answer. Rate-limited
-  **20/min**. Enqueues provisioning on `completed`.
-- **POST `/api/clarification/{lead_id}/skip-remaining`** → `ClarificationStatus`.
-  Finalizes the profile with whatever has been gathered and enqueues provisioning.
-- **GET `/api/clarification/{lead_id}`** → `ClarificationStatus {lead_id, status,
-  current_question?, recommendations?, conversation_history[], profile?,
-  missing_fields[], is_final_question, final_question_answered}`.
-
-All clarification endpoints 404 if the lead is missing and return 500 with the
-error detail on unexpected graph errors.
-
-### Legacy discovery / agents (separate path)
-- **POST `/api/discovery`** → `DiscoveryResponse`. Computes
-  `calculated_monthly_leakage = missed_calls_per_week × 4.34 × average_booking_value × 0.25`.
-- **GET `/api/discovery`** → `DiscoveryResponse[]`.
-- **POST `/api/agents/provision/{discovery_id}`** → `VoiceAgent`. Compiles a prompt
-  via `compile_agent_prompt()` and provisions (or returns an existing) Vapi
-  assistant for that discovery record. 404 if discovery not found.
-- **GET `/api/agents`** → `VoiceAgent[]`.
-
-#### Edge-case behavior worth knowing
-- **Failed provisioning:** `provision_vapi_assistant_task` sets `agent_status =
-  failed` and writes `failure_reason`; the frontend surfaces this via a
-  `ProvisioningError`.
-- **Declined consent:** document summarization and KB upload are skipped; the
-  agent is still provisioned from profile + scenario library only.
-- **Flagged document (prompt injection ≥2 hits):** the document is not summarized
-  and not uploaded; provisioning continues without it (logged as a warning).
-- **No/mock `VAPI_API_KEY`:** assistant creation returns a deterministic mock id
-  (`vapi_ast_mock_…`); deletion and call-report fetch short-circuit for mocks.
+#### Step 8: Early Scoping Termination
+The user can click to skip remaining questions, firing `POST /api/clarification/{lead_id}/skip-remaining` to finalize profile assembly early.
 
 ---
 
-## Environment variables
+### Phase 4: Agent Provisioning (Background)
 
-### Backend (read via `os.getenv` / `config.py`)
-| Variable | Required? | Purpose |
-|---|---|---|
-| `DATABASE_URL` | **Required** | Postgres (Supabase) or sqlite URL. App raises on startup if unset. Password is auto URL-encoded. |
-| `PORT` | Optional (default `8000`) | Server port. |
-| `HOST` | Optional (default `0.0.0.0`) | Bind host. |
-| `CORS_ORIGINS` | Optional (defaults to localhost:3000/5173/5174) | Comma-separated allowed origins. |
-| `VAPI_API_KEY` | Optional | Vapi private key. If missing/`dummy…`/`mock…`, the app runs in mock mode (fake assistant/KB ids, no real calls). |
-| `GROQ_API_KEY` | Situational | Required for real LLM work. Qualifier **fails open** without it; `llm_client` **raises** without it (so clarification/summarization need it). |
-| `LLM_PROVIDER` | Optional (default `groq`) | `groq` works; `other_provider` is a stub that raises. |
-| `SUPABASE_URL` | Optional (required for real uploads) | Supabase project URL. |
-| `SUPABASE_SERVICE_KEY` | Optional (required for real uploads) | Supabase service-role key. Missing/dummy → simulated URL in dev, hard fail in prod. |
-| `ENVIRONMENT` | Optional (default `development`) | `production` makes Supabase misconfiguration a hard failure. **Read in `storage.py` but missing from `.env.example`.** |
+#### Step 9: Provisioning Task Trigger
+When clarification completes (or is skipped), the endpoint fires `provision_vapi_assistant_task()` as a background task. This is the heaviest pipeline stage, with three internal sub-stages that are committed to the DB so the frontend's progress indicator tracks real transitions:
 
-### Frontend
-| Variable | Required? | Purpose |
-|---|---|---|
-| `VITE_API_BASE_URL` | Optional (default `http://localhost:8000`) | Backend base URL. |
-| `VITE_VAPI_PUBLIC_KEY` | Required for live browser call | Vapi public key used by `@vapi-ai/web`. |
-| `VITE_VAPI_ASSISTANT_ID` | Optional/legacy | Fallback assistant id (the flow uses the lead's own assistant). |
-| `PORTAL_PASSWORD` | Optional (default `admin123`) | Password for the internal `/portal` gate. **Change for any real deployment.** |
-| `SLACK_WEBHOOK_URL` | Optional | If set, `submitLead` posts a lead summary to Slack; otherwise it console-logs. |
-| `NODE_ENV` | Optional | `production` sets the secure cookie flag. |
+| Stage (`AgentStatus`) | What happens |
+|-----------------------|-------------|
+| `summarizing_documents` | If documents exist, consent is given, and no pre-existing brief: runs `summarize_documents()` (map-reduce LLM calls with rate-limit pacing). |
+| `building_profile` | Calls `generate_company_content_fields()` (`prompt_generator.py`) — an LLM writes the four variable slots (greeting line, business context, escalation terms/action). Then `compile_lead_prompt()` assembles the final Vapi system prompt from invariant template sections + these slots. `prompt_lint.lint_compiled_prompt()` runs advisory checks. |
+| `provisioning` | Calls `_call_vapi_create_assistant()` to create a Vapi assistant (Deepgram Nova-2 transcriber, GPT-4.1 model, Vapi native voice v2). If documents passed sanitization, their original bytes are uploaded to Vapi's file library via `upload_to_knowledge_base()` and attached via `attach_knowledge_base()`. |
+
+#### Step 10: Finalizing Local State
+On success: `lead.assistant_id` is set and `agent_status` becomes `active`. The frontend detects this via polling and navigates to the demo preview.
 
 ---
 
-## Setup instructions
+### Phase 5: Demo Preview & Live Call
 
-Written for someone who has never touched this project. Rough edges are flagged.
+#### Step 11: Frontend SDK Connection
+Frontend demo preview (`_wizard.demo-preview.tsx`) embeds the **Vapi Web SDK** (`@vapi-ai/web`), which connects browser audio to the provisioned assistant via `assistant_id`. The prospect can call their own AI receptionist from their browser.
+
+#### Step 12: Call Detail Retrieval
+When a call ends, the frontend calls `POST /api/demo-request/{lead_id}/calls` with the Vapi `call_id`. A background task `fetch_vapi_call_task()` polls Vapi's `GET /call/{id}` until the report (recording, transcript, summary, cost) is finalized, then stores it on a `CallRecord`.
+
+#### Step 13: Customer Feedback Log
+Prospect submits feedback via `POST /api/demo-request/{lead_id}/feedback` (thumbs up/down + optional comment). Stored in `DemoFeedback`.
+
+---
+
+### Phase 6: Cleanup
+
+#### Step 14: Automated Resource Sweeper
+Agent TTL: A background asyncio task (`_cleanup_expired_agents`) sweeps every 15 minutes and deletes Vapi assistants whose leads are older than 6 hours, freeing resources.
+
+#### Step 15: Manual Team Deletion
+The internal dashboard can call `DELETE /api/demo-request/{lead_id}/agent` to tear down a specific agent's Vapi resources immediately.
+
+---
+
+## Key Architectural Decisions and Why
+
+### 1. Modular Monolith over Microservices
+The entire backend is a single FastAPI process. At current scale (demo pipeline, not production call handling) a monolith is dramatically simpler to deploy, debug, and reason about. Splitting would add network hops, deployment complexity, and distributed-state headaches for no benefit at this stage. If individual modules (e.g. the summarizer, the provisioning task) become independently scalable bottlenecks, they're already cleanly separated and can be extracted.
+
+### 2. LangGraph with `PostgresSaver` for Scoping
+The interview is a multi-turn, stateful conversation where the graph can pause for minutes or hours waiting for a user response. LangGraph's `interrupt()` + checkpoint/resume model is a natural fit: each turn resumes from persisted state, and the graph topology (conditional routing, re-extraction loops) is explicit in code rather than hidden in a state machine. `PostgresSaver` checkpoints to the same Supabase Postgres instance the rest of the app uses, so there's no additional infrastructure.
+
+### 3. Two-Layer Prompt (Invariant Template + Constrained LLM)
+The Vapi system prompt is split into **invariant behaviour** (how the agent speaks, its restrictions, KB discipline, closing) that is human-written template text and **variable content** (who this business is, what they do, escalation specifics) that an LLM fills from gathered data. This is deliberate:
+- The invariant layer is never LLM-generated, so it can't drift, hallucinate, or be prompt-injected by user-supplied content.
+- The variable layer is tightly constrained: the LLM fills only four named content fields, and `prompt_lint.py` rejects leaks of invariant-layer language (e.g. "knowledge base", "let me check").
+- If generation fails, `compile_lead_prompt()` falls back to deterministic slot-filling from the profile and scenario library — provisioning never breaks on a degraded LLM.
+
+### 4. Fail-Open Architecture Design
+Every external dependency has a graceful degradation path:
+- **LLM Provider Fallback:** Fireworks is primary, Groq is automatic fallback. If both fail, the prompt generator returns `""` and the deterministic path handles it.
+- **Supabase Storage Fail-Open:** If unconfigured/unavailable, `upload_document()` returns a mock URL in dev; document extraction still works from in-memory bytes.
+- **Vapi API Mocking:** Mock assistant IDs are generated when the API key is missing/dummy, so the full flow can be exercised locally without Vapi credentials.
+- **Knowledge Base Upload Fallback:** If the raw file can't be downloaded from Supabase, falls back to uploading the extracted text as `.txt`.
+
+### 5. Scenario Library (Vetted & Human-Written)
+`scenario_library.py` contains industry-specific call handling rules (HVAC, dental, legal, etc.) as explicit (trigger, action) pairs. These are the **default behaviour** when a lead provides no specifics, and they're also fed to the question generator so it doesn't ask about things the library already covers. Everything in this file is hand-reviewed — no LLM writes to it at runtime. This is the "safe floor" that stops an agent from inventing policies.
+
+### 6. Multi-Layer Input Sanitization (Adversarial Defenses)
+User-supplied text passes through multiple sanitization layers before reaching any prompt:
+- `sanitize_input()` — short identifiers (company name, industry): 100 char cap, bracket/brace strip, injection keyword removal.
+- `sanitize_profile_text()` — profile fields: 400 char cap, same injection patterns.
+- `sanitize_document_text()` — full document text: flags and rejects documents exceeding a match threshold for injection patterns. Below threshold, strips matches but preserves content.
+- The prompt template itself isolates user content in clearly labeled `{{slots}}` within a fixed structure, and the `restrictions` section is always emitted **after** any generated content.
+
+### 7. Background Queue for Heavy Tasks
+Document summarization, profile extraction, and Vapi provisioning all run as FastAPI `BackgroundTasks`, not in the request path. Endpoints return immediately with a status the frontend polls. This prevents HTTP timeouts and lets the UI show real progress stages (`summarizing_documents → building_profile → provisioning → active`).
+
+---
+
+## Project Structure
+
+```
+dq_demo/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                  # FastAPI app, all REST endpoints, lifespan (DB init + agent cleanup)
+│   │   ├── models.py                # SQLModel table definitions (Lead, Document, CompanyProfileDB, etc.)
+│   │   ├── db.py                    # Engine creation, init_db() with idempotent ALTER TABLE migrations
+│   │   ├── config.py                # Env var loading (DATABASE_URL, CORS_ORIGINS, etc.)
+│   │   ├── agents.py                # Prompt composition (compile_lead_prompt), Vapi assistant CRUD, provisioning task
+│   │   ├── clarification.py         # LangGraph clarification workflow (graph, nodes, API interface functions)
+│   │   ├── llm_client.py            # Unified LLM dispatch (Fireworks primary → Groq fallback), structured JSON output
+│   │   ├── prompt_generator.py      # LLM generation of the four variable content fields for the Vapi prompt
+│   │   ├── document_summarizer.py   # Map-reduce summarization of uploaded SOPs into a business brief
+│   │   ├── scenario_library.py      # Human-written, per-industry call scenarios and escalation defaults
+│   │   ├── prompt_lint.py           # Compile-time invariant checks on assembled prompts
+│   │   ├── storage.py               # Supabase Storage upload/download (fail-open)
+│   │   ├── vapi_calls.py            # Polls Vapi GET /call/{id} for native call reports (recording, transcript)
+│   │   ├── vapi_knowledge_base.py   # Uploads files to Vapi's KB, attaches to assistant
+│   │   ├── utils.py                 # Input sanitization (injection defense), document text sanitization
+│   │   ├── logging_config.py        # Structured JSON logging to stdout
+│   │   └── templates/
+│   │       └── vapi_prompt_template.md  # The human-written Vapi system prompt template (invariant + variable sections)
+│   ├── migrations/                  # Alembic migration versions
+│   ├── tests/
+│   │   ├── test_clarification.py
+│   │   ├── test_clarification_dedup_and_meta.py
+│   │   ├── test_modular_prompt.py
+│   │   ├── test_prompt_lint.py
+│   │   ├── test_reasoning_clarification.py
+│   │   ├── test_summarization_bypass.py
+│   │   ├── test_vapi_knowledge_base.py
+│   │   └── debug_end_to_end.py
+│   ├── alembic.ini
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── frontend/
+│   ├── src/
+│   │   ├── routes/
+│   │   │   ├── index.tsx                    # Landing page
+│   │   │   ├── _wizard.tsx                  # Wizard layout wrapper
+│   │   │   ├── _wizard.build-demo.tsx       # Step 1: Intake form
+│   │   │   ├── _wizard.upload.tsx           # Step 2: Document upload + consent
+│   │   │   ├── _wizard.clarification.tsx    # Step 3: AI-guided scoping interview chat
+│   │   │   ├── _wizard.pipeline.tsx         # Step 4: Provisioning progress display
+│   │   │   ├── _wizard.demo-preview.tsx     # Step 5: Live demo with Vapi Web SDK
+│   │   │   ├── _app.tsx                     # Internal dashboard layout
+│   │   │   ├── _app.dashboard.tsx           # Internal: leads overview
+│   │   │   ├── _app.active-demos.tsx        # Internal: live provisioned agents
+│   │   │   ├── _app.feedback.tsx            # Internal: client feedback list
+│   │   │   ├── _app.voice-agent.tsx         # Internal: voice agent management
+│   │   │   ├── _app.settings.tsx            # Internal: settings
+│   │   │   └── portal.tsx                   # Auth-gated entry to internal dashboard
+│   │   ├── components/
+│   │   │   ├── ui/                          # shadcn/Radix UI primitives
+│   │   │   ├── common/                      # Shared components
+│   │   │   └── layout/                      # Layout components
+│   │   ├── lib/
+│   │   │   ├── api.ts                       # Backend API client (fetch wrappers)
+│   │   │   ├── leads.ts                     # Lead-related API helpers
+│   │   │   ├── auth.ts                      # Portal auth
+│   │   │   ├── industry-narratives.ts       # Client-side industry display copy
+│   │   │   └── mock-data.ts                 # Dev mock data
+│   │   ├── hooks/
+│   │   │   ├── use-mobile.tsx
+│   │   │   └── use-theme.tsx
+│   │   ├── styles.css                       # Global styles (Tailwind v4)
+│   │   ├── router.tsx                       # TanStack Router setup
+│   │   └── routeTree.gen.ts                 # Auto-generated route tree
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
+│
+└── .gitignore
+```
+
+---
+
+## Database Tables
+
+All tables are defined as SQLModel models in `backend/app/models.py` and auto-created by `init_db()`:
+
+| Table | Purpose |
+|-------|---------|
+| `leads` | Core table. One row per demo request. Tracks `agent_status` lifecycle, stores `rendered_prompt`, `assistant_id`, qualification data, consent. |
+| `company_profile` | 1:1 with a lead. Stores the structured `profile` (JSON), `missing_fields`, `business_brief`, and `status` of the clarification interview. |
+| `documents` | Uploaded SOP/process files. `file_url` points to Supabase Storage, `extracted_text` holds the parsed content. |
+| `clarification_messages` | Chat history for the scoping interview (role: `assistant` / `user`). |
+| `demo_feedback` | Thumbs up/down + optional comment from the prospect after the demo. |
+| `call_records` | One row per Vapi call. Stores Vapi's native report: `recording_url`, `transcript` (JSON), `summary`, `cost`, `duration_seconds`. |
+| `discoveryresponse` | Legacy discovery form responses (revenue leakage calculator). |
+| `voiceagent` | Legacy provisioned agents from the discovery flow. |
+
+LangGraph's `PostgresSaver` also creates its own checkpoint tables in the same database.
+
+---
+
+## Setup / How to Run Locally
 
 ### Prerequisites
-- Python 3.13 (the compiled artifacts are cpython-313)
-- Node with **Bun** (a `bun.lock` is committed) — or npm/pnpm if you prefer
-- A PostgreSQL database (Supabase or local). SQLite also works for the backend via
-  `DATABASE_URL=sqlite:///./database.db`, but note the LangGraph clarification
-  checkpointer is Postgres-specific and will not run on sqlite.
 
-### 1. Clone
-```bash
-git clone <repo-url>
-cd dq_demo
-```
+- Python 3.11+
+- Node.js 18+ (or Bun)
+- A PostgreSQL database (Supabase free tier works)
 
-### 2. Backend
+### Backend Local Setup
+
 ```bash
 cd backend
+
+# 1. Create and activate a virtual environment
 python -m venv .venv
-# Windows PowerShell:
-.venv\Scripts\Activate.ps1
-# macOS/Linux:
-# source .venv/bin/activate
+.\.venv\Scripts\Activate.ps1          # Windows PowerShell
+# source .venv/bin/activate            # macOS/Linux
+
+# 2. Install dependencies
 pip install -r requirements.txt
-```
-> **Rough edge:** `requirements.txt` pins `psycopg2-binary`, but the clarification
-> module imports `psycopg_pool` and uses `langgraph-checkpoint-postgres`
-> (psycopg3). These arrive transitively via `langgraph-checkpoint-postgres`; if you
-> hit a `psycopg`/`psycopg_pool` import error, `pip install psycopg[binary] psycopg-pool`.
 
-### 3. Configure `.env`
+# 3. Configure environment
+cp .env.example .env
+# Edit .env and fill in:
+#   DATABASE_URL    — your Supabase PostgreSQL connection string
+#   GROQ_API_KEY    — get one at https://console.groq.com/keys
+#   VAPI_API_KEY    — your Vapi private key (optional for mock mode)
+#   SUPABASE_URL    — your Supabase project URL (optional for mock mode)
+#   SUPABASE_SERVICE_KEY — Supabase service role key (optional for mock mode)
+#
+# Optional:
+#   FIREWORKS_API_KEY  — enables Fireworks as primary LLM (Groq becomes fallback)
+#   LLM_PROVIDER       — pin to "groq" or "fireworks" to disable fallback
+
+# 4. Run the server
+uvicorn app.main:app --reload
+# API available at http://localhost:8000
+# OpenAPI docs at http://localhost:8000/docs
+```
+
+> **Mock mode:** If `VAPI_API_KEY` is missing or starts with `dummy`/`mock`, the provisioning pipeline generates mock assistant IDs and skips real Vapi calls. Similarly, if Supabase credentials are missing, storage operations return simulated URLs. This lets you run the full flow locally without any paid service.
+
+### Frontend Local Setup
+
 ```bash
-cp .env.example .env   # in backend/
+cd frontend
+
+# 1. Install dependencies
+npm install
+# or: bun install
+
+# 2. Configure environment (already has sensible defaults)
+# Edit .env if your backend is not on http://localhost:8000:
+#   VITE_API_BASE_URL=http://localhost:8000
+
+# 3. Start the dev server
+npm run dev
+# Frontend available at http://localhost:3000
 ```
-Fill in at minimum `DATABASE_URL`. For real (non-mock) behavior also set
-`GROQ_API_KEY`, `VAPI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. Add
-`ENVIRONMENT=development` explicitly (it is read by the code but absent from
-`.env.example`).
 
-### 4. Database schema
-Two options — this is a known rough edge (they overlap):
-- **Alembic (partial):** `alembic upgrade head`. Covers the initial tables,
-  qualification columns, and clarification tables — **but not** `demo_feedback`,
-  `call_records`, or the newer `leads` columns / enum values.
-- **App bootstrap (fuller):** just start the app. `init_db()` runs
-  `create_all()` **and** idempotent `ALTER`s that add the missing columns/enum
-  values. In practice this is what makes a fresh DB fully usable today.
+### Running Tests
 
-### 5. Run the backend
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-(from `backend/`, venv active). Startup runs `init_db()`.
-
-### 6. Frontend
-```bash
-cd ../frontend
-bun install        # or: npm install
-```
-Create `frontend/.env` (a template is committed) with at least
-`VITE_API_BASE_URL`, `VITE_VAPI_PUBLIC_KEY`, and `PORTAL_PASSWORD`.
-```bash
-bun run dev        # vite dev
-```
-Internal portal is at `/portal` (default password `admin123`). The public
-demo wizard starts at `/build-demo`.
-
----
-
-## Known limitations / open items
-
-Honest list — this is the part that saves the next person the most time.
-
-1. **Qualifier is not wired into the pipeline.** `qualifier.py` and `/api/qualify`
-   exist and work, but the demo flow never calls `qualify_lead_internal`.
-   Consequently `AgentStatus.skipped` is never set and `leads.qualified` /
-   `qualification_confidence` / `qualification_reasoning` are never populated by
-   the flow. (The import in `clarification.py` is currently unused.)
-2. **Second LLM provider is a stub.** `llm_client.py`'s `"other_provider"` branch
-   raises `NotImplementedError`. Only Groq is implemented.
-3. **No orphaned-assistant cleanup.** `end_demo_session` carries an explicit TODO:
-   there is no scheduled job to delete Vapi assistants for demos that were never
-   explicitly ended. Long-lived leftover assistants are possible.
-4. **Scenario library has no LLM-assisted generation for new industries.** Only
-   the eight curated entries + `GENERIC_ENTRY` fallback exist. Any industry that
-   doesn't match an alias gets the generic playbook. (This is by design today, but
-   it means new verticals need a human PR, not an automated path.)
-5. **Dual schema management (Alembic vs `init_db`).** Alembic migrations and the
-   hand-written `ALTER`s in `db.py` overlap and partially diverge; several
-   tables/columns (`demo_feedback`, `call_records`, newer `leads` columns, newer
-   `agentstatus` enum values) exist only via `create_all` + `init_db`, with no
-   migration. Treat `models.py` + `init_db` as the real source of truth today.
-6. **`requirements.txt` under-pins the Postgres driver stack** — see the setup
-   rough edge above.
-7. **Legacy discovery path coexists with the Lead flow.** `Company`, `DemoJob`,
-   `DiscoveryResponse`, `VoiceAgent` + `/api/discovery` and `/api/agents/*` are a
-   parallel, older mechanism. `Company` and `DemoJob` have no endpoints at all
-   (dead schema). This is a candidate for removal once confirmed unused.
-8. **Orphaned bytecode:** a `call_analysis` `.pyc` exists with no corresponding
-   source file.
-9. **Committed local artifacts:** `backend/database.db` and
-   `backend/empty_temp.db` are checked in.
-10. **`ENVIRONMENT` is undocumented** in `backend/.env.example` despite affecting
-    production storage behavior.
-
----
-
-## Testing
-
-Tests live in `backend/tests/`. There is no configured test runner in
-`requirements.txt` (no pytest pin), and several files read the running server's
-`PORT`, so some are **integration-style** and expect a live backend + real/valid
-keys rather than pure unit tests. Review each before running.
-
-| File | Covers |
-|---|---|
-| `test_qualifier.py` | Lead qualification behavior (reads `PORT`; integration-style). |
-| `test_clarification.py` | Clarification flow (reads `PORT`; integration-style). |
-| `test_clarification_dedup_and_meta.py` | Question de-duplication and meta-response (question-back) handling in the clarification graph. |
-| `test_reasoning_clarification.py` | Reasoning/behavior of the clarification question generation. |
-| `test_modular_prompt.py` | The deterministic modular prompt composition (`compile_lead_prompt` + template sections). |
-| `test_vapi_knowledge_base.py` | Vapi knowledge-base upload/attach helpers. |
-| `debug_end_to_end.py` | An end-to-end debugging script, not a formal test. |
-
-To run (after `pip install pytest`):
 ```bash
 cd backend
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
-For the integration-style files, start the backend first (`uvicorn app.main:app`)
-and ensure the relevant keys are set, or expect network/auth failures.
 
 ---
 
-## Verification notes
+## Known Limitations / Open Questions
 
-Per the request, every claim in [Key architectural decisions](#key-architectural-decisions)
-that rests on **inference** rather than a direct code statement is flagged here:
+### 1. No Authentication on the Backend API
+All endpoints are open. The internal dashboard has a client-side portal password (`PORTAL_PASSWORD` env var), but the API itself has no auth middleware. Fine for demo/staging, not for production.
 
-- **Decisions #3, #4, #5, #6, #8, #9, #10** are backed by **explicit comments/
-  docstrings in the code** (the determinism contract, the template/library editing
-  rules, the fail-open/fail-safe reasoning, the consent-skip logs, the
-  first-message rationale, the "native report is source of truth" docstring, the
-  checkpointer timing note). These are confirmed, not inferred.
-- **Decision #1 (modular monolith)** is an **inference** from the structure (one
-  FastAPI app, in-process module calls, no Docker/broker). The *reasoning* is not
-  written in the code; it is the standard justification for this shape. Correct me
-  if the intent was different.
-- **Decision #2 (Supabase over self-hosted)** is a **partial inference**: the code
-  confirms a single managed `DATABASE_URL` with a sqlite fallback, but the
-  "avoids backups/patching overhead" rationale is inferred, not documented.
-- **Decision #7 (scenario library design)** — the "vetted/human-curated, generic
-  fallback is complete not a stub" is documented in the file; the statement that
-  **LLM-assisted generation is not implemented** is confirmed by its **absence**
-  in the code (verified by search), which is an argument from absence rather than
-  a positive statement.
+### 2. Schema Migrations Performed Inline
+The Alembic migrations directory exists but most schema evolution happens via idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `db.py`. This works but means migration history isn't fully tracked. Consider consolidating to Alembic-only migrations before production.
 
-If any inferred rationale misstates the original intent, flag it and I'll correct
-the wording.
+### 3. Rate-Limit Sensitive Document Summarization
+The map-reduce summarizer paces chunk calls with a 4-second delay (`INTER_CHUNK_DELAY`) to stay within provider TPM budgets. A very long document (20+ pages) can take 1–2 minutes. This is acceptable but not ideal.
+
+### 4. Polling Instead of Vapi Webhooks for Call Reporting
+Call reports are fetched by polling `GET /call/{id}` (up to 20 attempts, 3s apart) in a background task. This works without a public URL but adds latency and is fragile if Vapi's report finalization takes longer than expected.
+
+### 5. Blunt 6-Hour Agent TTL Sweeper
+All expired assistants are deleted regardless of whether the prospect is still actively demoing. A more sophisticated approach would track actual session activity.
+
+### 6. Single-Point Dependency on LLM Providers
+The pipeline depends on at least one of Fireworks AI or Groq being reachable and returning valid JSON. Both providers have rate limits and occasional outages. The dual-provider fallback mitigates this but doesn't eliminate it.
+
+### 7. Missing Production Deployment Configuration
+There's no Dockerfile, no CI/CD pipeline, no infrastructure-as-code. The Vite config supports Cloudflare/Nitro builds for the frontend, but backend deployment is not codified.
+
+### 8. Keyword-Based Prompt Injection Sanitization
+The sanitization in `utils.py` uses regex pattern matching for known injection keywords. This is a practical first layer but not a comprehensive defense against adversarial prompt injection.
+
+### 9. Scenario Library Limited Industry Coverage
+Unknown industries fall back to a generic entry. The library can be extended by adding entries to `SCENARIO_LIBRARY` in `scenario_library.py`, and there's an LLM-backed `resolve_industry_entry()` that generates display names and stakes for uncovered industries at runtime — but the generated entries lack vetted call scenarios.

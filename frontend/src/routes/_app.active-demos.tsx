@@ -1,12 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
-import { Search, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import {
+  Search,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+} from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
 import { StatusBadge, statusToTone } from "@/components/common/StatusBadge";
 import { LeadDetailDrawer } from "@/components/common/LeadDetailDrawer";
 import { listLeads, type LeadResponse } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/active-demos")({
   head: () => ({ meta: [{ title: "Demos — DataQuartz" }] }),
@@ -14,6 +24,26 @@ export const Route = createFileRoute("/_app/active-demos")({
 });
 
 type StatusFilter = "all" | LeadResponse["agent_status"];
+type SortKey = "company_name" | "industry" | "agent_status" | "created_at";
+type SortDir = "asc" | "desc";
+
+// Status quick-filters shown as buttons with live counts. A chip is rendered
+// only when "all" or when at least one loaded lead has that status, so the bar
+// never advertises a filter that would return nothing.
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "completed", label: "Completed" },
+  { value: "pending", label: "Pending" },
+  { value: "provisioning", label: "Provisioning" },
+  { value: "building_profile", label: "Building" },
+  { value: "summarizing_documents", label: "Summarizing" },
+  { value: "failed", label: "Failed" },
+];
+
+function statusLabel(value: StatusFilter): string {
+  return STATUS_CHIPS.find((c) => c.value === value)?.label ?? value;
+}
 
 /**
  * Internal demo list, backed by GET /api/leads.
@@ -31,6 +61,8 @@ function ActiveDemos() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<LeadResponse | null>(null);
 
   const load = async () => {
@@ -49,9 +81,17 @@ function ActiveDemos() {
     load();
   }, []);
 
+  // Live counts per status over everything loaded (not the filtered view), so
+  // the chips show the true pipeline breakdown regardless of the active filter.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: leads.length };
+    for (const l of leads) c[l.agent_status] = (c[l.agent_status] ?? 0) + 1;
+    return c;
+  }, [leads]);
+
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return leads.filter((l) => {
+    const filtered = leads.filter((l) => {
       if (filter !== "all" && l.agent_status !== filter) return false;
       if (!needle) return true;
       return (
@@ -60,7 +100,59 @@ function ActiveDemos() {
         l.contact_email.toLowerCase().includes(needle)
       );
     });
-  }, [leads, q, filter]);
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    const val = (l: LeadResponse): string | number => {
+      switch (sortKey) {
+        case "company_name":
+          return l.company_name.toLowerCase();
+        case "industry":
+          return l.industry.toLowerCase();
+        case "agent_status":
+          return l.agent_status;
+        case "created_at":
+          return new Date(l.created_at).getTime() || 0;
+      }
+    };
+    return [...filtered].sort((a, b) => {
+      const av = val(a);
+      const bv = val(b);
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }, [leads, q, filter, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // Text columns read best A→Z; dates default newest first.
+      setSortDir(key === "company_name" || key === "industry" ? "asc" : "desc");
+    }
+  };
+
+  const exportCsv = () => {
+    const header = ["Company", "Contact email", "Industry", "Status", "Created"];
+    const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const body = rows.map((l) =>
+      [l.company_name, l.contact_email, l.industry, l.agent_status, l.created_at]
+        .map(esc)
+        .join(","),
+    );
+    const csv = [header.map(esc).join(","), ...body].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `demos-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} ${rows.length === 1 ? "row" : "rows"} to CSV`);
+  };
 
   const copyLink = (lead: LeadResponse) => {
     if (typeof window === "undefined") return;
@@ -72,7 +164,7 @@ function ActiveDemos() {
   return (
     <>
       <TopNav title="Demos" />
-      <div className="space-y-4 p-6">
+      <div className="console-page-glow flex-1 space-y-4 p-6">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1 max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -83,25 +175,46 @@ function ActiveDemos() {
               className="w-full rounded-lg border border-border/80 bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 transition-shadow"
             />
           </div>
-          <Select
-            value={filter}
-            onValueChange={(val) => setFilter(val as StatusFilter)}
-          >
-            <SelectTrigger className="w-[140px] border border-border/80 bg-card px-2.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 cursor-pointer shadow-sm hover:shadow transition-shadow">
-              <SelectValue placeholder="All statuses" />
+
+          {/* Status filter — a dropdown with live per-status counts. Both the
+              trigger and the menu carry the dense elevation shadow. */}
+          <Select value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
+            <SelectTrigger className="w-[190px] demo-dropdown-trigger btn-themed-shadow transition-all duration-200 hover:-translate-y-[1px] active:translate-y-0 cursor-pointer">
+              <span className="text-sm font-bold text-primary tracking-wide">
+                {statusLabel(filter)}
+              </span>
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="skipped">Skipped</SelectItem>
+            <SelectContent className="dropdown-dense-shadow">
+              {STATUS_CHIPS.filter((c) => c.value === "all" || (counts[c.value] ?? 0) > 0).map(
+                (c) => {
+                  const n = c.value === "all" ? counts.all : (counts[c.value] ?? 0);
+                  return (
+                    <SelectItem key={c.value} value={c.value}>
+                      <span className="flex w-full items-center justify-between gap-3">
+                        <span>{c.label}</span>
+                        <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums text-muted-foreground">
+                          {n}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  );
+                },
+              )}
             </SelectContent>
           </Select>
+
+          <button
+            onClick={exportCsv}
+            disabled={rows.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border/80 disabled:hover:text-muted-foreground cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
+            title="Export the current view as CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export CSV
+          </button>
           <button
             onClick={load}
-            className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-2.5 py-2 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-[1px] active:translate-y-0"
           >
             <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
             Refresh
@@ -116,28 +229,51 @@ function ActiveDemos() {
             {error}
           </div>
         ) : (
-          <div className="console-card overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="console-card-glass overflow-x-auto">
+            <table className="w-full text-sm console-table-futuristic">
               <thead>
                 <tr className="border-b border-border/70 bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-2.5 font-semibold">Company</th>
-                  <th className="px-4 py-2.5 font-semibold">Industry</th>
-                  <th className="px-4 py-2.5 font-semibold">Status</th>
-                  <th className="px-4 py-2.5 font-semibold">Qualified</th>
-                  <th className="px-4 py-2.5 font-semibold">Created</th>
+                  <SortTh
+                    label="Company"
+                    col="company_name"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Industry"
+                    col="industry"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Status"
+                    col="agent_status"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortTh
+                    label="Created"
+                    col="created_at"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
                   <th className="w-20 px-4 py-2.5" />
                 </tr>
               </thead>
               <tbody>
                 {loading && leads.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                       No demos match.
                     </td>
                   </tr>
@@ -157,13 +293,6 @@ function ActiveDemos() {
                         <StatusBadge tone={statusToTone(l.agent_status)}>
                           {l.agent_status}
                         </StatusBadge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {l.qualified === null || l.qualified === undefined
-                          ? "—"
-                          : l.qualified
-                            ? "Yes"
-                            : "No"}
                       </td>
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">
                         {formatDate(l.created_at)}
@@ -204,12 +333,41 @@ function ActiveDemos() {
           </div>
         )}
       </div>
-      <LeadDetailDrawer
-        lead={selected}
-        onClose={() => setSelected(null)}
-        onAgentDeleted={load}
-      />
+      <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} onAgentDeleted={load} />
     </>
+  );
+}
+
+function SortTh({
+  label,
+  col,
+  sortKey,
+  sortDir,
+  onToggle,
+}: {
+  label: string;
+  col: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onToggle: (key: SortKey) => void;
+}) {
+  const active = sortKey === col;
+  const Icon = !active ? ChevronsUpDown : sortDir === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <th className="px-4 py-2.5 font-semibold">
+      <button
+        type="button"
+        onClick={() => onToggle(col)}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        className={cn(
+          "inline-flex items-center gap-1 uppercase tracking-wider cursor-pointer transition-colors hover:text-foreground",
+          active && "text-foreground",
+        )}
+      >
+        {label}
+        <Icon className={cn("h-3 w-3", active ? "text-primary" : "text-muted-foreground/60")} />
+      </button>
+    </th>
   );
 }
 

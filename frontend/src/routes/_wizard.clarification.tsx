@@ -28,7 +28,8 @@ function ClarificationRoute() {
   const { leadId } = Route.useSearch();
   const navigate = useNavigate();
 
-  const [clarificationStatus, setClarificationStatus] = useState<ClarificationStatusResponse | null>(null);
+  const [clarificationStatus, setClarificationStatus] =
+    useState<ClarificationStatusResponse | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);
   const [currentQuestionText, setCurrentQuestionText] = useState("");
   // The user's answer, shown instantly on submit so it appears the moment they
@@ -47,10 +48,7 @@ function ClarificationRoute() {
       list.push({ role: m.role, content: m.content });
     }
     const pending = clarificationStatus?.current_question?.trim();
-    if (
-      pending &&
-      !history.some((m) => m.role === "assistant" && m.content.trim() === pending)
-    ) {
+    if (pending && !history.some((m) => m.role === "assistant" && m.content.trim() === pending)) {
       list.push({ role: "assistant", content: pending });
     }
     return list;
@@ -134,10 +132,7 @@ function ClarificationRoute() {
     }
 
     const pending = clarificationStatus?.current_question?.trim();
-    if (
-      pending &&
-      !history.some((m) => m.role === "assistant" && m.content.trim() === pending)
-    ) {
+    if (pending && !history.some((m) => m.role === "assistant" && m.content.trim() === pending)) {
       const last = groups[groups.length - 1];
       if (last && last.role === "assistant") {
         last.items.push({ content: pending, flatIndex });
@@ -149,38 +144,76 @@ function ClarificationRoute() {
     return groups;
   }, [clarificationStatus?.conversation_history, clarificationStatus?.current_question]);
 
-  const questionNumber = new Set(
-    (clarificationStatus?.conversation_history ?? [])
+  const currentQuestionIndex = useMemo(() => {
+    const history = clarificationStatus?.conversation_history ?? [];
+    const questions = history
       .filter((m) => m.role === "assistant")
-      .map((m) => m.content.trim()),
-  ).size;
+      .map((m) => m.content.trim())
+      .filter((content) => {
+        if (content.startsWith("Hi! Before we dive in")) return false;
+        if (content.startsWith("Is there anything else about how you'd want")) return false;
+        if (content.startsWith("Happy to clarify")) return false;
+        return true;
+      });
+    const unique = Array.from(new Set(questions));
+    return unique.length;
+  }, [clarificationStatus?.conversation_history]);
 
-  // Load the initial status when navigating here
+  // Load the initial status when navigating here, then poll until the first
+  // question is ready. The heavy first pass (document extraction + profile build
+  // + first-question generation) now runs in a background task on the server, so
+  // on arrival the status is `in_progress` with no question yet — the empty-state
+  // "Analyzing requirements…" indicator shows while we poll. Once a question
+  // arrives (or the flow completes) we stop polling; from there the conversation
+  // is driven turn-by-turn by respondToClarification.
   useEffect(() => {
     let mounted = true;
+    let pollId: ReturnType<typeof setInterval> | undefined;
+
+    const stopPolling = () => {
+      if (pollId) {
+        clearInterval(pollId);
+        pollId = undefined;
+      }
+    };
+
     const fetchStatus = async () => {
       try {
         const status = await getClarificationStatus(leadId);
-        if (mounted) {
-          setClarificationStatus(status);
-          
-          const initialFlatCount = (status.conversation_history?.length || 0) + 
-            (status.current_question && !status.conversation_history?.some(
-              m => m.role === "assistant" && m.content.trim() === status.current_question?.trim()
-            ) ? 1 : 0);
-          setStaticHistoryLength(initialFlatCount);
+        if (!mounted) return;
+        setClarificationStatus(status);
 
-          if (status.status === "completed") {
-            navigate({ to: "/pipeline", search: { leadId } });
-          }
+        const initialFlatCount =
+          (status.conversation_history?.length || 0) +
+          (status.current_question &&
+          !status.conversation_history?.some(
+            (m) => m.role === "assistant" && m.content.trim() === status.current_question?.trim(),
+          )
+            ? 1
+            : 0);
+        setStaticHistoryLength(initialFlatCount);
+
+        if (status.status === "completed") {
+          stopPolling();
+          navigate({ to: "/pipeline", search: { leadId } });
+          return;
+        }
+
+        // First question is ready — stop polling and hand off to the turn-by-turn
+        // answer flow so we never clobber in-progress input.
+        if (status.current_question) {
+          stopPolling();
         }
       } catch (err) {
         console.error("Failed to fetch clarification status:", err);
       }
     };
+
     fetchStatus();
+    pollId = setInterval(fetchStatus, 2000);
     return () => {
       mounted = false;
+      stopPolling();
     };
   }, [leadId, navigate]);
 
@@ -260,34 +293,52 @@ function ClarificationRoute() {
             {/* Within-step progress. The total number of questions varies per lead,
                 so this counts answered questions rather than showing a fake total,
                 and switches to an explicit "last one" state on the final question. */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
               {clarificationStatus?.is_final_question ? (
                 <span className="text-xs font-sans font-bold uppercase tracking-wider bg-primary/15 border border-primary/35 text-primary px-3 py-1.5 rounded-full shrink-0 flex items-center gap-1.5">
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                   Last question
                 </span>
-              ) : questionNumber > 0 ? (
-                <span className="flex items-center gap-2" aria-label={`Question ${questionNumber}`}>
+              ) : currentQuestionIndex > 0 ? (
+                <div
+                  className="flex flex-col items-end gap-1"
+                  aria-label={`Question ${currentQuestionIndex}`}
+                >
                   <span className="hidden sm:inline text-xs font-sans uppercase tracking-wider text-foreground/50 font-bold">
-                    Question {questionNumber}
+                    {currentQuestionIndex <= 5
+                      ? `Question ${currentQuestionIndex} of 5 (Max 9)`
+                      : `Question ${currentQuestionIndex} of 9 (Optional)`}
                   </span>
-                  <span className="flex items-center gap-1.5" aria-hidden="true">
-                    {Array.from({ length: Math.min(questionNumber, 6) }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={cn(
-                          "h-2 w-2 rounded-full transition-colors",
-                          i === Math.min(questionNumber, 6) - 1
-                            ? "bg-primary"
-                            : "bg-primary/35",
-                        )}
-                      />
-                    ))}
+                  <span className="flex items-center gap-1" aria-hidden="true">
+                    {Array.from({ length: 9 }).map((_, i) => {
+                      const index = i + 1;
+                      const isCore = index <= 5;
+                      const isActive = index === currentQuestionIndex;
+                      const isCompleted = index < currentQuestionIndex;
+
+                      return (
+                        <span
+                          key={i}
+                          className={cn(
+                            "h-2 w-2 rounded-full transition-all duration-300",
+                            isActive
+                              ? "bg-primary scale-125 ring-2 ring-primary/20"
+                              : isCompleted
+                                ? "bg-primary/70"
+                                : isCore
+                                  ? "bg-muted-foreground/30 border border-muted-foreground/20"
+                                  : "bg-muted-foreground/15 border border-dashed border-muted-foreground/30",
+                          )}
+                          title={isCore ? `Core Question ${index}` : `Optional Question ${index}`}
+                        />
+                      );
+                    })}
                   </span>
-                </span>
+                </div>
               ) : null}
             </div>
-          </div>          {/* Chat Conversation Thread */}
+          </div>{" "}
+          {/* Chat Conversation Thread */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs md:text-sm font-sans uppercase tracking-wider text-foreground/85 flex items-center gap-2 font-bold">
@@ -361,7 +412,8 @@ function ClarificationRoute() {
                           </div>
                         )}
                         {visibleItems.map((item, i) => {
-                          const shouldAnimate = staticHistoryLength !== -1 && item.flatIndex === currentTypingIndex;
+                          const shouldAnimate =
+                            staticHistoryLength !== -1 && item.flatIndex === currentTypingIndex;
                           return (
                             <p
                               key={i}
@@ -418,38 +470,35 @@ function ClarificationRoute() {
               )}
             </div>
           </div>
-
           {/* AI Question Answer Recommendations Bar.
               Hidden while a request is in flight: the options belong to the question
               being replaced, so leaving them up makes them look static across turns. */}
-          {!isQuerying && clarificationStatus?.recommendations && clarificationStatus.recommendations.length > 0 && (
-            <div className="space-y-1.5 bg-primary/5 border border-primary/20 p-3 rounded-lg">
-              <div className="flex items-center gap-1.5 text-[10px] font-mono text-primary font-bold uppercase tracking-wider">
-                <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
-                <span>Recommended Answers (Click to select):</span>
+          {!isQuerying &&
+            clarificationStatus?.recommendations &&
+            clarificationStatus.recommendations.length > 0 && (
+              <div className="space-y-1.5 bg-primary/5 border border-primary/20 p-3 rounded-lg">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-primary font-bold uppercase tracking-wider">
+                  <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+                  <span>Recommended Answers (Click to select):</span>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {clarificationStatus.recommendations.map((rec, rIdx) => (
+                    <button
+                      key={`${rec}-${rIdx}`}
+                      type="button"
+                      onClick={(e) => handleSendClarificationAnswer(undefined, rec)}
+                      disabled={isQuerying}
+                      className="px-3 py-1.5 bg-background hover:bg-primary hover:text-primary-foreground border border-primary/30 text-foreground text-xs font-sans rounded-full transition-all duration-200 cursor-pointer hover:border-primary active:scale-95 flex items-center gap-1.5 font-medium disabled:opacity-50 shadow-sm"
+                    >
+                      <span>{rec}</span>
+                      <ArrowRight className="h-3 w-3 opacity-60" />
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {clarificationStatus.recommendations.map((rec, rIdx) => (
-                  <button
-                    key={`${rec}-${rIdx}`}
-                    type="button"
-                    onClick={(e) => handleSendClarificationAnswer(undefined, rec)}
-                    disabled={isQuerying}
-                    className="px-3 py-1.5 bg-background hover:bg-primary hover:text-primary-foreground border border-primary/30 text-foreground text-xs font-sans rounded-full transition-all duration-200 cursor-pointer hover:border-primary active:scale-95 flex items-center gap-1.5 font-medium disabled:opacity-50 shadow-sm"
-                  >
-                    <span>{rec}</span>
-                    <ArrowRight className="h-3 w-3 opacity-60" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
+            )}
           {/* Free-form Input Area */}
-          <form
-            onSubmit={handleSendClarificationAnswer}
-            className="flex items-stretch gap-2.5"
-          >
+          <form onSubmit={handleSendClarificationAnswer} className="flex items-stretch gap-2.5">
             <input
               type="text"
               value={currentQuestionText}
@@ -460,19 +509,23 @@ function ClarificationRoute() {
             />
             <button
               type="submit"
-              disabled={isQuerying || !currentQuestionText.trim() || clarificationStatus?.status === "completed"}
+              disabled={
+                isQuerying ||
+                !currentQuestionText.trim() ||
+                clarificationStatus?.status === "completed"
+              }
               className={cn(
                 "px-6 font-sans font-bold uppercase text-sm cursor-pointer border-2 flex items-center justify-center gap-2 rounded-lg transition-all shrink-0",
-                isQuerying || !currentQuestionText.trim() || clarificationStatus?.status === "completed"
+                isQuerying ||
+                  !currentQuestionText.trim() ||
+                  clarificationStatus?.status === "completed"
                   ? "bg-secondary text-foreground/40 border-border cursor-not-allowed"
-                  : "bg-primary text-primary-foreground border-primary hover:bg-primary/90 active:scale-98 shadow-sm",
+                  : "bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 hover:border-yellow-500 dark:bg-sky-500 dark:text-white dark:border-sky-500 dark:hover:bg-sky-600 dark:hover:border-sky-600 btn-themed-shadow active:scale-98",
               )}
             >
               {isQuerying ? "Sending..." : "Send"}
             </button>
           </form>
-
-
         </div>
 
         {/* Actions Footer */}
@@ -481,9 +534,9 @@ function ClarificationRoute() {
             type="button"
             onClick={handleSkipRemainingQuestions}
             disabled={isQuerying || clarificationStatus?.status === "completed"}
-            className="bg-transparent border border-border text-foreground hover:bg-secondary transition-colors font-mono font-medium text-xs tracking-wider uppercase px-5 py-3 cursor-pointer rounded disabled:opacity-50"
+            className="inline-flex items-center gap-2 border-0 bg-yellow-400 text-black hover:bg-yellow-500 dark:bg-sky-500 dark:text-white dark:hover:bg-sky-600 font-sans text-xs font-semibold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
-            Skip remaining questions
+            Skip for now
           </button>
 
           {clarificationStatus?.status === "completed" && (
@@ -509,7 +562,12 @@ interface TypewriterParagraphProps {
   onType?: () => void;
 }
 
-function TypewriterParagraph({ text, shouldAnimate, onComplete, onType }: TypewriterParagraphProps) {
+function TypewriterParagraph({
+  text,
+  shouldAnimate,
+  onComplete,
+  onType,
+}: TypewriterParagraphProps) {
   const [displayedText, setDisplayedText] = useState(shouldAnimate ? "" : text);
   const [isTyping, setIsTyping] = useState(shouldAnimate);
 

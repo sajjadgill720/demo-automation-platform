@@ -36,7 +36,17 @@ const NARRATIVES: IndustryNarrative[] = [
   {
     key: "logistics",
     specificity: 2,
-    aliases: ["logistics", "freight", "transport", "trucking", "shipping", "supply chain", "courier", "fleet", "delivery"],
+    aliases: [
+      "logistics",
+      "freight",
+      "transport",
+      "trucking",
+      "shipping",
+      "supply chain",
+      "courier",
+      "fleet",
+      "delivery",
+    ],
     before: [
       "Tracking calls interrupt dispatchers mid-shift, every shift.",
       "Inbound queues drop callers during peak scheduling congestion.",
@@ -44,14 +54,23 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     after: [
       "Status calls answered instantly, with the load reference captured up front.",
-      "Every line answered at once — no queue, no dropped callers.",
+      "Every line answered at once, no queue, no dropped callers.",
       "Call details written straight into your systems, no copy-paste.",
     ],
     projection: "Faster status calls · zero missed dispatches",
     faqs: [
-      { q: "Where's my shipment right now?", a: "I'll take your load or reference number and confirm dispatch will call straight back with the status - I won't guess at a location or an ETA." },
-      { q: "Can you quote a rate on a lane?", a: "I'll capture the origin, destination, weight, equipment and pickup date, and have a rep follow up with pricing." },
-      { q: "A driver's broken down - who do I talk to?", a: "That's urgent, so I take the load number and location and escalate it immediately rather than leaving a routine message." },
+      {
+        q: "Where's my shipment right now?",
+        a: "I'll take your load or reference number and confirm dispatch will call straight back with the status. I won't guess at a location or an ETA.",
+      },
+      {
+        q: "Can you quote a rate on a lane?",
+        a: "I'll capture the origin, destination, weight, equipment and pickup date, and have a rep follow up with pricing.",
+      },
+      {
+        q: "A driver has broken down, who do I talk to?",
+        a: "That's urgent, so I take the load number and location and escalate it immediately rather than leaving a routine message.",
+      },
     ],
   },
   {
@@ -70,9 +89,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "Fewer missed bookings · nothing lost to voicemail",
     faqs: [
-      { q: "Can I get an appointment this week?", a: "I'll take your name, callback number and preferred timing, and confirm what happens next - no more waiting on hold at the desk." },
-      { q: "Are my test results back?", a: "Clinical staff have to handle results, so I take your details and pass the message on. I never read anything back from a record." },
-      { q: "This feels like an emergency.", a: "I tell the caller to hang up and call 911 or go to the nearest ER right away, and I don't try to book it as an appointment." },
+      {
+        q: "Can I get an appointment this week?",
+        a: "I'll take your name, callback number and preferred timing, and confirm what happens next - no more waiting on hold at the desk.",
+      },
+      {
+        q: "Are my test results back?",
+        a: "Clinical staff have to handle results, so I take your details and pass the message on. I never read anything back from a record.",
+      },
+      {
+        q: "This feels like an emergency.",
+        a: "I tell the caller to hang up and call 911 or go to the nearest ER right away, and I don't try to book it as an appointment.",
+      },
     ],
   },
   {
@@ -91,9 +119,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "More new patients booked · urgent calls never queued",
     faqs: [
-      { q: "Are you taking new patients?", a: "Yes - I collect name, phone, email and the reason for the visit, and explain what happens next, all without pulling the desk off chairside work." },
-      { q: "I'm in a lot of pain, can I be seen today?", a: "I treat pain as urgent: I take your name and number first, then follow the practice's emergency instruction rather than offering routine scheduling." },
-      { q: "Do you take my insurance?", a: "I only confirm plans the practice has given me; otherwise I take your insurer's name and the office verifies coverage and calls back." },
+      {
+        q: "Are you taking new patients?",
+        a: "Yes, I collect name, phone, email and the reason for the visit, and explain what happens next, all without pulling the desk off chairside work.",
+      },
+      {
+        q: "I'm in a lot of pain, can I be seen today?",
+        a: "I treat pain as urgent: I take your name and number first, then follow the practice's emergency instruction rather than offering routine scheduling.",
+      },
+      {
+        q: "Do you take my insurance?",
+        a: "I only confirm plans the practice has given me; otherwise I take your insurer's name and the office verifies coverage and calls back.",
+      },
     ],
   },
   {
@@ -112,9 +149,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "More intakes captured · deadline calls escalated on the spot",
     faqs: [
-      { q: "Do you handle this type of case?", a: "I capture the matter and your contact details, and explain an attorney reviews it before any advice - I never give a legal opinion on the call." },
-      { q: "There's a filing deadline coming up.", a: "Anything with a stated deadline I treat as time-critical: I capture the exact date and escalate immediately instead of a routine callback." },
-      { q: "What does a consultation cost?", a: "I share the consultation fee the firm has given me, and explain that matter fees are confirmed by the firm after intake." },
+      {
+        q: "Do you handle this type of case?",
+        a: "I capture the matter and your contact details, and explain an attorney reviews it before any advice. I never give a legal opinion on the call.",
+      },
+      {
+        q: "There's a filing deadline coming up.",
+        a: "Anything with a stated deadline I treat as time-critical: I capture the exact date and escalate immediately instead of a routine callback.",
+      },
+      {
+        q: "What does a consultation cost?",
+        a: "I share the consultation fee the firm has given me, and explain that matter fees are confirmed by the firm after intake.",
+      },
     ],
   },
   {
@@ -124,7 +170,7 @@ const NARRATIVES: IndustryNarrative[] = [
     before: [
       "After-hours emergency calls hit voicemail and go to a competitor.",
       "Peak-season call volume overwhelms a single office line.",
-      "Job details get relayed twice — caller to office, office to tech.",
+      "Job details get relayed twice, caller to office, office to tech.",
     ],
     after: [
       "No-heat and no-cool calls captured any hour, address confirmed.",
@@ -133,9 +179,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "No after-hours jobs lost · every emergency call captured",
     faqs: [
-      { q: "My system's completely dead - how soon can someone come?", a: "I treat a no-heat or no-cool call as urgent: confirm the address, check if anyone's vulnerable, and offer the earliest emergency slot before a routine one." },
-      { q: "What'll it cost to fix?", a: "I give the diagnostic fee if the business has provided it, and explain the repair price depends on the fault - I never invent a number." },
-      { q: "I smell gas.", a: "I tell the caller to leave the property and call their gas emergency line or 911 immediately, then end the call - I never book it as a job." },
+      {
+        q: "My system is completely dead, how soon can someone come?",
+        a: "I treat a no-heat or no-cool call as urgent: confirm the address, check if anyone's vulnerable, and offer the earliest emergency slot before a routine one.",
+      },
+      {
+        q: "What'll it cost to fix?",
+        a: "I give the diagnostic fee if the business has provided it, and explain the repair price depends on the fault. I never invent a number.",
+      },
+      {
+        q: "I smell gas.",
+        a: "I tell the caller to leave the property and call their gas emergency line or 911 immediately, then end the call. I never book it as a job.",
+      },
     ],
   },
   {
@@ -154,9 +209,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "Emergency calls answered instantly · no lost overnight jobs",
     faqs: [
-      { q: "I've got water everywhere - help.", a: "I treat an active leak as an emergency: I walk you to the shut-off valve, confirm the address, and offer the earliest emergency slot." },
-      { q: "What's your call-out charge?", a: "I share the call-out fee if it's been provided, and explain the final cost depends on what the plumber finds on site." },
-      { q: "Do you work weekends and overnight?", a: "I answer from the hours the business has given me, and take your details for a callback if a slot needs confirming." },
+      {
+        q: "I've got water everywhere, help.",
+        a: "I treat an active leak as an emergency: I walk you to the shut-off valve, confirm the address, and offer the earliest emergency slot.",
+      },
+      {
+        q: "What's your call-out charge?",
+        a: "I share the call-out fee if it's been provided, and explain the final cost depends on what the plumber finds on site.",
+      },
+      {
+        q: "Do you work weekends and overnight?",
+        a: "I answer from the hours the business has given me, and take your details for a callback if a slot needs confirming.",
+      },
     ],
   },
   {
@@ -175,9 +239,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "Faster lead response · no enquiry left waiting",
     faqs: [
-      { q: "Is this listing still available?", a: "I capture which property, your contact details and whether you're pre-approved, and confirm an agent calls straight back - before you ring the next agency." },
-      { q: "Can I book a viewing?", a: "I collect the property, your preferred days and times and your contact details, and confirm the agent will lock in the slot." },
-      { q: "I'm a tenant with a maintenance problem.", a: "I check whether it affects heat, water, power or security - those I treat as urgent, everything else as a routine work order with the details captured." },
+      {
+        q: "Is this listing still available?",
+        a: "I capture which property, your contact details and whether you're pre-approved, and confirm an agent calls straight back, before you ring the next agency.",
+      },
+      {
+        q: "Can I book a viewing?",
+        a: "I collect the property, your preferred days and times and your contact details, and confirm the agent will lock in the slot.",
+      },
+      {
+        q: "I'm a tenant with a maintenance problem.",
+        a: "I check whether it affects heat, water, power or security - those I treat as urgent, everything else as a routine work order with the details captured.",
+      },
     ],
   },
   {
@@ -196,9 +269,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "Every booking call answered · fewer no-shows from missed changes",
     faqs: [
-      { q: "Can I make a booking?", a: "I take the date, party size and your contact details and confirm the reservation request - even through the dinner rush when nobody can reach the phone." },
-      { q: "I need to change my reservation.", a: "I capture your name, the existing booking and the change, and confirm it's passed on so nothing gets scribbled down and missed." },
-      { q: "What are your hours and is there parking?", a: "I answer routine questions like these straight from the venue's details, without pulling a member of staff off the floor." },
+      {
+        q: "Can I make a booking?",
+        a: "I take the date, party size and your contact details and confirm the reservation request, even through the dinner rush when nobody can reach the phone.",
+      },
+      {
+        q: "I need to change my reservation.",
+        a: "I capture your name, the existing booking and the change, and confirm it's passed on so nothing gets scribbled down and missed.",
+      },
+      {
+        q: "What are your hours and is there parking?",
+        a: "I answer routine questions like these straight from the venue's details, without pulling a member of staff off the floor.",
+      },
     ],
   },
   {
@@ -217,9 +299,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "First-call response every time · cleaner routing",
     faqs: [
-      { q: "I need to speak to someone about my account.", a: "I take your name, callback number and what it's about, and route it to the right person so it doesn't bounce around or queue behind another call." },
-      { q: "Can you tell me my balance or account details?", a: "I don't read account details aloud - I confirm who you are, take a message and route it to the right person to call you back securely." },
-      { q: "Who handles new enquiries?", a: "I capture enough detail to route your enquiry correctly the first time, and confirm the right person will follow up." },
+      {
+        q: "I need to speak to someone about my account.",
+        a: "I take your name, callback number and what it's about, and route it to the right person so it doesn't bounce around or queue behind another call.",
+      },
+      {
+        q: "Can you tell me my balance or account details?",
+        a: "I don't read account details aloud - I confirm who you are, take a message and route it to the right person to call you back securely.",
+      },
+      {
+        q: "Who handles new enquiries?",
+        a: "I capture enough detail to route your enquiry correctly the first time, and confirm the right person will follow up.",
+      },
     ],
   },
   {
@@ -238,9 +329,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "No enquiry missed at intake · less time on repeat questions",
     faqs: [
-      { q: "How do I enrol, and what are the next steps?", a: "I capture the student and your contact details and the programme of interest, and confirm admissions will follow up - however many enquiries arrive at once." },
-      { q: "Can I reach a teacher or the office?", a: "During teaching hours I take a clear message with your name and number and pass it on, rather than sending you to voicemail." },
-      { q: "What are your term dates and hours?", a: "Routine admissions questions like these I answer straight from the school's information, saving staff answering them dozens of times a week." },
+      {
+        q: "How do I enrol, and what are the next steps?",
+        a: "I capture the student and your contact details and the programme of interest, and confirm admissions will follow up - however many enquiries arrive at once.",
+      },
+      {
+        q: "Can I reach a teacher or the office?",
+        a: "During teaching hours I take a clear message with your name and number and pass it on, rather than sending you to voicemail.",
+      },
+      {
+        q: "What are your term dates and hours?",
+        a: "Routine admissions questions like these I answer straight from the school's information, saving staff answering them dozens of times a week.",
+      },
     ],
   },
   {
@@ -259,9 +359,18 @@ const NARRATIVES: IndustryNarrative[] = [
     ],
     projection: "Phones covered through peak · fewer mistyped orders",
     faqs: [
-      { q: "Is this item in stock?", a: "I take the product and your contact details and confirm the team will check and come back - without pulling staff off the customer in front of them." },
-      { q: "Where's my order?", a: "I capture your order reference accurately the first time and confirm someone will follow up with the status." },
-      { q: "Can I return or exchange something?", a: "I take the order details and reason and confirm it's being passed to the team - I don't promise a refund or outcome on the call." },
+      {
+        q: "Is this item in stock?",
+        a: "I take the product and your contact details and confirm the team will check and come back - without pulling staff off the customer in front of them.",
+      },
+      {
+        q: "Where's my order?",
+        a: "I capture your order reference accurately the first time and confirm someone will follow up with the status.",
+      },
+      {
+        q: "Can I return or exchange something?",
+        a: "I take the order details and reason and confirm it's being passed to the team - I don't promise a refund or outcome on the call.",
+      },
     ],
   },
 ];
@@ -282,9 +391,18 @@ const GENERIC: IndustryNarrative = {
   ],
   projection: "Every call answered · nothing lost to voicemail",
   faqs: [
-    { q: "What do you offer, and how much is it?", a: "I answer from the business's own information where I have it, and where I don't, I take your details and confirm someone follows up rather than guessing." },
-    { q: "Can I speak to a specific person?", a: "I take your name, number and the reason for the call and confirm the message gets passed on." },
-    { q: "I've got a problem with my order or account.", a: "I acknowledge it, capture what happened and any reference, and confirm it's being escalated - I don't promise a resolution I can't guarantee." },
+    {
+      q: "What do you offer, and how much is it?",
+      a: "I answer from the business's own information where I have it, and where I don't, I take your details and confirm someone follows up rather than guessing.",
+    },
+    {
+      q: "Can I speak to a specific person?",
+      a: "I take your name, number and the reason for the call and confirm the message gets passed on.",
+    },
+    {
+      q: "I've got a problem with my order or account.",
+      a: "I acknowledge it, capture what happened and any reference, and confirm it's being escalated - I don't promise a resolution I can't guarantee.",
+    },
   ],
 };
 

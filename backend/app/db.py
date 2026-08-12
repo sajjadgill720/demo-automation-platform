@@ -3,11 +3,11 @@ from app.config import DATABASE_URL
 
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
-    engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
+    engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 else:
     engine = create_engine(
         DATABASE_URL,
-        echo=True,
+        echo=False,
         pool_size=5,
         max_overflow=10,
         pool_pre_ping=True,
@@ -42,6 +42,12 @@ def init_db():
                     conn.execute(text("ALTER TABLE leads ADD COLUMN voice_gender VARCHAR"))
                 else:
                     conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS voice_gender VARCHAR"))
+            prof_columns = [c["name"] for c in inspector.get_columns("company_profile")]
+            if "business_brief" not in prof_columns:
+                if DATABASE_URL.startswith("sqlite"):
+                    conn.execute(text("ALTER TABLE company_profile ADD COLUMN business_brief VARCHAR"))
+                else:
+                    conn.execute(text("ALTER TABLE company_profile ADD COLUMN IF NOT EXISTS business_brief VARCHAR"))
             doc_columns = [c["name"] for c in inspector.get_columns("documents")]
             if "file_name" not in doc_columns:
                 if DATABASE_URL.startswith("sqlite"):

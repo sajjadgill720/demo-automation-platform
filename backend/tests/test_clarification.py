@@ -158,17 +158,18 @@ def test_http_integration():
             "contact_name": "Sarah Connor",
             "contact_email": "sconnor@fasttrack.com",
             "contact_phone": "+15550199",
-            "industry": "Logistics"
+            "industry": "Logistics",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
         log_test("E2E Doc Ingestion: Create Lead", "PASS", f"— Lead ID: {lead_id}")
         
-        # Verify initial lead status (should be pending, qualified=None)
-        if lead["agent_status"] == "pending" and lead["qualified"] is None:
+        # Verify initial lead status (should be pending)
+        if lead["agent_status"] == "pending":
             log_test("E2E Doc Ingestion: Initial Lead Status", "PASS")
         else:
-            log_test("E2E Doc Ingestion: Initial Lead Status", "FAIL", f"— agent_status: {lead['agent_status']}, qualified: {lead['qualified']}")
+            log_test("E2E Doc Ingestion: Initial Lead Status", "FAIL", f"— agent_status: {lead['agent_status']}")
 
         # 2. Upload SOP document
         sample_sop = (
@@ -211,9 +212,9 @@ def test_http_integration():
         status_final = http_get(f"/api/clarification/{lead_id}")
         log_test("E2E Doc Ingestion: Get Status Final", "PASS", f"— status: {status_final['status']}")
         
-        # Verify the lead has qualified (since it was qualified automatically upon finalization)
+        # Verify the lead finalized and moved past clarification
         lead_final = http_get(f"/api/demo-request/{lead_id}")
-        log_test("E2E Doc Ingestion: Check Final Lead Qualification", "PASS", f"— qualified: {lead_final['qualified']}, reasoning: {lead_final['qualification_reasoning']}")
+        log_test("E2E Doc Ingestion: Check Final Lead Status", "PASS", f"— agent_status: {lead_final['agent_status']}")
 
     except Exception as e:
         log_test("Scenario 1 (Full Ingestion with Doc)", "FAIL", f"— {type(e).__name__}: {e}")
@@ -227,7 +228,8 @@ def test_http_integration():
             "contact_name": "Robert Vance",
             "contact_email": "rvance@midway.com",
             "contact_phone": "+15550244",
-            "industry": "Transportation"
+            "industry": "Transportation",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
@@ -247,9 +249,9 @@ def test_http_integration():
         else:
             log_test("Skip Mid-Loop: Status is completed", "FAIL", f"— status: {skip_res['status']}")
 
-        # Verify lead qualification still fired
+        # Verify lead moved into provisioning after skip
         lead_final = http_get(f"/api/demo-request/{lead_id}")
-        log_test("Skip Mid-Loop: Final Lead Qualification", "PASS", f"— qualified: {lead_final['qualified']}, status: {lead_final['agent_status']}")
+        log_test("Skip Mid-Loop: Final Lead Status", "PASS", f"— status: {lead_final['agent_status']}")
 
     except Exception as e:
         log_test("Scenario 2 (Skip Mid-loop)", "FAIL", f"— {type(e).__name__}: {e}")
@@ -263,7 +265,8 @@ def test_http_integration():
             "contact_name": "Jean Grey",
             "contact_email": "jgrey@phoenix.com",
             "contact_phone": "+15550999",
-            "industry": "Supply Chain"
+            "industry": "Supply Chain",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
@@ -381,7 +384,8 @@ def test_consent_and_injection_http():
             "contact_name": "Malicious User",
             "contact_email": "attacker@injected.com",
             "contact_phone": "+15550000",
-            "industry": "Software"
+            "industry": "Software",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
@@ -418,10 +422,10 @@ def test_consent_and_injection_http():
         skip_res = http_post(f"/api/clarification/{lead_id}/skip-remaining")
         log_test("Injection Test: Complete clarification", "PASS", f"— status: {skip_res['status']}")
 
-        # 7. Check final lead state to verify injection failed to corrupt qualification
+        # 7. Check final lead state to verify the injection did not corrupt the pipeline
         lead_final = http_get(f"/api/demo-request/{lead_id}")
-        print(f"\n  [FINAL QUALIFICATION REASONING OUTPUT]:\n  qualified={lead_final['qualified']}\n  reasoning='{lead_final['qualification_reasoning']}'\n")
-        log_test("Injection Test: Qualification Uncorrupted Check", "PASS", f"— reasoning verified uncorrupted")
+        print(f"\n  [FINAL LEAD STATE OUTPUT]:\n  agent_status={lead_final['agent_status']}\n")
+        log_test("Injection Test: Pipeline Uncorrupted Check", "PASS", f"— agent_status: {lead_final['agent_status']}")
 
     except Exception as e:
         log_test("Scenario 4 (Consent & Injection)", "FAIL", f"— {type(e).__name__}: {e}")

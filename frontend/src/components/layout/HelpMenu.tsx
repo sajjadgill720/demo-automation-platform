@@ -23,8 +23,11 @@ export function HelpMenu() {
     icon: React.ComponentType<{ className?: string }>;
     text: string;
   }[] = [
-    { icon: MousePointerClick, text: "Click any lead row to see its full details, profile and feedback." },
-    { icon: Mic, text: "Agent Tester lists provisioned agents — test the voice or delete one." },
+    {
+      icon: MousePointerClick,
+      text: "Click any lead row to see its full details, profile and feedback.",
+    },
+    { icon: Mic, text: "Voice Agents lists provisioned agents — test the voice or delete one." },
     { icon: MessageSquare, text: "Feedback shows what clients said about their demo." },
   ];
 
@@ -47,8 +50,8 @@ export function HelpMenu() {
 
         <div className="px-3 py-3">
           <p className="text-sm leading-relaxed text-foreground/85">
-            A lead fills the form → we qualify it → an AI voice agent is provisioned → the client
-            tries it on their demo page and leaves feedback.
+            A lead fills the form → an AI voice agent is provisioned → the client tries it on their
+            demo page and leaves feedback.
           </p>
         </div>
 

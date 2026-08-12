@@ -4,11 +4,9 @@ import {
   Sparkles,
   RefreshCw,
   Users,
-  BadgeCheck,
   Radio,
   Clock,
   AlertTriangle,
-  MinusCircle,
   type LucideIcon,
 } from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
@@ -65,8 +63,6 @@ function Dashboard() {
       pending: by("pending"),
       live: by("active") + by("completed"),
       failed: by("failed"),
-      skipped: by("skipped"),
-      qualified: leads.filter((l) => l.qualified === true).length,
     };
   }, [leads]);
 
@@ -79,34 +75,43 @@ function Dashboard() {
         actions={
           <Link
             to="/build-demo"
-            title="Create a new AI demo (⌘ N)"
-            className="console-cta inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 btn-themed-shadow transition-all duration-200 hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
+            title="Create a new AI demo"
+            className="console-cta inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-400 btn-themed-shadow transition-all duration-200 hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
           >
             <Sparkles className="h-3.5 w-3.5" />
             New demo
-            <span className="kbd-chip ml-1 hidden sm:inline-flex">⌘N</span>
           </Link>
         }
       />
-      <div className="space-y-6 p-6">
+      <div className="console-page-glow flex-1 space-y-6 p-6">
         {error && (
           <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Leads" value={stats.total} loading={loading} icon={Users} tone="primary" />
-          <Stat label="Qualified" value={stats.qualified} loading={loading} icon={BadgeCheck} tone="success" />
           <Stat label="Live" value={stats.live} loading={loading} icon={Radio} tone="accent" />
-          <Stat label="Pending" value={stats.pending} loading={loading} icon={Clock} tone="warning" />
-          <Stat label="Failed" value={stats.failed} loading={loading} icon={AlertTriangle} tone="danger" />
-          <Stat label="Skipped" value={stats.skipped} loading={loading} icon={MinusCircle} tone="muted" />
+          <Stat
+            label="Pending"
+            value={stats.pending}
+            loading={loading}
+            icon={Clock}
+            tone="warning"
+          />
+          <Stat
+            label="Failed"
+            value={stats.failed}
+            loading={loading}
+            icon={AlertTriangle}
+            tone="danger"
+          />
         </div>
 
-        <div className="console-card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="console-card-glass overflow-hidden">
+          <div className="console-card-header-futuristic flex items-center justify-between border-b border-border/70 px-5 py-4 bg-muted/10">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground pl-2">
               Recent leads
             </h2>
             <div className="flex items-center gap-3">
@@ -127,7 +132,7 @@ function Dashboard() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm console-table-futuristic">
               <thead>
                 <tr className="border-b border-border/70 bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-2.5 font-semibold">Company</th>
@@ -177,11 +182,7 @@ function Dashboard() {
           </div>
         </div>
       </div>
-      <LeadDetailDrawer
-        lead={selected}
-        onClose={() => setSelected(null)}
-        onAgentDeleted={load}
-      />
+      <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} onAgentDeleted={load} />
     </>
   );
 }
@@ -193,7 +194,10 @@ const STAT_TONES: Record<StatTone, { icon: string; value: string }> = {
   success: { icon: "bg-success/10 text-success ring-success/20", value: "text-foreground" },
   accent: { icon: "bg-accent/15 text-accent ring-accent/25", value: "text-foreground" },
   warning: { icon: "bg-warning/15 text-warning ring-warning/25", value: "text-foreground" },
-  danger: { icon: "bg-destructive/10 text-destructive ring-destructive/20", value: "text-foreground" },
+  danger: {
+    icon: "bg-destructive/10 text-destructive ring-destructive/20",
+    value: "text-foreground",
+  },
   muted: { icon: "bg-muted text-muted-foreground ring-border", value: "text-foreground" },
 };
 
@@ -212,12 +216,17 @@ function Stat({
 }) {
   const t = STAT_TONES[tone];
   return (
-    <div className="console-card console-card-interactive stat-hover-shimmer p-4">
+    <div className="console-card-glass console-card-interactive stat-hover-shimmer p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </span>
-        <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-inset", t.icon)}>
+        <span
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-inset console-stat-glow-ring",
+            t.icon,
+          )}
+        >
           <Icon className="h-3.5 w-3.5" />
         </span>
       </div>

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import json
 import uuid
 import logging
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pypdf import PdfReader
 
 # SlowAPI imports
@@ -27,7 +28,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 from app.db import init_db, get_session
-from app.config import CORS_ORIGINS
+from app.config import CORS_ORIGINS, TURNSTILE_SECRET_KEY
 from app.models import (
     DiscoveryResponse,
     VoiceAgent,
@@ -47,9 +48,9 @@ from app.agents import (
     provision_vapi_assistant_task,
     delete_vapi_assistant
 )
-from app.qualifier import QualifyRequest, QualificationResult, qualify_lead_internal
 from app.clarification import (
     start_clarification,
+    ensure_clarification_pending,
     submit_clarification_answer,
     skip_remaining_questions,
     get_clarification_status,
@@ -59,11 +60,65 @@ from app.clarification import (
 )
 
 
+# ── Periodic cleanup: delete Vapi assistants older than 6 hours ──
+
+AGENT_TTL_HOURS = 6
+CLEANUP_INTERVAL_SECONDS = 15 * 60  # sweep every 15 minutes
+
+
+async def _cleanup_expired_agents():
+    """Runs in the background on a fixed interval. Deletes Vapi assistants
+    whose leads were created more than AGENT_TTL_HOURS ago and still have an
+    assistant_id, regardless of agent_status. This replaces the old event-based
+    deletion that happened on end-session."""
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+        try:
+            cutoff = datetime.utcnow() - timedelta(hours=AGENT_TTL_HOURS)
+            with Session(engine) as session:
+                statement = select(Lead).where(
+                    Lead.assistant_id.isnot(None),  # type: ignore[union-attr]
+                    Lead.created_at < cutoff,
+                )
+                expired_leads = session.exec(statement).all()
+
+                if not expired_leads:
+                    continue
+
+                logger.info(f"Agent cleanup: found {len(expired_leads)} expired agent(s) to delete")
+
+                for lead in expired_leads:
+                    try:
+                        delete_vapi_assistant(lead.assistant_id)
+                        logger.info(
+                            f"Agent cleanup: deleted Vapi assistant {lead.assistant_id}",
+                            extra={"extra_data": {"lead_id": str(lead.id)}},
+                        )
+                    except Exception:
+                        logger.error(
+                            f"Agent cleanup: failed to delete Vapi assistant {lead.assistant_id}",
+                            exc_info=True,
+                            extra={"extra_data": {"lead_id": str(lead.id)}},
+                        )
+
+                    lead.assistant_id = None
+                    lead.agent_status = AgentStatus.completed
+                    lead.updated_at = datetime.utcnow()
+                    session.add(lead)
+
+                session.commit()
+        except Exception:
+            logger.error("Agent cleanup: unhandled error in sweep", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables and compile schemas automatically on start
     init_db()
+    # Launch the periodic agent-expiry sweeper
+    cleanup_task = asyncio.create_task(_cleanup_expired_agents())
     yield
+    cleanup_task.cancel()
     close_checkpointer_pool()
 
 app = FastAPI(
@@ -104,6 +159,8 @@ class DemoRequestCreate(BaseModel):
     industry: str
     problem_text: Optional[str] = None
     voice_gender: Optional[str] = None
+    captcha_token: str
+
 
 class LeadResponse(BaseModel):
     id: uuid.UUID
@@ -117,9 +174,6 @@ class LeadResponse(BaseModel):
     agent_status: AgentStatus
     assistant_id: Optional[str] = None
     failure_reason: Optional[str] = None
-    qualified: Optional[bool] = None
-    qualification_confidence: Optional[float] = None
-    qualification_reasoning: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -464,13 +518,40 @@ def get_agents(session: Session = Depends(get_session)):
     return results
 
 
-@app.post("/api/qualify", response_model=QualificationResult)
-def qualify_lead(payload: QualifyRequest):
-    """Exposes the internal lead qualification LangGraph workflow.
+def verify_captcha(token: str) -> bool:
+    """Verifies Cloudflare Turnstile token using siteverify API."""
+    url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    import urllib.parse
+    import urllib.request
+    import json
     
-    Exposed for backward compatibility and integration testing.
-    """
-    return qualify_lead_internal(payload.company_name, payload.industry)
+    try:
+        params = urllib.parse.urlencode({
+            "secret": TURNSTILE_SECRET_KEY,
+            "response": token
+        }).encode("utf-8")
+        
+        req = urllib.request.Request(
+            url,
+            data=params,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            success = data.get("success", False)
+            if not success:
+                logger.warning(
+                    "Cloudflare Turnstile verification failed",
+                    extra={"extra_data": {"errors": data.get("error-codes", [])}}
+                )
+            return success
+    except Exception as e:
+        logger.error(f"Failed to perform Turnstile CAPTCHA verification: {e}", exc_info=True)
+        # For local dev / testing, allow success on network/timeout issues if using test key
+        if TURNSTILE_SECRET_KEY == "1x0000000000000000000000000000000AA":
+            logger.info("Local Turnstile verification connection failed; allowing fallback success (using test keys)")
+            return True
+        return False
 
 
 @app.post("/api/demo-request", response_model=LeadResponse, status_code=201)
@@ -486,6 +567,11 @@ def create_demo_request(
         extra={"extra_data": {"company_name": payload.company_name, "contact_email": payload.contact_email}}
     )
     
+    # Enforce CAPTCHA check
+    if not verify_captcha(payload.captcha_token):
+        raise HTTPException(status_code=400, detail="CAPTCHA verification failed. Please try again.")
+
+    
     # Render and compile the template (includes sanitization)
     rendered_prompt = compile_lead_prompt(payload.company_name, payload.industry)
 
@@ -500,14 +586,20 @@ def create_demo_request(
         problem_statement=problem or None,
         voice_gender=(payload.voice_gender or "female").strip().lower(),
         rendered_prompt=rendered_prompt,
-        agent_status=AgentStatus.pending
+        agent_status=AgentStatus.pending,
     )
-    
+
     session.add(lead)
     session.commit()
     session.refresh(lead)
-    
-    logger.info("Saved lead to database", extra={"extra_data": {"lead_id": str(lead.id)}})
+
+    logger.info(
+        "Saved lead to database",
+        extra={"extra_data": {
+            "lead_id": str(lead.id),
+            "agent_status": lead.agent_status.value,
+        }},
+    )
     return lead
 
 
@@ -558,35 +650,24 @@ def delete_lead_agent(lead_id: uuid.UUID, session: Session = Depends(get_session
 
 @app.post("/api/demo-request/{lead_id}/end-session")
 def end_demo_session(lead_id: uuid.UUID, session: Session = Depends(get_session)):
-    """Deletes the Vapi assistant for the lead and marks status as completed."""
+    """Marks the demo session as completed without deleting the Vapi assistant.
+
+    The assistant stays alive so the user can call back during the demo window.
+    A background cleanup task (_cleanup_expired_agents) automatically deletes
+    assistants that are older than AGENT_TTL_HOURS (6 hours).
+    """
     logger.info("Received request to end demo session", extra={"extra_data": {"lead_id": str(lead_id)}})
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")
-        
-    if lead.assistant_id:
-        try:
-            delete_vapi_assistant(lead.assistant_id)
-        except Exception as e:
-            # Wrap in try/except so persistent failures/network glitches do not crash the request
-            # We log the error but proceed with database status update to avoid orphaned state in DB
-            logger.error(
-                f"Failed to delete Vapi assistant {lead.assistant_id} during end-session",
-                exc_info=True,
-                extra={"extra_data": {"lead_id": str(lead_id)}}
-            )
-            
+
     lead.agent_status = AgentStatus.completed
     lead.updated_at = datetime.utcnow()
     session.add(lead)
     session.commit()
     session.refresh(lead)
-    
-    # TODO: scheduled cleanup job to delete Vapi assistants older than
-    # N hours with agent_status still "active" and no end-session call.
-    # This is a known gap to prevent orphaned assistants.
-    
-    logger.info("Demo session ended successfully", extra={"extra_data": {"lead_id": str(lead_id)}})
+
+    logger.info("Demo session ended successfully (agent retained for TTL cleanup)", extra={"extra_data": {"lead_id": str(lead_id)}})
     return {"message": "Demo session ended successfully", "agent_status": lead.agent_status}
 
 
@@ -709,15 +790,34 @@ def start_lead_clarification(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
-    """Invokes the LangGraph clarification workflow for the lead."""
+    """Kicks off the LangGraph clarification workflow for the lead.
+
+    The heavy first pass (document parsing + profile extraction + summarization +
+    first-question generation) runs in a background task rather than blocking this
+    request, which previously took ~20s on a lead with an uploaded document. We
+    return immediately with an `in_progress` status; the client polls
+    GET /api/clarification/{lead_id} until the first question appears.
+    """
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")
     try:
-        status = start_clarification(str(lead_id))
-        if status.status == "completed":
+        # If a previous run already produced a question or finished, don't restart —
+        # just return where things stand (handles refresh / re-entry).
+        current = get_clarification_status(str(lead_id))
+        if current.status == "completed":
             background_tasks.add_task(provision_vapi_assistant_task, str(lead_id))
-        return status
+            return current
+        if current.current_question:
+            return current
+
+        # Ensure the profile row exists so polling immediately reports in_progress,
+        # then run the pipeline in the background. Return a lightweight in_progress
+        # status directly rather than a second get_state round-trip — the client
+        # polls GET /api/clarification/{lead_id} for the first question anyway.
+        ensure_clarification_pending(str(lead_id))
+        background_tasks.add_task(start_clarification, str(lead_id))
+        return ClarificationStatus(lead_id=str(lead_id), status="in_progress")
     except Exception as e:
         logger.error(f"[{lead_id}] Error starting clarification: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -752,7 +852,7 @@ def skip_lead_clarification(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
-    """Skips the remaining questions to immediately qualify/disqualify the lead with existing profile."""
+    """Skips the remaining questions to finalize the lead's profile and begin provisioning."""
     lead = session.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead request not found")

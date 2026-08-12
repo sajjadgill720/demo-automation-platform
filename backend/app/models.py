@@ -54,7 +54,7 @@ class VoiceAgent(SQLModel, table=True):
     company_name: str
     discovery_id: int
     system_prompt: str
-    llm_model: str = "gpt-4o"
+    llm_model: str = "gpt-4.1"
     voice_provider: str = "playht"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -136,6 +136,7 @@ class CompanyProfileDB(SQLModel, table=True):
     profile: Optional[str] = Field(default=None, nullable=True)  # JSON string
     status: ProfileStatus = Field(default=ProfileStatus.not_started)
     missing_fields: Optional[str] = Field(default=None, nullable=True)  # JSON string
+    business_brief: Optional[str] = Field(default=None, nullable=True)  # Persistent business brief
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
