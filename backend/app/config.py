@@ -32,3 +32,7 @@ CORS_ORIGINS = os.getenv(
     "http://localhost:3000,http://localhost:5173,http://localhost:5174"
 ).split(",")
 
+# Cloudflare Turnstile CAPTCHA Keys
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA")
+
+

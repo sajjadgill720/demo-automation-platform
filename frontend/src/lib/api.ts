@@ -39,6 +39,7 @@ export interface DemoRequestPayload {
   industry: string;
   problem_text?: string;
   voice_gender?: "male" | "female";
+  captcha_token: string;
 }
 
 export interface LeadResponse {

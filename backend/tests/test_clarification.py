@@ -158,7 +158,8 @@ def test_http_integration():
             "contact_name": "Sarah Connor",
             "contact_email": "sconnor@fasttrack.com",
             "contact_phone": "+15550199",
-            "industry": "Logistics"
+            "industry": "Logistics",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
@@ -227,7 +228,8 @@ def test_http_integration():
             "contact_name": "Robert Vance",
             "contact_email": "rvance@midway.com",
             "contact_phone": "+15550244",
-            "industry": "Transportation"
+            "industry": "Transportation",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
@@ -263,7 +265,8 @@ def test_http_integration():
             "contact_name": "Jean Grey",
             "contact_email": "jgrey@phoenix.com",
             "contact_phone": "+15550999",
-            "industry": "Supply Chain"
+            "industry": "Supply Chain",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]
@@ -381,7 +384,8 @@ def test_consent_and_injection_http():
             "contact_name": "Malicious User",
             "contact_email": "attacker@injected.com",
             "contact_phone": "+15550000",
-            "industry": "Software"
+            "industry": "Software",
+            "captcha_token": "mock-token"
         }
         lead = http_post("/api/demo-request", lead_payload)
         lead_id = lead["id"]

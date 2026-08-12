@@ -58,6 +58,17 @@ graph TB
 | **Fireworks AI** | Primary LLM inference (structured JSON extraction, question generation, prompt generation) | `FIREWORKS_API_KEY`, OpenAI-compatible API |
 | **Groq** | Fallback LLM inference (automatic failover from Fireworks) | `GROQ_API_KEY` |
 | **Vapi** | Voice agent provisioning, Knowledge Base file uploads, call recording/transcript retrieval | `VAPI_API_KEY` (server), `VITE_VAPI_PUBLIC_KEY` (client) |
+| **Slack Webhook** | Optional incoming webhook to send detailed lead capture notifications to your internal team | `SLACK_WEBHOOK_URL` (frontend server env var) |
+
+### Rate Limiting & Operations
+
+To protect downstream systems and API budgets from abuse, the application includes built-in rate-limiting and alert components:
+
+- **SlowAPI Rate Limiting**: The backend API enforces client IP rate limits using `SlowAPI` on key routes:
+  - `POST /api/clarification/{lead_id}/documents` is limited to **5 requests per minute** per IP.
+  - `POST /api/clarification/{lead_id}/respond` is limited to **20 requests per minute** per IP.
+- **Slack Alert Integration**: Form submissions on the onboarding wizard invoke a frontend server function (`submitLead`) which packages lead profile information and posts it directly to your Slack channel via `SLACK_WEBHOOK_URL`. If the webhook is missing, details are printed to the console output as a fallback.
+
 
 ---
 

@@ -28,7 +28,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 from app.db import init_db, get_session
-from app.config import CORS_ORIGINS
+from app.config import CORS_ORIGINS, TURNSTILE_SECRET_KEY
 from app.models import (
     DiscoveryResponse,
     VoiceAgent,
@@ -159,6 +159,8 @@ class DemoRequestCreate(BaseModel):
     industry: str
     problem_text: Optional[str] = None
     voice_gender: Optional[str] = None
+    captcha_token: str
+
 
 class LeadResponse(BaseModel):
     id: uuid.UUID
@@ -516,6 +518,42 @@ def get_agents(session: Session = Depends(get_session)):
     return results
 
 
+def verify_captcha(token: str) -> bool:
+    """Verifies Cloudflare Turnstile token using siteverify API."""
+    url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    import urllib.parse
+    import urllib.request
+    import json
+    
+    try:
+        params = urllib.parse.urlencode({
+            "secret": TURNSTILE_SECRET_KEY,
+            "response": token
+        }).encode("utf-8")
+        
+        req = urllib.request.Request(
+            url,
+            data=params,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            success = data.get("success", False)
+            if not success:
+                logger.warning(
+                    "Cloudflare Turnstile verification failed",
+                    extra={"extra_data": {"errors": data.get("error-codes", [])}}
+                )
+            return success
+    except Exception as e:
+        logger.error(f"Failed to perform Turnstile CAPTCHA verification: {e}", exc_info=True)
+        # For local dev / testing, allow success on network/timeout issues if using test key
+        if TURNSTILE_SECRET_KEY == "1x0000000000000000000000000000000AA":
+            logger.info("Local Turnstile verification connection failed; allowing fallback success (using test keys)")
+            return True
+        return False
+
+
 @app.post("/api/demo-request", response_model=LeadResponse, status_code=201)
 def create_demo_request(
     payload: DemoRequestCreate,
@@ -528,6 +566,11 @@ def create_demo_request(
         "Received demo request",
         extra={"extra_data": {"company_name": payload.company_name, "contact_email": payload.contact_email}}
     )
+    
+    # Enforce CAPTCHA check
+    if not verify_captcha(payload.captcha_token):
+        raise HTTPException(status_code=400, detail="CAPTCHA verification failed. Please try again.")
+
     
     # Render and compile the template (includes sanitization)
     rendered_prompt = compile_lead_prompt(payload.company_name, payload.industry)

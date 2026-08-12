@@ -434,9 +434,90 @@ export const Route = createFileRoute("/_wizard/build-demo")({
   component: BuildDemoPage,
 });
 
+const TURNSTILE_SITEKEY = (import.meta.env.VITE_TURNSTILE_SITEKEY as string) || "1x00000000000000000000AA";
+
+interface TurnstileProps {
+  sitekey: string;
+  onVerify: (token: string) => void;
+}
+
+function Turnstile({ sitekey, onVerify }: TurnstileProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const scriptId = "cloudflare-turnstile-script";
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+
+    const initializeTurnstile = () => {
+      if (!active || !containerRef.current || !(window as any).turnstile) return;
+      try {
+        if (widgetIdRef.current) {
+          (window as any).turnstile.remove(widgetIdRef.current);
+          widgetIdRef.current = null;
+        }
+        const id = (window as any).turnstile.render(containerRef.current, {
+          sitekey,
+          callback: (token: string) => {
+            if (active) onVerify(token);
+          },
+          "expired-callback": () => {
+            if (active) onVerify("");
+          },
+          "error-callback": () => {
+            if (active) onVerify("");
+          },
+        });
+        widgetIdRef.current = id;
+      } catch (err) {
+        console.error("Turnstile render error:", err);
+      }
+    };
+
+    if (!script) {
+      script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback";
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+      (window as any).onloadTurnstileCallback = () => {
+        initializeTurnstile();
+      };
+    } else if ((window as any).turnstile) {
+      initializeTurnstile();
+    } else {
+      const interval = setInterval(() => {
+        if ((window as any).turnstile) {
+          clearInterval(interval);
+          initializeTurnstile();
+        }
+      }, 100);
+      return () => {
+        clearInterval(interval);
+        active = false;
+      };
+    }
+
+    return () => {
+      active = false;
+      if (widgetIdRef.current && (window as any).turnstile) {
+        try {
+          (window as any).turnstile.remove(widgetIdRef.current);
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+  }, [sitekey, onVerify]);
+
+  return <div ref={containerRef} className="cf-turnstile min-h-[65px] flex justify-center py-2" />;
+}
+
 type FormErrors = Partial<
   Record<
-    "name" | "email" | "company" | "phone" | "industry" | "customIndustry" | "problem_text",
+    "name" | "email" | "company" | "phone" | "industry" | "customIndustry" | "problem_text" | "captcha",
     string
   >
 >;
@@ -450,6 +531,7 @@ function BuildDemoPage() {
   const [phoneCountry, setPhoneCountry] = useState(DEFAULT_COUNTRY);
   const [phoneDigits, setPhoneDigits] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
+  const [captchaToken, setCaptchaToken] = useState("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const formRef = useRef<HTMLFormElement>(null);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
@@ -508,6 +590,7 @@ function BuildDemoPage() {
     if (!formData.problem_text.trim()) next.problem_text = "Tell us what you'd like to solve.";
     else if (formData.problem_text.trim().length < 10)
       next.problem_text = "A little more detail helps us tailor the agent.";
+    if (!captchaToken) next.captcha = "Please complete the CAPTCHA challenge.";
     return next;
   };
 
@@ -537,6 +620,7 @@ function BuildDemoPage() {
       industry: true,
       customIndustry: true,
       problem_text: true,
+      captcha: true,
     });
 
     if (Object.keys(found).length > 0) {
@@ -578,6 +662,7 @@ function BuildDemoPage() {
         industry: targetIndustry,
         problem_text: formData.problem_text || undefined,
         voice_gender: formData.voiceGender,
+        captcha_token: captchaToken,
       });
 
       // Save details to localStorage
@@ -1065,6 +1150,20 @@ function BuildDemoPage() {
                   })}
                 </div>
               </motion.section>
+
+              {/* CAPTCHA Widget */}
+              <div className="pt-2">
+                <Turnstile
+                  sitekey={TURNSTILE_SITEKEY}
+                  onVerify={setCaptchaToken}
+                />
+                {errors.captcha && (
+                  <p className="mt-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-destructive">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    {errors.captcha}
+                  </p>
+                )}
+              </div>
 
               {/* Submit */}
               <div className="pt-1">
