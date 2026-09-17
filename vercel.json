@@ -1,0 +1,4 @@
+{
+  "installCommand": "cd frontend && npm install --include=dev",
+  "buildCommand": "cd frontend && npm run build && cd .. && mkdir -p .vercel && rm -rf .vercel/output && cp -r frontend/.vercel/output .vercel/output"
+}

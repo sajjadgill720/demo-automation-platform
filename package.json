@@ -1,0 +1,7 @@
+{
+  "name": "demo-automation-platform",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install --include=dev && npm run build"
+  }
+}
