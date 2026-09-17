@@ -12,6 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  nitro: {
+    // Target Vercel output format for deployment on Vercel
+    preset: process.env.NITRO_PRESET || "vercel",
+  },
   // Overrides the package's 8080 default. Has no effect inside Lovable's
   // sandbox (LOVABLE_SANDBOX=1 / DEV_SERVER__PROJECT_PATH set), which force
   // port 8080 regardless of this setting.

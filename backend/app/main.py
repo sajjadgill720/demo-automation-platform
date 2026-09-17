@@ -28,7 +28,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 from app.db import init_db, get_session
-from app.config import CORS_ORIGINS, TURNSTILE_SECRET_KEY
+from app.config import CORS_ORIGINS, TURNSTILE_SECRET_KEY, CORS_ORIGIN_REGEX
 from app.models import (
     DiscoveryResponse,
     VoiceAgent,
@@ -132,6 +132,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

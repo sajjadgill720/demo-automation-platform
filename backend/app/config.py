@@ -27,10 +27,15 @@ PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
 
 # Allowed origins for CORS (e.g. your frontend location)
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS", 
-    "http://localhost:3000,http://localhost:5173,http://localhost:5174"
-).split(",")
+CORS_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        "CORS_ORIGINS", 
+        "http://localhost:3000,http://localhost:5173,http://localhost:5174"
+    ).split(",") if origin.strip()
+]
+
+# Regex pattern for CORS (allows all Vercel production and preview subdomains by default)
+CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"^https://.*\.vercel\.app$")
 
 # Cloudflare Turnstile CAPTCHA Keys
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA")
