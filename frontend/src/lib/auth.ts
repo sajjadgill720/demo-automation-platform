@@ -1,11 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+async function getSessionSignature(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`dq-portal-auth-salt:${password}`);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export const checkAuth = createServerFn({ method: "GET" }).handler(async () => {
   const { getCookie } = await import("@tanstack/react-start/server");
   const session = getCookie("dq_session");
   const expectedPassword = process.env.PORTAL_PASSWORD || "admin123";
-  const authenticated = session === expectedPassword;
+  const expectedSignature = await getSessionSignature(expectedPassword);
+  const authenticated = session === expectedSignature;
   return { authenticated };
 });
 
@@ -15,7 +25,8 @@ export const loginPortal = createServerFn({ method: "POST" })
     const { setCookie } = await import("@tanstack/react-start/server");
     const expectedPassword = process.env.PORTAL_PASSWORD || "admin123";
     if (password === expectedPassword) {
-      setCookie("dq_session", expectedPassword, {
+      const signature = await getSessionSignature(expectedPassword);
+      setCookie("dq_session", signature, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         path: "/",

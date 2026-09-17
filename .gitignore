@@ -32,8 +32,14 @@ dist-ssr
 *.sln
 *.sw?
 
-#sensistive data
+# sensitive data
 .env
+.env.*
+*.env
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
 .claude
 .gemini
 
