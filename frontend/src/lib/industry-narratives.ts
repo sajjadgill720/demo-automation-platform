@@ -23,7 +23,7 @@ export interface IndustryNarrative {
   specificity: number;
   /** What their day looks like today. */
   before: string[];
-  /** What it looks like with Convoa answering. */
+  /** What it looks like with Audia answering. */
   after: string[];
   projection: string;
   /** Questions a real caller to this business asks, with how the demo agent

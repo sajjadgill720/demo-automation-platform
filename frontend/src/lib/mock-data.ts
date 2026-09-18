@@ -1,6 +1,6 @@
 export type DemoStatus = "lead" | "research" | "prompt" | "agent" | "ready" | "sent" | "completed";
 
-export type Product = "Convoa" | "Chatquartz" | "QuartzGPT" | "DataWorks";
+export type Product = "Audia" | "Chatquartz" | "QuartzGPT" | "DataWorks";
 
 export interface Company {
   id: string;
@@ -46,7 +46,7 @@ export const companies: Company[] = [
       "No real-time visibility for enterprise shippers",
       "High driver churn from paper workflows",
     ],
-    recommendedProduct: "Convoa",
+    recommendedProduct: "Audia",
     confidence: 0.92,
     logoColor: "oklch(0.72 0.15 40)",
     logoInitials: "AL",
@@ -136,7 +136,7 @@ export const products: {
   bestFor: string;
 }[] = [
   {
-    id: "Convoa",
+    id: "Audia",
     tagline: "Voice AI for operations",
     description:
       "Inbound + outbound voice agents for dispatch, logistics and field ops. Handles 40+ languages.",
@@ -187,7 +187,7 @@ export const demoJobs: DemoJob[] = [
   {
     id: "DMO-2040",
     company: companies[0],
-    product: "Convoa",
+    product: "Audia",
     status: "sent",
     researchStatus: "complete",
     agentStatus: "live",

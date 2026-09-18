@@ -267,7 +267,7 @@ function PhoneMockup() {
                       Live Call
                     </span>
                   </div>
-                  <p className="text-foreground font-medium text-sm">Convoa AI Receptionist</p>
+                  <p className="text-foreground font-medium text-sm">Audia AI Receptionist</p>
                   <p className="text-foreground/40 text-[11px] font-mono">
                     00:{String(Math.min(currentLine * 8, 59)).padStart(2, "0")}
                   </p>
@@ -655,11 +655,11 @@ function ScrollProgressBar() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Convoa — AI Receptionist That Never Misses a Call" },
+      { title: "Audia — AI Receptionist That Never Misses a Call" },
       {
         name: "description",
         content:
-          "Convoa is an AI-powered receptionist that answers every call, books appointments, and qualifies leads 24/7. Get a personalized demo in minutes.",
+          "Audia is an AI-powered receptionist that answers every call, books appointments, and qualifies leads 24/7. Get a personalized demo in minutes.",
       },
     ],
   }),
@@ -747,7 +747,7 @@ function LandingPage() {
               <Headphones className="h-4 w-4" />
             </div>
             <span className="uppercase tracking-widest text-sm font-semibold font-mono">
-              Convoa
+              Audia
             </span>
           </Link>
 
@@ -885,7 +885,7 @@ function LandingPage() {
                 </div>
                 <p className="text-[11px] text-foreground/45 font-mono mt-0.5">
                   <span className="text-foreground/70 font-semibold">2,400+</span> businesses trust
-                  Convoa
+                  Audia
                 </p>
               </div>
             </motion.div>
@@ -924,7 +924,7 @@ function LandingPage() {
               viewport={{ once: true }}
               className="text-[11px] font-mono text-primary font-bold uppercase tracking-widest"
             >
-              What Convoa Does
+              What Audia Does
             </motion.p>
             <motion.h2
               initial={{ opacity: 0, y: 16 }}
@@ -1223,7 +1223,7 @@ function LandingPage() {
                   <Headphones className="h-4 w-4" />
                 </div>
                 <span className="font-semibold tracking-widest uppercase text-foreground/80 text-sm">
-                  Convoa
+                  Audia
                 </span>
               </div>
               <p className="text-[11px] text-foreground/45 font-sans leading-relaxed max-w-xs">
@@ -1285,7 +1285,7 @@ function LandingPage() {
           {/* Bottom bar */}
           <div className="mt-14 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
             <span className="text-foreground/35 text-[11px]">
-              © 2026 Convoa. All rights reserved.
+              © 2026 Audia. All rights reserved.
             </span>
             <div className="flex items-center gap-4 text-foreground/40">
               <a

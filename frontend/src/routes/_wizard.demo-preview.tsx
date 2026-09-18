@@ -7,7 +7,6 @@ import {
   Sparkles,
   Check,
   Share2,
-  ArrowRight,
   ThumbsUp,
   ThumbsDown,
   CheckCircle,
@@ -16,7 +15,6 @@ import {
   X,
   ChevronDown,
   MessageSquare,
-  DollarSign,
   Clock,
   UserCheck,
   BarChart3,
@@ -52,7 +50,7 @@ export const Route = createFileRoute("/_wizard/demo-preview")({
   validateSearch: (search) => demoPreviewSearchSchema.parse(search),
   head: () => ({
     meta: [
-      { title: "Your Personalized Demo — Convoa" },
+      { title: "Your Personalized Demo — Audia" },
       { name: "description", content: "A tailored AI voice demo sandbox." },
     ],
   }),
@@ -107,7 +105,7 @@ function DemoPreview() {
     // 2. Check localStorage
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("convoa_demo_preview_data");
+        const stored = localStorage.getItem("audia_demo_preview_data");
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed.name || parsed.company) {
@@ -665,7 +663,7 @@ function DemoPreview() {
                         color: "transparent",
                       }}
                     >
-                      convoa
+                      audia
                     </span>
                     <div className="h-[60px] flex items-center justify-center w-full px-4 overflow-hidden">
                       <AnimatePresence mode="wait">
@@ -812,7 +810,7 @@ function DemoPreview() {
                 Inside the console
               </span>
               <h2 className="text-2xl font-normal tracking-tight">
-                Everything Convoa captures, in one view
+                Everything Audia captures, in one view
               </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
@@ -1028,7 +1026,7 @@ function DemoPreview() {
                 </div>
               </div>
 
-              {/* Booking card */}
+              {/* Share Demo card */}
               <div className="relative overflow-hidden rounded-3xl border border-primary/30 bg-primary/[0.03] p-6 md:p-8 flex flex-col">
                 <div
                   className="absolute inset-x-0 -top-24 mx-auto h-48 w-96 max-w-full rounded-full blur-3xl pointer-events-none"
@@ -1039,35 +1037,25 @@ function DemoPreview() {
                 <div className="relative z-10 flex flex-col flex-1">
                   <div className="flex items-center gap-2.5 mb-5">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary shrink-0">
-                      <DollarSign className="h-4 w-4" aria-hidden="true" />
+                      <Share2 className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div>
                       <h3 className="text-base font-medium tracking-tight leading-tight">
-                        Take it live
+                        Share Demo
                       </h3>
-                      <p className="text-xs text-muted-foreground font-sans">Pricing & Plans</p>
+                      <p className="text-xs text-muted-foreground font-sans">Send to your team</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed font-sans">
-                    Every day this isn't live is another day of calls going to voicemail. Choose a
-                    pricing plan that suits your call volume and start answering for{" "}
-                    {personalization.company}.
+                    Share this personalized interactive voice demo with your team or stakeholders to
+                    explore how it handles live calls for {personalization.company}.
                   </p>
-                  <div className="mt-auto pt-6 space-y-2.5">
-                    <a
-                      href="https://convoa.com/pricing/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all duration-200 hover:bg-primary/90 cursor-pointer border-0 text-center select-none btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
-                    >
-                      <DollarSign className="h-4 w-4" /> See Convoa Pricing
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </a>
+                  <div className="mt-auto pt-6">
                     <button
                       onClick={handleCopyShareLink}
-                      className="inline-flex w-full items-center justify-center gap-1.5 bg-transparent border-0 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer"
+                      className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all duration-200 hover:bg-primary/90 cursor-pointer border-0 text-center select-none btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
                     >
-                      <Share2 className="h-3.5 w-3.5" /> Share this demo
+                      <Share2 className="h-4 w-4" /> Share this demo
                     </button>
                   </div>
                 </div>
@@ -1106,11 +1094,11 @@ function DemoPreview() {
                 </ul>
               </div>
 
-              {/* Convoa State */}
+              {/* Audia State */}
               <div className="p-6 md:p-8 space-y-4 bg-success/[0.02]">
                 <div className="flex items-center gap-2 text-success font-mono text-xs uppercase tracking-wider">
                   <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse"></span>
-                  From day one with Convoa
+                  From day one with Audia
                 </div>
                 <ul className="space-y-3.5 text-sm sm:text-base text-foreground/80 leading-relaxed font-sans list-disc list-inside">
                   {narrative.after.map((line) => (
@@ -1201,7 +1189,7 @@ function DemoPreview() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Convoa Command Grid — presentational sub-components
+   Audia Command Grid — presentational sub-components
    ───────────────────────────────────────────────────────────── */
 
 /* Precomputed organic "silk ribbon" knot — concentric wobbly closed

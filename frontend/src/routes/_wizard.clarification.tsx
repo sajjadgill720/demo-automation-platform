@@ -270,7 +270,7 @@ function ClarificationRoute() {
       <div className="dq-form-surface w-full max-w-5xl mx-auto glass-card gradient-border p-10 md:p-14 relative overflow-hidden text-left space-y-8 animate-fade-in transition-all rounded-2xl border-2 border-border/60 bg-card">
         <div className="absolute top-0 left-0 w-full h-[3px] gradient-line-animated" />
 
-        {/* Convoa AI Advisor Chat */}
+        {/* Audia AI Advisor Chat */}
         <div className="w-full flex flex-col justify-between space-y-5">
           <div className="flex items-center justify-between gap-4 pb-3 border-b border-border/40">
             <div className="min-w-0">
@@ -280,7 +280,7 @@ function ClarificationRoute() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success"></span>
                 </span>
                 <h3 className="text-foreground text-lg md:text-xl font-bold uppercase tracking-tight font-sans flex items-center gap-2">
-                  <span>Convoa AI Advisor</span>
+                  <span>Audia AI Advisor</span>
                 </h3>
               </div>
               {/* Reduced from a two-clause instructional sentence — the chat and the

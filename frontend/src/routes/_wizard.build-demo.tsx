@@ -667,7 +667,7 @@ function BuildDemoPage() {
 
       // Save details to localStorage
       localStorage.setItem(
-        "convoa_demo_preview_data",
+        "audia_demo_preview_data",
         JSON.stringify({
           name: formData.name,
           email: formData.email,
@@ -678,7 +678,7 @@ function BuildDemoPage() {
       );
 
       localStorage.setItem(
-        "convoa_pipeline_data",
+        "audia_pipeline_data",
         JSON.stringify({
           company: formData.company,
           problem: formData.problem_text,
