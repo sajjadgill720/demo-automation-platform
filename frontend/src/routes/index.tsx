@@ -655,7 +655,7 @@ function ScrollProgressBar() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Audia — AI Receptionist That Never Misses a Call" },
+      { title: "devxsol - audia your ai voice receptionist" },
       {
         name: "description",
         content:

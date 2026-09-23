@@ -78,13 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DataQuartz — AI Demo Automation Platform" },
+      { title: "devxsol - audia your ai voice receptionist" },
       {
         name: "description",
         content:
           "Auto-generate personalized AI voice demos for enterprise prospects. Research, agent provisioning and delivery in one pipeline.",
       },
-      { property: "og:title", content: "DataQuartz — AI Demo Automation Platform" },
+      { property: "og:title", content: "devxsol - audia your ai voice receptionist" },
       {
         property: "og:description",
         content: "Auto-generate personalized AI voice demos for enterprise prospects.",

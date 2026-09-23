@@ -20,6 +20,13 @@ import {
   BarChart3,
 } from "lucide-react";
 import { CompanyLogo } from "@/components/common/CompanyCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { motion, AnimatePresence } from "framer-motion";
@@ -281,9 +288,14 @@ function DemoPreview() {
   // times, so the actions never depend on completing a call.
   const actNowRef = useRef<HTMLDivElement>(null);
   const justEnded = callStatus === "ended";
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+
   useEffect(() => {
     if (callStatus === "ended") {
-      actNowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const timer = setTimeout(() => {
+        setFeedbackModalOpen(true);
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [callStatus]);
 
@@ -443,6 +455,10 @@ function DemoPreview() {
       return;
     }
     setCallStatus("connecting");
+    setFeedbackModalOpen(false);
+    setFeedbackSubmitted(false);
+    setFeedbackRating(null);
+    setFeedbackText("");
     try {
       // start() resolves to Vapi's Call object; capture its id so we can pull the
       // native report after the call ends.
@@ -496,7 +512,12 @@ function DemoPreview() {
     if (!feedbackRating) return;
 
     if (!dynamicLeadId) {
-      toast.error("This preview isn't linked to a request, so feedback can't be saved.");
+      setFeedbackSubmitted(true);
+      toast.success(
+        feedbackRating === "positive"
+          ? "Thanks, your feedback has been sent to the team."
+          : "Sent. The team will review what needs adjusting.",
+      );
       return;
     }
 
@@ -582,7 +603,10 @@ function DemoPreview() {
           <div className="relative pt-2">
             <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 lg:items-center">
               {/* Left — the pitch */}
-              <motion.div variants={fadeUp} className="space-y-7 text-center lg:text-left">
+              <motion.div
+                variants={fadeUp}
+                className="order-2 lg:order-1 space-y-7 text-center lg:text-left"
+              >
                 {/* Company lockup */}
                 <div className="flex items-center gap-3 justify-center lg:justify-start">
                   <CompanyLogo company={companyRepresentation} size={44} />
@@ -634,7 +658,7 @@ function DemoPreview() {
               </motion.div>
 
               {/* Right — the live-call orb (the primary action, now the hero visual) */}
-              <motion.div variants={fadeUp} className="w-full no-print">
+              <motion.div variants={fadeUp} className="order-1 lg:order-2 w-full no-print">
                 <button
                   onClick={callStatus === "on-call" ? handleEndBrowserCall : handleStartBrowserCall}
                   disabled={callStatus === "connecting" || !canCall}
@@ -1172,6 +1196,133 @@ function DemoPreview() {
             Don't take our word for it, call the agent above and ask it yourself.
           </p>
         </section>
+
+        {/* Post-call Feedback Popup */}
+        <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>
+          <DialogContent
+            className={cn(
+              "w-[calc(100%-2rem)] sm:w-full sm:max-w-md rounded-3xl border border-border/80 bg-card/95 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl overflow-hidden text-foreground",
+              theme === "dark" && "dark",
+            )}
+          >
+            {/* Ambient top glow */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-20 inset-x-0 mx-auto h-36 w-64 rounded-full blur-3xl opacity-30"
+              style={{
+                background: "radial-gradient(circle, var(--color-primary), transparent 70%)",
+              }}
+            />
+
+            <DialogHeader className="relative z-10 flex flex-col items-center text-center space-y-2.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary shadow-sm">
+                <MessageSquare className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <DialogTitle className="text-xl font-normal tracking-tight text-foreground">
+                How was that call?
+              </DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm text-muted-foreground font-sans max-w-xs mx-auto leading-relaxed">
+                Tell us if {displayCompany}&apos;s receptionist answered your questions accurately.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="relative z-10 mt-2">
+              {!feedbackSubmitted ? (
+                <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-sm">
+                  {/* Rating Selector */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackRating("positive")}
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-4 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]",
+                        feedbackRating === "positive"
+                          ? "border-success text-success bg-success/[0.08] ring-1 ring-success"
+                          : "border-border text-foreground bg-secondary/40 hover:bg-secondary",
+                      )}
+                    >
+                      <ThumbsUp className="h-5 w-5" />
+                      <span>Yes, Accurate</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackRating("negative")}
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-4 font-mono uppercase tracking-wider text-xs font-semibold cursor-pointer transition-all duration-200 btn-themed-shadow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]",
+                        feedbackRating === "negative"
+                          ? "border-destructive text-destructive bg-destructive/[0.08] ring-1 ring-destructive"
+                          : "border-border text-foreground bg-secondary/40 hover:bg-secondary",
+                      )}
+                    >
+                      <ThumbsDown className="h-5 w-5" />
+                      <span>Needs Tweaks</span>
+                    </button>
+                  </div>
+
+                  {/* Dynamic Rating Feedback Textarea */}
+                  <AnimatePresence>
+                    {feedbackRating && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="space-y-2 text-left pt-1"
+                      >
+                        <label className="text-[11px] font-mono uppercase tracking-wider text-foreground/75 font-semibold block">
+                          {feedbackRating === "positive"
+                            ? "What worked well? (Optional)"
+                            : "What did the agent miss? (e.g. tools, phrasing) *"}
+                        </label>
+                        <textarea
+                          required={feedbackRating === "negative"}
+                          rows={3}
+                          value={feedbackText}
+                          onChange={(e) => setFeedbackText(e.target.value)}
+                          placeholder={
+                            feedbackRating === "positive"
+                              ? "Tell us what you liked about the response..."
+                              : "Tell us what to adjust so we can rebuild your agent..."
+                          }
+                          className="w-full bg-secondary/60 border border-border rounded-xl px-3.5 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm font-sans resize-none transition-colors"
+                        />
+                        <button
+                          type="submit"
+                          disabled={feedbackSending}
+                          className="w-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-200 text-sm font-mono font-semibold uppercase tracking-wider py-3 cursor-pointer border-0 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl btn-themed-shadow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          {feedbackSending ? "Sending…" : "Send feedback"}
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </form>
+              ) : (
+                <div className="py-4 text-center space-y-3 font-mono">
+                  <div className="h-12 w-12 bg-success/10 border border-success/20 text-success flex items-center justify-center rounded-full mx-auto">
+                    <Check className="h-6 w-6" />
+                  </div>
+                  <p className="text-base font-bold uppercase tracking-wider text-foreground">
+                    Feedback sent
+                  </p>
+                  <p className="text-xs text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
+                    Thank you! Your feedback has been sent to our team to tune the demo agent.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackModalOpen(false)}
+                      className="w-full bg-secondary hover:bg-secondary/80 text-foreground font-sans font-medium py-2.5 px-4 rounded-xl text-sm transition-colors cursor-pointer border border-border"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Footer */}
         <footer className="relative z-10 border-t border-border bg-background">
