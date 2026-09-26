@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as WizardRouteImport } from './routes/_wizard'
 import { Route as PortalRouteImport } from './routes/portal'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as AppActiveDemosRouteImport } from './routes/_app.active-demos'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppFeedbackRouteImport } from './routes/_app.feedback'
@@ -40,6 +41,11 @@ const WizardRoute = WizardRouteImport.update({
 const PortalRoute = PortalRouteImport.update({
   id: '/portal',
   path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppActiveDemosRoute = AppActiveDemosRouteImport.update({
@@ -96,6 +102,7 @@ const WizardUploadRoute = WizardUploadRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/portal': typeof PortalRoute
+  '/pricing': typeof PricingRoute
   '/active-demos': typeof AppActiveDemosRoute
   '/dashboard': typeof AppDashboardRoute
   '/feedback': typeof AppFeedbackRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/portal': typeof PortalRoute
+  '/pricing': typeof PricingRoute
   '/active-demos': typeof AppActiveDemosRoute
   '/dashboard': typeof AppDashboardRoute
   '/feedback': typeof AppFeedbackRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_wizard': typeof WizardRouteWithChildren
   '/portal': typeof PortalRoute
+  '/pricing': typeof PricingRoute
   '/_app/active-demos': typeof AppActiveDemosRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/feedback': typeof AppFeedbackRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/portal'
+    | '/pricing'
     | '/active-demos'
     | '/dashboard'
     | '/feedback'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/portal'
+    | '/pricing'
     | '/active-demos'
     | '/dashboard'
     | '/feedback'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_wizard'
     | '/portal'
+    | '/pricing'
     | '/_app/active-demos'
     | '/_app/dashboard'
     | '/_app/feedback'
@@ -190,6 +202,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   WizardRoute: typeof WizardRouteWithChildren
   PortalRoute: typeof PortalRoute
+  PricingRoute: typeof PricingRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/portal'
       fullPath: '/portal'
       preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/active-demos': {
@@ -337,6 +357,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   WizardRoute: WizardRouteWithChildren,
   PortalRoute: PortalRoute,
+  PricingRoute: PricingRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

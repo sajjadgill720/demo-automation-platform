@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Phone,
@@ -87,6 +87,7 @@ const HERO_POINTS = [
 ] as const;
 
 function DemoPreview() {
+  const navigate = useNavigate();
   const search = Route.useSearch();
   const { theme, toggleTheme } = useTheme();
 
@@ -292,12 +293,23 @@ function DemoPreview() {
 
   useEffect(() => {
     if (callStatus === "ended") {
+      toast.success("Demo call ended! Redirecting to plans and feedback...", {
+        duration: 3500,
+      });
       const timer = setTimeout(() => {
-        setFeedbackModalOpen(true);
-      }, 500);
+        navigate({
+          to: "/pricing",
+          search: {
+            lead_id: dynamicLeadId ?? undefined,
+            company: displayCompany,
+            assistant_id: resolvedAssistantId ?? undefined,
+            feedback: "open",
+          },
+        });
+      }, 1200);
       return () => clearTimeout(timer);
     }
-  }, [callStatus]);
+  }, [callStatus, dynamicLeadId, displayCompany, resolvedAssistantId, navigate]);
 
   // Feedback States
   const [feedbackRating, setFeedbackRating] = useState<"positive" | "negative" | null>(null);
@@ -1074,14 +1086,25 @@ function DemoPreview() {
                     Share this personalized interactive voice demo with your team or stakeholders to
                     explore how it handles live calls for {personalization.company}.
                   </p>
-                  <div className="mt-auto pt-6">
-                    <button
-                      onClick={handleCopyShareLink}
-                      className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all duration-200 hover:bg-primary/90 cursor-pointer border-0 text-center select-none btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
-                    >
-                      <Share2 className="h-4 w-4" /> Share this demo
-                    </button>
-                  </div>
+                    <div className="mt-auto pt-6 space-y-2.5">
+                      <button
+                        onClick={handleCopyShareLink}
+                        className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all duration-200 hover:bg-primary/90 cursor-pointer border-0 text-center select-none btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
+                      >
+                        <Share2 className="h-4 w-4" /> Share this demo
+                      </button>
+                      <Link
+                        to="/pricing"
+                        search={{
+                          lead_id: dynamicLeadId ?? undefined,
+                          company: displayCompany,
+                          assistant_id: resolvedAssistantId ?? undefined,
+                        }}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 px-6 py-3 text-sm font-semibold tracking-tight transition-all duration-200 cursor-pointer text-center select-none"
+                      >
+                        <Sparkles className="h-4 w-4" /> View Pricing & Plans
+                      </Link>
+                    </div>
                 </div>
               </div>
             </div>

@@ -758,6 +758,9 @@ function LandingPage() {
             <a href="#how-it-works" className="hover:text-foreground transition-colors">
               How It Works
             </a>
+            <Link to="/pricing" className="hover:text-foreground transition-colors">
+              Pricing
+            </Link>
             <a href="#faq" className="hover:text-foreground transition-colors">
               FAQ
             </a>
@@ -1242,6 +1245,7 @@ function LandingPage() {
                 title: "Product",
                 links: [
                   { label: "Features", href: "#features" },
+                  { label: "Pricing & Plans", href: "/pricing" },
                   { label: "How It Works", href: "#how-it-works" },
                   { label: "View Simple Demo", href: "/demo-preview" },
                 ],
