@@ -18,6 +18,9 @@ import {
   Clock,
   UserCheck,
   BarChart3,
+  Home,
+  ArrowRight,
+  Compass,
 } from "lucide-react";
 import { CompanyLogo } from "@/components/common/CompanyCard";
 import {
@@ -995,6 +998,27 @@ function DemoPreview() {
                         </p>
                       </div>
 
+                      {/* Quick paths after feedback submission */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 pb-1">
+                        <Link
+                          to="/pricing"
+                          search={{
+                            lead_id: dynamicLeadId ?? undefined,
+                            company: displayCompany,
+                            assistant_id: resolvedAssistantId ?? undefined,
+                          }}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/35 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 text-xs font-semibold tracking-tight transition-all duration-200 text-center select-none"
+                        >
+                          <Sparkles className="h-3.5 w-3.5 shrink-0" /> View Pricing
+                        </Link>
+                        <Link
+                          to="/"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground px-3 py-2 text-xs font-semibold tracking-tight transition-all duration-200 text-center select-none"
+                        >
+                          <Home className="h-3.5 w-3.5 shrink-0" /> Landing Page
+                        </Link>
+                      </div>
+
                       {/* The client's own submissions, read back from the server so they
                       can see exactly what was sent and when. */}
                       {pastFeedback.length > 0 && (
@@ -1086,26 +1110,63 @@ function DemoPreview() {
                     Share this personalized interactive voice demo with your team or stakeholders to
                     explore how it handles live calls for {personalization.company}.
                   </p>
-                    <div className="mt-auto pt-6 space-y-2.5">
+                    <div className="mt-auto pt-6 space-y-3">
                       <button
                         onClick={handleCopyShareLink}
                         className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-6 py-3.5 text-sm font-semibold tracking-tight transition-all duration-200 hover:bg-primary/90 cursor-pointer border-0 text-center select-none btn-themed-shadow hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.97]"
                       >
                         <Share2 className="h-4 w-4" /> Share this demo
                       </button>
-                      <Link
-                        to="/pricing"
-                        search={{
-                          lead_id: dynamicLeadId ?? undefined,
-                          company: displayCompany,
-                          assistant_id: resolvedAssistantId ?? undefined,
-                        }}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 px-6 py-3 text-sm font-semibold tracking-tight transition-all duration-200 cursor-pointer text-center select-none"
-                      >
-                        <Sparkles className="h-4 w-4" /> View Pricing & Plans
-                      </Link>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <Link
+                          to="/pricing"
+                          search={{
+                            lead_id: dynamicLeadId ?? undefined,
+                            company: displayCompany,
+                            assistant_id: resolvedAssistantId ?? undefined,
+                          }}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/35 bg-primary/10 text-primary hover:bg-primary/20 px-4 py-3 text-xs sm:text-sm font-semibold tracking-tight transition-all duration-200 cursor-pointer text-center select-none"
+                        >
+                          <Sparkles className="h-4 w-4 shrink-0" /> Pricing & Plans
+                        </Link>
+                        <Link
+                          to="/"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground px-4 py-3 text-xs sm:text-sm font-semibold tracking-tight transition-all duration-200 cursor-pointer text-center select-none"
+                        >
+                          <Home className="h-4 w-4 shrink-0" /> Landing Page
+                        </Link>
+                      </div>
                     </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Quick Navigation Banner to Landing and Pricing */}
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm">
+              <div className="flex items-center gap-2.5 text-xs text-muted-foreground font-sans">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                  <Compass className="h-3.5 w-3.5" />
+                </span>
+                <span>Ready to roll out or explore all Audia voice capabilities?</span>
+              </div>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <Link
+                  to="/"
+                  className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-border bg-secondary/40 hover:bg-secondary text-foreground text-xs font-mono uppercase tracking-wider font-semibold transition-all duration-200"
+                >
+                  <Home className="h-3.5 w-3.5" /> Landing Page
+                </Link>
+                <Link
+                  to="/pricing"
+                  search={{
+                    lead_id: dynamicLeadId ?? undefined,
+                    company: displayCompany,
+                    assistant_id: resolvedAssistantId ?? undefined,
+                  }}
+                  className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-mono uppercase tracking-wider font-semibold transition-all duration-200"
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> View Pricing & Plans <ArrowRight className="h-3 w-3" />
+                </Link>
               </div>
             </div>
           </motion.div>
@@ -1332,14 +1393,33 @@ function DemoPreview() {
                   <p className="text-xs text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
                     Thank you! Your feedback has been sent to our team to tune the demo agent.
                   </p>
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackModalOpen(false)}
-                      className="w-full bg-secondary hover:bg-secondary/80 text-foreground font-sans font-medium py-2.5 px-4 rounded-xl text-sm transition-colors cursor-pointer border border-border"
+                  <div className="pt-2 flex flex-col gap-2">
+                    <Link
+                      to="/pricing"
+                      search={{
+                        lead_id: dynamicLeadId ?? undefined,
+                        company: displayCompany,
+                        assistant_id: resolvedAssistantId ?? undefined,
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground py-2.5 px-4 text-sm font-semibold tracking-tight transition-all hover:bg-primary/90"
                     >
-                      Close
-                    </button>
+                      <Sparkles className="h-4 w-4" /> View Pricing & Plans
+                    </Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link
+                        to="/"
+                        className="inline-flex items-center justify-center gap-1.5 bg-secondary hover:bg-secondary/80 text-foreground font-medium py-2 px-3 rounded-xl text-xs transition-colors border border-border"
+                      >
+                        <Home className="h-3.5 w-3.5" /> Landing Page
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackModalOpen(false)}
+                        className="bg-secondary/50 hover:bg-secondary text-muted-foreground font-medium py-2 px-3 rounded-xl text-xs transition-colors border border-border cursor-pointer"
+                      >
+                        Stay Here
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

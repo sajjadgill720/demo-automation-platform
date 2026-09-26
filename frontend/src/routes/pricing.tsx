@@ -156,6 +156,9 @@ function PricingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 font-mono text-[11px] uppercase tracking-widest text-foreground/60">
+            <Link to="/" className="hover:text-foreground transition-colors">
+              Home
+            </Link>
             <a href="#plans" className="hover:text-foreground transition-colors">
               Plans
             </a>

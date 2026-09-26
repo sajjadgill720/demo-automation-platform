@@ -58,9 +58,9 @@ export function JourneyHeader() {
           className="flex items-center gap-2 text-foreground font-mono font-bold tracking-widest text-[11px] uppercase group shrink-0"
         >
           <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold text-[10px] group-hover:bg-primary/15 transition-colors">
-            DQ
+            AU
           </div>
-          <span className="hidden sm:inline">DataQuartz</span>
+          <span className="hidden sm:inline">Audia</span>
         </Link>
 
         {/* Center Section: Wizard Steps */}
@@ -157,8 +157,20 @@ export function JourneyHeader() {
           </ol>
         </div>
 
-        {/* Right Side: Theme Toggle */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Side: Quick Links & Theme Toggle */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Link
+            to="/"
+            className="hidden sm:inline-flex items-center px-2.5 py-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Home
+          </Link>
+          <Link
+            to="/pricing"
+            className="hidden sm:inline-flex items-center px-2.5 py-1.5 text-xs font-mono uppercase tracking-wider text-primary hover:text-primary/80 transition-colors font-semibold"
+          >
+            Pricing
+          </Link>
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg border border-border/50 hover:bg-secondary text-foreground transition-colors cursor-pointer bg-transparent"
